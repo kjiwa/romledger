@@ -12,7 +12,7 @@ from repository import model
 
 COOLROM_HOME_URL = 'https://coolrom.com.au/roms/'
 COOLROM_SECTION_URL = 'https://coolrom.com.au/roms/%s/%s/'
-COOLROM_GAME_URL = 'https://coolrom.com.au/dlpop.php?id=%d'
+COOLROM_GAME_URL = 'https://coolrom.com.au/dlpop.php?id=%s'
 COOLROM_PLATFORM_URL_REGEX = re.compile(r'^/roms/(.+)/$')
 COOLROM_GAME_URL_REGEX = re.compile(r'^/roms/\S+/(\d+)/.+.php$')
 

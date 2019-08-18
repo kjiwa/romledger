@@ -1,13 +1,14 @@
 """"A program that downloads games from repositories such as Vimm's Lair and CoolROM."""
 
 import argparse
+import datetime
 import logging
 import string
-import time
 
 import repository
 
-SCRAPER_TIME_FORMAT = '%H:%M:%S'
+SCRAPER_LOG_FORMAT = '%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s'
+SCRAPER_TIME_FORMAT = '{:0>2d}:{:0>2d}:{:0>4.01f}'
 
 
 def get_logger(log_level):
@@ -19,7 +20,7 @@ def get_logger(log_level):
     Returns:
         A logger instance.
     """
-    logging.basicConfig()
+    logging.basicConfig(format=SCRAPER_LOG_FORMAT)
     logger = logging.getLogger()
 
     if log_level == 'notset':
@@ -75,16 +76,18 @@ def retry_download(repo, game, retries):
                 raise ex
 
 
-def get_download_duration(download_start):
-    """Computes the duration of a download and returns it in a displayable format.
+def format_duration(tdelta):
+    """Formats a time period in seconds for display.
 
     Args:
-        download_start: The time at which the download began.
+        tdelta: The time period being formatted.
 
     Returns:
-        A string showing the duration of the download.
+        A string representing the time period.
     """
-    return time.strftime(SCRAPER_TIME_FORMAT, time.gmtime(time.time() - download_start))
+    hrs, rem = divmod(tdelta.total_seconds(), 3600)
+    mins, secs = divmod(rem, 60)
+    return SCRAPER_TIME_FORMAT.format(int(hrs), int(mins), round(secs, 1))
 
 
 def parse_arguments():
@@ -101,15 +104,17 @@ def parse_arguments():
                             help='The repository to scan for games.')
     repo_group.add_argument('--platform', required=True, help='The platform for which to download games.')
     repo_group.add_argument('--section', action='append', choices=['#'] + list(string.ascii_lowercase),
-                            help='The sections to scan for games.')
+                            help='The sections to scan for games. This option may be used multiple times.')
     repo_group.add_argument('--pretend', action='store_true', help='Whether to pretend downloading games.')
     repo_group.add_argument('--retries', default=3, type=int, help='The number of times to try to download a game.')
-    repo_group.add_argument('--allow_tag', action='append', help='Allow games with a tag to be downloaded.')
+    repo_group.add_argument('--allow_tag', action='append',
+                            help='Allow games with a tag to be downloaded. This option may be used multiple times.')
 
     # Logging arguments.
     logging_group = repo_group.add_argument_group('logging')
     logging_group.add_argument('--log_level', default='info',
-                               choices=['notset', 'debug', 'info', 'warning', 'error', 'critical'])
+                               choices=['notset', 'debug', 'info', 'warning', 'error', 'critical'],
+                               help='The minimum log level to be displayed.')
 
     return parser.parse_args()
 
@@ -145,27 +150,34 @@ def main():
     # Collect download statistics.
     games_downloaded = 0
     games_skipped = 0
-    games_download_start = time.time()
+    scraping_start = datetime.datetime.now()
+    cumulative_game_download_duration = datetime.timedelta()
 
     # Scan each section for games and download them.
     for section in sections:
+        logger.info('Scraping section %s', section)
         for game in repo.games(args.platform, section):
             # Check if the game is allowed to be downloaded.
             if not is_download_allowed(game, allowed_tags):
                 games_skipped += 1
-                logger.info('Skipping %s (%s)', game.name, ', '.join(game.tags))
+                logger.info('Skipping game %s (%s)', game.name, ', '.join(game.tags))
                 continue
 
             # Download the game.
             games_downloaded += 1
-            download_start = time.time()
+            game_download_start = datetime.datetime.now()
             if not args.pretend:
                 retry_download(repo, game, args.retries)
 
-            logger.info('Downloaded %s in %s.', game.name, get_download_duration(download_start))
+            game_download_duration = datetime.datetime.now() - game_download_start
+            cumulative_game_download_duration += game_download_duration
+            logger.info('Downloaded game %s in %s.', game.name, format_duration(game_download_duration))
 
-    logger.info('Downloaded %d/%d games in %s.', games_downloaded, games_downloaded + games_skipped,
-                get_download_duration(games_download_start))
+    scraping_duration = (datetime.datetime.now() - scraping_start) - cumulative_game_download_duration
+    logger.info('Downloaded %d/%d game(s) from %d section(s) in %s (%s scraping, %s downloading).',
+                games_downloaded, games_downloaded + games_skipped, len(sections),
+                format_duration(scraping_duration + cumulative_game_download_duration),
+                format_duration(scraping_duration), format_duration(cumulative_game_download_duration))
 
 
 if __name__ == '__main__':
