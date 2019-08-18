@@ -6,7 +6,6 @@ import string
 import time
 
 import repository
-import repository.factory
 
 SCRAPER_TIME_FORMAT = '%H:%M:%S'
 
@@ -76,6 +75,18 @@ def retry_download(repo, game, retries):
                 raise ex
 
 
+def get_download_duration(download_start):
+    """Computes the duration of a download and returns it in a displayable format.
+
+    Args:
+        download_start: The time at which the download began.
+
+    Returns:
+        A string showing the duration of the download.
+    """
+    return time.strftime(SCRAPER_TIME_FORMAT, time.gmtime(time.time() - download_start))
+
+
 def parse_arguments():
     """Parses command line arguments.
 
@@ -86,7 +97,7 @@ def parse_arguments():
 
     # Repository arguments.
     repo_group = parser.add_argument_group('repository')
-    repo_group.add_argument('--repository', required=True, choices=[i.value for i in repository.factory.RepositoryType],
+    repo_group.add_argument('--repository', required=True, choices=[i.value for i in repository.RepositoryType],
                             help='The repository to scan for games.')
     repo_group.add_argument('--platform', required=True, help='The platform for which to download games.')
     repo_group.add_argument('--section', action='append', choices=['#'] + list(string.ascii_lowercase),
@@ -110,7 +121,7 @@ def main():
 
     # Ensure the repository is supported.
     try:
-        repo_type = repository.factory.RepositoryType(args.repository)
+        repo_type = repository.RepositoryType(args.repository)
     except ValueError:
         logger.error('Unsupported repository type %s.', args.repository)
         return
@@ -151,11 +162,10 @@ def main():
             if not args.pretend:
                 retry_download(repo, game, args.retries)
 
-            logger.info('Downloaded %s in %s.', game.name,
-                        time.strftime(SCRAPER_TIME_FORMAT, time.gmtime(time.time() - download_start)))
+            logger.info('Downloaded %s in %s.', game.name, get_download_duration(download_start))
 
     logger.info('Downloaded %d/%d games in %s.', games_downloaded, games_downloaded + games_skipped,
-                time.strftime(SCRAPER_TIME_FORMAT, time.gmtime(time.time() - games_download_start)))
+                get_download_duration(games_download_start))
 
 
 if __name__ == '__main__':
