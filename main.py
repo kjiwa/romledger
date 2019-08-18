@@ -1,4 +1,4 @@
-""""A program that downloads games from repositories such as Vimm's Lair and CoolROM."""
+""""A program that downloads games from repositories such as Vimm's Lair and CoolROM.com."""
 
 import argparse
 import datetime
@@ -8,6 +8,8 @@ import string
 import repository
 
 SCRAPER_LOG_FORMAT = '%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s'
+SCRAPER_LOG_LEVELS = {'notset': logging.NOTSET, 'debug': logging.DEBUG, 'info': logging.INFO,
+                      'warning': logging.WARNING, 'error': logging.ERROR, 'critical': logging.CRITICAL}
 SCRAPER_TIME_FORMAT = '{:0>2d}:{:0>2d}:{:0>4.01f}'
 
 
@@ -22,20 +24,7 @@ def get_logger(log_level):
     """
     logging.basicConfig(format=SCRAPER_LOG_FORMAT)
     logger = logging.getLogger()
-
-    if log_level == 'notset':
-        logger.setLevel(logging.NOTSET)
-    elif log_level == 'debug':
-        logger.setLevel(logging.DEBUG)
-    elif log_level == 'info':
-        logger.setLevel(logging.INFO)
-    elif log_level == 'warning':
-        logger.setLevel(logging.WARNING)
-    elif log_level == 'error':
-        logger.setLevel(logging.ERROR)
-    elif log_level == 'critical':
-        logger.setLevel(logging.CRITICAL)
-
+    logger.setLevel(SCRAPER_LOG_LEVELS[log_level])
     return logger
 
 
@@ -155,12 +144,12 @@ def main():
 
     # Scan each section for games and download them.
     for section in sections:
-        logger.info('Scraping section %s', section)
+        logger.info('Scraping section "%s."', section)
         for game in repo.games(args.platform, section):
             # Check if the game is allowed to be downloaded.
             if not is_download_allowed(game, allowed_tags):
                 games_skipped += 1
-                logger.info('Skipping game %s (%s)', game.name, ', '.join(game.tags))
+                logger.info('Skipping game "%s" (tags: %s).', game.name, ', '.join(game.tags))
                 continue
 
             # Download the game.
@@ -171,7 +160,7 @@ def main():
 
             game_download_duration = datetime.datetime.now() - game_download_start
             cumulative_game_download_duration += game_download_duration
-            logger.info('Downloaded game %s in %s.', game.name, format_duration(game_download_duration))
+            logger.info('Downloaded game "%s" in %s.', game.name, format_duration(game_download_duration))
 
     scraping_duration = (datetime.datetime.now() - scraping_start) - cumulative_game_download_duration
     logger.info('Downloaded %d/%d game(s) from %d section(s) in %s (%s scraping, %s downloading).',

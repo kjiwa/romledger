@@ -4,6 +4,10 @@ import unittest
 
 import repository
 
+TEST_ROM_FILENAME = 'atari7800/Xenophobe.zip'
+TEST_ROM_PLATFORM = 'atari7800'
+TEST_ROM_SECTION = 'x'
+
 
 class TestCoolRomRepository(unittest.TestCase):
     @staticmethod
@@ -14,16 +18,15 @@ class TestCoolRomRepository(unittest.TestCase):
         self.assertTrue(self.get_repository().platforms())
 
     def test_games(self):
-        self.assertTrue(self.get_repository().games('atari2600', 'a'))
+        self.assertTrue(self.get_repository().games(TEST_ROM_PLATFORM, TEST_ROM_SECTION))
 
     def test_download(self):
-        game = repository.Game('16080', 'atari2600', 'Pac-Man', ['USA'],
-                               'http://dl.coolrom.com.au/dl/16080/x0MQ-vo6cramrV-pcqENXw/1566159911/')
-        self.get_repository().download(game)
+        repo = self.get_repository()
+        repo.download(repo.games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)[0])
 
         try:
-            self.assertTrue(os.path.isfile('atari2600/Pac-Man.zip'))
+            self.assertTrue(os.path.isfile(TEST_ROM_FILENAME))
         finally:
-            if os.path.isfile('atari2600/Pac-Man.zip'):
-                os.unlink('atari2600/Pac-Man.zip')
-                os.rmdir('atari2600')
+            if os.path.isfile(TEST_ROM_FILENAME):
+                os.unlink(TEST_ROM_FILENAME)
+                os.rmdir(TEST_ROM_PLATFORM)
