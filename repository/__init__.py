@@ -1,5 +1,6 @@
 """Initialization for the repository module."""
 
-from repository.factory import RepositoryType
 from .factory import RepositoryFactory
+from .factory import RepositoryType
+from .model import Game
 from .model import GameDownloadException
