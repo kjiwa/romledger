@@ -68,7 +68,7 @@ class VimmsLairRepository(model.Repository):
         if not tree.xpath('//input[@value="Download"]'):
             raise model.GameDownloadException('No download link for %s' % game_name)
 
-        game_id = tree.xpath('//input[@name="id"]')[0].get('value')
+        game_id = tree.xpath('//input[@name="mediaId"]')[0].get('value')
         game_t1 = tree.xpath('//input[@name="t1"]')[0].get('value')
         game_t2 = tree.xpath('//input[@name="t2"]')[0].get('value')
         return VIMMS_VAULT_GAME_DOWNLOAD_URL % (game_id, game_t1, game_t2)
