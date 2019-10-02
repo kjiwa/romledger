@@ -21,8 +21,8 @@ class TestVimmsLairRepository(unittest.TestCase):
         repo.download(repo.games('NES', 'x')[0])
 
         try:
-            self.assertTrue(os.path.isfile('NES/X-Men.zip'))
+            self.assertTrue(os.path.isfile('NES/Xenophobe.zip'))
         finally:
-            if os.path.isfile('NES/X-Men.zip'):
-                os.unlink('NES/X-Men.zip')
+            if os.path.isfile('NES/Xenophobe.zip'):
+                os.unlink('NES/Xenophobe.zip')
                 os.rmdir('NES')
