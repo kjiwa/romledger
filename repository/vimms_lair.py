@@ -1,6 +1,7 @@
 """A module for accessing games on Vimm's Lair."""
 
 import re
+import urllib.parse
 
 import lxml.html
 import requests
@@ -11,7 +12,7 @@ VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.
 VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system=%s&section=%s'
 VIMMS_VAULT_GAME_URL_REGEX = re.compile(r'^/vault/(\d+)$')
 VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/%s'
-VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?id=%s&t1=%s&t2=%s&download=Download'
+VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 
 
 class VimmsLairRepository(model.Repository):
@@ -68,7 +69,6 @@ class VimmsLairRepository(model.Repository):
         if not tree.xpath('//input[@value="Download"]'):
             raise model.GameDownloadException('No download link for %s' % game_name)
 
-        game_id = tree.xpath('//input[@name="mediaId"]')[0].get('value')
-        game_t1 = tree.xpath('//input[@name="t1"]')[0].get('value')
-        game_t2 = tree.xpath('//input[@name="t2"]')[0].get('value')
-        return VIMMS_VAULT_GAME_DOWNLOAD_URL % (game_id, game_t1, game_t2)
+        inputs = tree.xpath('//table[@id="downloadTable1"]//input')
+        query = {i.name: i.get('value') for i in inputs}
+        return '{}{}'.format(VIMMS_VAULT_GAME_DOWNLOAD_URL, urllib.parse.urlencode(query))
