@@ -9,9 +9,9 @@ import requests
 from repository import model
 
 VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
-VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system=%s&section=%s'
+VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system={}&section={}'
 VIMMS_VAULT_GAME_URL_REGEX = re.compile(r'^/vault/(\d+)$')
-VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/%s'
+VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/{}'
 VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 
 
@@ -28,7 +28,7 @@ class VimmsLairRepository(model.Repository):
         if section == '#':
             section = 'number'
 
-        response = requests.get(VIMMS_VAULT_SECTION_URL % (platform, section), headers=VIMMS_VAULT_HEADERS)
+        response = requests.get(VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS)
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -42,8 +42,9 @@ class VimmsLairRepository(model.Repository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_url = VimmsLairRepository._game_url(game_id, game_name)
-            games.append(model.Game(game_id, platform, game_name, game_tags, game_url))
+            game_urls = VimmsLairRepository._game_urls(game_id, game_name)
+            game_size = VimmsLairRepository._game_size(game_urls)
+            games.append(model.Game(game_id, platform, game_name, game_size, game_tags, game_urls))
 
         return games
 
@@ -60,15 +61,33 @@ class VimmsLairRepository(model.Repository):
         return matches.group(1)
 
     @staticmethod
-    def _game_url(game_id, game_name):
-        response = requests.get(VIMMS_VAULT_GAME_URL % game_id, headers=VIMMS_VAULT_HEADERS)
+    def _game_size(game_urls):
+        size = 0
+        for url in game_urls:
+            response = requests.get(url, headers=VIMMS_VAULT_HEADERS, stream=True)
+            if response.status_code != 200:
+                raise RuntimeError(response)
+
+            size += int(response.headers['Content-length'])
+            response.close()
+
+        return size
+
+    @staticmethod
+    def _game_urls(game_id, game_name):
+        response = requests.get(VIMMS_VAULT_GAME_URL.format(game_id), headers=VIMMS_VAULT_HEADERS)
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
         tree = lxml.html.fromstring(response.content)
         if not tree.xpath('//input[@value="Download"]'):
-            raise model.GameDownloadException('No download link for %s' % game_name)
+            raise model.GameDownloadException('No download link for {}'.format(game_name))
 
-        inputs = tree.xpath('//table[@id="downloadTable1"]//input')
-        query = {i.name: i.get('value') for i in inputs}
-        return '{}{}'.format(VIMMS_VAULT_GAME_DOWNLOAD_URL, urllib.parse.urlencode(query))
+        urls = []
+        rows = tree.xpath('//table[@id="downloadTable1"]//tr')
+        for row in rows:
+            inputs = row.xpath('.//input')
+            query = {i.name: i.get('value') for i in inputs}
+            urls.append('{}{}'.format(VIMMS_VAULT_GAME_DOWNLOAD_URL, urllib.parse.urlencode(query)))
+
+        return urls

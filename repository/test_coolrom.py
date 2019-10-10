@@ -20,6 +20,11 @@ class TestCoolRomRepository(unittest.TestCase):
     def test_games(self):
         self.assertTrue(self.get_repository().games(TEST_ROM_PLATFORM, TEST_ROM_SECTION))
 
+    def test_size(self):
+        games = self.get_repository().games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)
+        for game in games:
+            self.assertGreater(game.size_bytes, 0)
+
     def test_download(self):
         repo = self.get_repository()
         repo.download(repo.games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)[0])

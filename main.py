@@ -10,7 +10,10 @@ import repository
 SCRAPER_LOG_FORMAT = '%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s'
 SCRAPER_LOG_LEVELS = {'notset': logging.NOTSET, 'debug': logging.DEBUG, 'info': logging.INFO,
                       'warning': logging.WARNING, 'error': logging.ERROR, 'critical': logging.CRITICAL}
+SCRAPER_SIZE_FORMAT = '{:.2f} {}'
+SCRAPER_SPEED_FORMAT = '{:.2f} {}/s'
 SCRAPER_TIME_FORMAT = '{:0>2d}:{:0>2d}:{:0>4.01f}'
+SCRAPER_DEFAULT_SECTIONS = ['#'] + list(string.ascii_lowercase)
 
 
 def get_logger(log_level):
@@ -79,6 +82,47 @@ def format_duration(tdelta):
     return SCRAPER_TIME_FORMAT.format(int(hrs), int(mins), round(secs, 1))
 
 
+def format_size(size):
+    """Formats the game size for display.
+
+    Args:
+        size: The size of the game in bytes.
+
+    Returns:
+        A string containing the game size and corresponding units.
+    """
+    if size < 1024:
+        return SCRAPER_SIZE_FORMAT.format(size, 'B')
+    elif size < 1024 ** 2:
+        return SCRAPER_SIZE_FORMAT.format(size / 1024, 'KiB')
+    elif size < 1024 ** 3:
+        return SCRAPER_SIZE_FORMAT.format(size / (1024 ** 2), 'MiB')
+
+    return SCRAPER_SIZE_FORMAT.format(size / (1024 ** 3), 'GiB')
+
+
+def format_speed(size, duration):
+    """Formats the download speed for display.
+
+    Args:
+        size: The size of the game in bytes.
+        duration: A timedelta object representing the download duration.
+
+    Returns:
+        A string containing the download speed and corresponding units.
+    """
+    speed = float('inf')
+    if duration.total_seconds() > 0:
+        speed = size / duration.total_seconds()
+
+    if speed < 1024:
+        return SCRAPER_SPEED_FORMAT.format(speed, 'B')
+    elif speed < 1024 ** 2:
+        return SCRAPER_SPEED_FORMAT.format(speed / 1024, 'KiB')
+
+    return SCRAPER_SPEED_FORMAT.format(speed / (1024 ** 2), 'MiB')
+
+
 def parse_arguments():
     """Parses command line arguments.
 
@@ -129,18 +173,19 @@ def main():
     # Set the sections to be scanned.
     sections = args.section
     if not sections:
-        sections = ['#'] + list(string.ascii_lowercase)
+        sections = SCRAPER_DEFAULT_SECTIONS
 
     # Set game tags that are allowed to be downloaded.
     allowed_tags = args.allow_tag
     if not allowed_tags:
         allowed_tags = []
 
-    # Collect download statistics.
+    # Initialize download statistics.
     games_downloaded = 0
     games_skipped = 0
     scraping_start = datetime.datetime.now()
     cumulative_game_download_duration = datetime.timedelta()
+    cumulative_game_size_bytes = 0
 
     # Scan each section for games and download them.
     for section in sections:
@@ -158,15 +203,21 @@ def main():
             if not args.pretend:
                 retry_download(repo, game, args.retries)
 
+            # Compute download statistics.
             game_download_duration = datetime.datetime.now() - game_download_start
             cumulative_game_download_duration += game_download_duration
-            logger.info('Downloaded game "%s" in %s.', game.name, format_duration(game_download_duration))
+            cumulative_game_size_bytes += game.size_bytes
+            logger.info('Downloaded game "{}" ({} in {}: {}).'.format(game.name, format_size(game.size_bytes),
+                                                                      format_duration(game_download_duration),
+                                                                      format_speed(game.size_bytes,
+                                                                                   game_download_duration)))
 
     scraping_duration = (datetime.datetime.now() - scraping_start) - cumulative_game_download_duration
-    logger.info('Downloaded %d/%d game(s) from %d section(s) in %s (%s scraping, %s downloading).',
-                games_downloaded, games_downloaded + games_skipped, len(sections),
-                format_duration(scraping_duration + cumulative_game_download_duration),
-                format_duration(scraping_duration), format_duration(cumulative_game_download_duration))
+    logger.info('Downloaded {:d}/{:d} game(s) from {:d} section(s) ({} in {}: {} scraping, {} downloading, {}).'.format(
+        games_downloaded, games_downloaded + games_skipped, len(sections), format_size(cumulative_game_size_bytes),
+        format_duration(scraping_duration + cumulative_game_download_duration), format_duration(scraping_duration),
+        format_duration(cumulative_game_download_duration),
+        format_speed(cumulative_game_size_bytes, cumulative_game_download_duration)))
 
 
 if __name__ == '__main__':

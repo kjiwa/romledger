@@ -18,8 +18,9 @@ class Game:
     game_id: str
     platform: str
     name: str
+    size_bytes: int
     tags: typing.List[str]
-    url: str
+    urls: typing.List[str]
 
 
 class Repository:
@@ -54,24 +55,39 @@ class Repository:
         Raises:
             GameDownloadException: The file could not be downloaded.
         """
+        for url in game.urls:
+            response = requests.get(url, headers=headers, stream=True)
+            if response.status_code != 200:
+                raise GameDownloadException('Unable to download game {}: {}'.format(game.name, response.content))
 
-        response = requests.get(game.url, headers=headers)
-        if response.status_code != 200:
-            raise GameDownloadException(response.content)
+            # Create the platform directory.
+            dirname = os.path.dirname(game.platform + '/')
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
 
+            # Skip the file if it already exists.
+            filename = Repository._get_filename(response, game)
+            path = '{}/{}'.format(dirname, filename)
+            if os.path.exists(path):
+                return
+
+            # Write the file.
+            with open(path, 'wb') as gamefile:
+                gamefile.write(response.content)
+
+            response.close()
+
+    @staticmethod
+    def _get_filename(response, game):
         # Get file name from the Content-Disposition header.
         content_disposition = response.headers.get('Content-Disposition', '')
         if not content_disposition:
-            raise GameDownloadException('Unable to determine file name for %s (%s)' % (game.name, game.platform))
+            raise GameDownloadException(
+                'Unable to determine file name for game {} ({})'.format(game.name, game.platform))
 
         filenames = [i.split('=')[1][1:-1] for i in content_disposition.split(';') if i.strip().startswith('filename=')]
         if not filenames:
-            raise GameDownloadException('Unable to determine file name for %s (%s)' % (game.name, game.platform))
+            raise GameDownloadException(
+                'Unable to determine file name for game {} ({})'.format(game.name, game.platform))
 
-        # Write the file to disk.
-        dirname = os.path.dirname(game.platform + '/')
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        with open('%s/%s' % (dirname, filenames[0]), 'wb') as gamefile:
-            gamefile.write(response.content)
+        return filenames[0]

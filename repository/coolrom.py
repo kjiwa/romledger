@@ -11,8 +11,8 @@ import requests
 from repository import model
 
 COOLROM_HOME_URL = 'https://coolrom.com.au/roms/'
-COOLROM_SECTION_URL = 'https://coolrom.com.au/roms/%s/%s/'
-COOLROM_GAME_URL = 'https://coolrom.com.au/dlpop.php?id=%s'
+COOLROM_SECTION_URL = 'https://coolrom.com.au/roms/{}/{}/'
+COOLROM_GAME_URL = 'https://coolrom.com.au/dlpop.php?id={}'
 COOLROM_PLATFORM_URL_REGEX = re.compile(r'^/roms/(.+)/$')
 COOLROM_GAME_URL_REGEX = re.compile(r'^/roms/\S+/(\d+)/.+.php$')
 
@@ -44,7 +44,7 @@ class CoolRomRepository(model.Repository):
         if section == '#':
             section = '0'
 
-        response = requests.get(COOLROM_SECTION_URL % (platform, section))
+        response = requests.get(COOLROM_SECTION_URL.format(platform, section))
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -59,7 +59,8 @@ class CoolRomRepository(model.Repository):
             game_name = i.find('a').text
             game_tags = [i.get('class')]
             game_url = CoolRomRepository._game_url(game_id)
-            games.append(model.Game(game_id, platform, game_name, game_tags, game_url))
+            game_size = CoolRomRepository._game_size(game_url)
+            games.append(model.Game(game_id, platform, game_name, game_size, game_tags, [game_url]))
 
         return games
 
@@ -69,8 +70,18 @@ class CoolRomRepository(model.Repository):
         return matches.group(1) if matches else None
 
     @staticmethod
+    def _game_size(game_url):
+        response = requests.get(game_url, stream=True)
+        if response.status_code != 200:
+            raise RuntimeError(response)
+
+        size = int(response.headers['Content-length'])
+        response.close()
+        return size
+
+    @staticmethod
     def _game_url(game_id):
-        response = requests.get(COOLROM_GAME_URL % game_id)
+        response = requests.get(COOLROM_GAME_URL.format(game_id))
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
