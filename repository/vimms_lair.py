@@ -13,7 +13,6 @@ VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.
 VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system={}&section={}'
 VIMMS_VAULT_GAME_URL_REGEX = re.compile(r'^/vault/(\d+)$')
 VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/{}'
-VIMMS_VAULT_GAME_FILENAME_REGEX = re.compile(r'attachment;filename="(\S+)";filename*')
 VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 
 
@@ -45,7 +44,7 @@ class VimmsLairRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_files = [VimmsLairRepository._game_file(url) for url in
+            game_files = [VimmsLairRepository._game_file(game_name, url) for url in
                           VimmsLairRepository._game_urls(game_id, game_name)]
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
@@ -79,13 +78,28 @@ class VimmsLairRepository(HttpRepository):
         return urls
 
     @staticmethod
-    def _game_file(game_url):
+    def _game_file(game_name, game_url):
         response = requests.get(game_url, headers=VIMMS_VAULT_HEADERS, stream=True)
         if response.status_code != 200:
-            raise RuntimeError(response.content)
+            raise model.GameScrapeException(
+                'Unable to get file information for {}: {}'.format(game_name, response.content))
 
-        filename = VIMMS_VAULT_GAME_FILENAME_REGEX.match(response.headers['Content-Disposition']).group(1)
+        filename = VimmsLairRepository._game_filename(game_name, response.headers['Content-Disposition'])
         size_bytes = int(response.headers['Content-Length'])
         response.close()
 
         return model.GameFile(filename, size_bytes, game_url)
+
+    @staticmethod
+    def _game_filename(game_name, content_disposition):
+        parts = [s.strip() for s in content_disposition.split(';')]
+        for s in parts:
+            if not s.startswith('filename'):
+                continue
+
+            subparts = s.split('=')
+            if subparts[0] == 'filename':
+                return subparts[1][1:-1]
+
+        raise model.GameScrapeException(
+            'Unable to determine filename for {}: {}'.format(game_name, content_disposition))

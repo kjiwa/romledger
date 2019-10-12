@@ -69,6 +69,30 @@ def retry_download(repo, game, retries, retry_delay):
             time.sleep((2 ** i) * retry_delay)
 
 
+def retry_scrape_section(repo, platform, section, retries, retry_delay):
+    """Tries to scrape a repository section a specified number of times before failing.
+
+    Args:
+        repo: The repository from which to download the game.
+        platform: The game platform to scrape.
+        section: The section to scrape.
+        retries: The number of times to try to download the game.
+        retry_delay: The base number of seconds to wait between retries.
+
+    Raises:
+        GameScrapeException: The game could not be downloaded.
+    """
+    for i in range(0, retries):
+        try:
+            return repo.games(platform, section)
+        except repository.GameScrapeException as ex:
+            if i == retries - 1:
+                raise ex
+
+            # Implement exponential backoff between download attempts.
+            time.sleep((2 ** i) * retry_delay)
+
+
 def parse_arguments():
     """Parses command line arguments.
 
@@ -113,7 +137,7 @@ def main():
         return
 
     # Ensure the platform is supported by the repository.
-    repo = repository.RepositoryFactory.get_repository(repo_type, logger)
+    repo = repository.RepositoryFactory.get_repository(repo_type)
     if args.platform not in repo.platforms():
         return
 
@@ -130,7 +154,8 @@ def main():
     # Scan each section for games and download them.
     for section in sections:
         logger.info('Scraping section %s.', section)
-        for game in repo.games(args.platform, section):
+        games = retry_scrape_section(repo, args.platform, section, args.retries, args.retry_delay)
+        for game in games:
             # Check if the game is allowed to be downloaded.
             if not is_download_allowed(game, allowed_tags):
                 logger.info('Skipping game "%s" (tags: %s).', game.name, ', '.join(game.tags))
