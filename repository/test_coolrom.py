@@ -4,7 +4,6 @@ import unittest
 
 import repository
 
-TEST_ROM_FILENAME = 'atari7800/Xenophobe.zip'
 TEST_ROM_PLATFORM = 'atari7800'
 TEST_ROM_SECTION = 'x'
 
@@ -23,15 +22,19 @@ class TestCoolRomRepository(unittest.TestCase):
     def test_size(self):
         games = self.get_repository().games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)
         for game in games:
-            self.assertGreater(game.size_bytes, 0)
+            for gamefile in game.files:
+                self.assertGreater(gamefile.size_bytes, 0)
 
     def test_download(self):
         repo = self.get_repository()
-        repo.download(repo.games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)[0])
+        game = repo.games(TEST_ROM_PLATFORM, TEST_ROM_SECTION)[0]
+        repo.download(game)
 
-        try:
-            self.assertTrue(os.path.isfile(TEST_ROM_FILENAME))
-        finally:
-            if os.path.isfile(TEST_ROM_FILENAME):
-                os.unlink(TEST_ROM_FILENAME)
-                os.rmdir(TEST_ROM_PLATFORM)
+        for gamefile in game.files:
+            path = '{}/{}'.format(game.platform, gamefile.filename)
+            try:
+                self.assertTrue(os.path.isfile(path))
+            finally:
+                if os.path.isfile(path):
+                    os.unlink(path)
+                    os.rmdir(game.platform)

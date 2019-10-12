@@ -6,25 +6,28 @@ import urllib.parse
 import lxml.html
 import requests
 
+from .http_repository import HttpRepository
 from repository import model
 
 VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
 VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system={}&section={}'
 VIMMS_VAULT_GAME_URL_REGEX = re.compile(r'^/vault/(\d+)$')
 VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/{}'
+VIMMS_VAULT_GAME_FILENAME_REGEX = re.compile(r'attachment;filename="(\S+)";filename*')
 VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 
 
-class VimmsLairRepository(model.Repository):
+class VimmsLairRepository(HttpRepository):
     """A class for interacting with Vimm's Lair games."""
 
-    @staticmethod
-    def platforms():
+    def __init__(self):
+        super().__init__(VIMMS_VAULT_HEADERS)
+
+    def platforms(self):
         return ['DS', 'Dreamcast', 'GB', 'GBA', 'GBC', 'GameCube', 'Genesis', 'N64', 'NES', 'PS1', 'PS2', 'PSP', 'SNES',
                 'Wii']
 
-    @staticmethod
-    def games(platform, section):
+    def games(self, platform, section):
         if section == '#':
             section = 'number'
 
@@ -42,15 +45,11 @@ class VimmsLairRepository(model.Repository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_urls = VimmsLairRepository._game_urls(game_id, game_name)
-            game_size = VimmsLairRepository._game_size(game_urls)
-            games.append(model.Game(game_id, platform, game_name, game_size, game_tags, game_urls))
+            game_files = [VimmsLairRepository._game_file(url) for url in
+                          VimmsLairRepository._game_urls(game_id, game_name)]
+            games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
-
-    @staticmethod
-    def download(game, headers=None):
-        return model.Repository.download(game, headers=VIMMS_VAULT_HEADERS)
 
     @staticmethod
     def _game_id(element):
@@ -59,19 +58,6 @@ class VimmsLairRepository(model.Repository):
             return None
 
         return matches.group(1)
-
-    @staticmethod
-    def _game_size(game_urls):
-        size = 0
-        for url in game_urls:
-            response = requests.get(url, headers=VIMMS_VAULT_HEADERS, stream=True)
-            if response.status_code != 200:
-                raise RuntimeError(response)
-
-            size += int(response.headers['Content-length'])
-            response.close()
-
-        return size
 
     @staticmethod
     def _game_urls(game_id, game_name):
@@ -91,3 +77,15 @@ class VimmsLairRepository(model.Repository):
             urls.append('{}{}'.format(VIMMS_VAULT_GAME_DOWNLOAD_URL, urllib.parse.urlencode(query)))
 
         return urls
+
+    @staticmethod
+    def _game_file(game_url):
+        response = requests.get(game_url, headers=VIMMS_VAULT_HEADERS, stream=True)
+        if response.status_code != 200:
+            raise RuntimeError(response.content)
+
+        filename = VIMMS_VAULT_GAME_FILENAME_REGEX.match(response.headers['Content-Disposition']).group(1)
+        size_bytes = int(response.headers['Content-Length'])
+        response.close()
+
+        return model.GameFile(filename, size_bytes, game_url)
