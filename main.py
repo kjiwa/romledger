@@ -9,8 +9,9 @@ import repository
 
 SCRAPER_DEFAULT_SECTIONS = ['#'] + list(string.ascii_lowercase)
 SCRAPER_LOG_FORMAT = '%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s'
-SCRAPER_LOG_LEVELS = {'notset': logging.NOTSET, 'debug': logging.DEBUG, 'info': logging.INFO,
-                      'warning': logging.WARNING, 'error': logging.ERROR, 'critical': logging.CRITICAL}
+SCRAPER_LOG_LEVELS = {
+    'notset': logging.NOTSET, 'debug': logging.DEBUG, 'info': logging.INFO,
+    'warning': logging.WARNING, 'error': logging.ERROR, 'critical': logging.CRITICAL}
 
 
 def get_logger(log_level):
@@ -103,17 +104,24 @@ def parse_arguments():
 
     # Repository arguments.
     repo_group = parser.add_argument_group('repository')
-    repo_group.add_argument('--repository', required=True, choices=[i.value for i in repository.RepositoryType],
-                            help='The repository to scan for games.')
-    repo_group.add_argument('--platform', required=True, help='The platform for which to download games.')
-    repo_group.add_argument('--section', action='append', choices=['#'] + list(string.ascii_lowercase),
-                            help='The sections to scan for games. This option may be used multiple times.')
-    repo_group.add_argument('--pretend', action='store_true', help='Whether to pretend downloading games.')
-    repo_group.add_argument('--retries', default=3, type=int, help='The number of times to try to download a game.')
-    repo_group.add_argument('--retry_delay', default=60, type=int,
-                            help='The number of seconds to wait between retries.')
-    repo_group.add_argument('--allow_tag', action='append',
-                            help='Allow games with a tag to be downloaded. This option may be used multiple times.')
+    repo_group.add_argument(
+        '--repository', required=True, choices=[i.value for i in repository.RepositoryType],
+        help='The repository to scan for games.')
+    repo_group.add_argument(
+        '--platform', required=True, help='The platform for which to download games.')
+    repo_group.add_argument(
+        '--section', action='append', choices=['#'] + list(string.ascii_lowercase),
+        help='The sections to scan for games. This option may be used multiple times.')
+    repo_group.add_argument(
+        '--pretend', action='store_true', help='Whether to pretend downloading games.')
+    repo_group.add_argument(
+        '--retries', default=3, type=int, help='The number of times to try to download a game.')
+    repo_group.add_argument(
+        '--retry_delay', default=60, type=int,
+        help='The number of seconds to wait between retries.')
+    repo_group.add_argument(
+        '--allow_tag', action='append',
+        help='Allow games with a tag to be downloaded. This option may be used multiple times.')
 
     # Logging arguments.
     logging_group = repo_group.add_argument_group('logging')

@@ -1,6 +1,7 @@
 """A module for accessing CoolROM.com games.
 
-Games in the CoolROM repository are typically tagged with a region code, such as Europe, Japan, or USA.
+Games in the CoolROM repository are typically tagged with a region code, such as Europe, Japan, or
+USA.
 """
 
 import re
@@ -8,8 +9,8 @@ import re
 import lxml.html
 import requests
 
-from .http_repository import HttpRepository
 from repository import model
+from .http_repository import HttpRepository
 
 COOLROM_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
 COOLROM_HOME_URL = 'https://coolrom.com.au/roms/'
@@ -50,7 +51,8 @@ class CoolRomRepository(HttpRepository):
 
         response = requests.get(COOLROM_SECTION_URL.format(platform, section))
         if response.status_code != 200:
-            raise model.GameScrapeException('Unable to scan section {}: {}'.format(section, response.content))
+            raise model.GameScrapeException(
+                'Unable to scan section {}: {}'.format(section, response.content))
 
         tree = lxml.html.fromstring(response.content)
         items = tree.xpath('//font/font/div[a[@href]]')
@@ -62,7 +64,8 @@ class CoolRomRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.get('class')]
-            game_files = [CoolRomRepository._game_file(game_name, CoolRomRepository._game_url(game_name, game_id))]
+            game_files = [CoolRomRepository._game_file(
+                game_name, CoolRomRepository._game_url(game_name, game_id))]
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
@@ -76,7 +79,8 @@ class CoolRomRepository(HttpRepository):
     def _game_url(game_name, game_id):
         response = requests.get(COOLROM_GAME_URL.format(game_id))
         if response.status_code != 200:
-            raise model.GameScrapeException('Unable to get URL for {}: {}'.format(game_name, response.content))
+            raise model.GameScrapeException(
+                'Unable to get URL for {}: {}'.format(game_name, response.content))
 
         contents = response.content.decode()
         return contents.split('form method="POST" action="')[1].split('"')[0]
@@ -88,5 +92,6 @@ class CoolRomRepository(HttpRepository):
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
 
-        return model.GameFile(COOLROM_GAME_FILENAME_REGEX.match(response.headers['Content-Disposition']).group(1),
-                              int(response.headers['Content-Length']), game_url)
+        return model.GameFile(
+            COOLROM_GAME_FILENAME_REGEX.match(response.headers['Content-Disposition']).group(1),
+            int(response.headers['Content-Length']), game_url)

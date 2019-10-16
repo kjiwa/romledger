@@ -6,8 +6,8 @@ import urllib.parse
 import lxml.html
 import requests
 
-from .http_repository import HttpRepository
 from repository import model
+from .http_repository import HttpRepository
 
 VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
 VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system={}&section={}'
@@ -23,14 +23,16 @@ class VimmsLairRepository(HttpRepository):
         super().__init__(VIMMS_VAULT_HEADERS)
 
     def platforms(self):
-        return ['DS', 'Dreamcast', 'GB', 'GBA', 'GBC', 'GameCube', 'Genesis', 'N64', 'NES', 'PS1', 'PS2', 'PSP', 'SNES',
-                'Wii']
+        return [
+            'DS', 'Dreamcast', 'GB', 'GBA', 'GBC', 'GameCube', 'Genesis', 'N64', 'NES', 'PS1',
+            'PS2', 'PSP', 'SNES', 'Wii']
 
     def games(self, platform, section):
         if section == '#':
             section = 'number'
 
-        response = requests.get(VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS)
+        response = requests.get(
+            VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS)
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -84,7 +86,8 @@ class VimmsLairRepository(HttpRepository):
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
 
-        filename = VimmsLairRepository._game_filename(game_name, response.headers['Content-Disposition'])
+        filename = VimmsLairRepository._game_filename(
+            game_name, response.headers['Content-Disposition'])
         size_bytes = int(response.headers['Content-Length'])
         response.close()
 
