@@ -24,11 +24,12 @@ COOLROM_GAME_FILENAME_REGEX = re.compile(r'^attachment; filename="(\S+)"$')
 class CoolRomRepository(HttpRepository):
     """A class for interacting with CoolROM.com games."""
 
-    def __init__(self):
-        super().__init__(COOLROM_HEADERS)
+    def __init__(self, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
+        super().__init__(
+            COOLROM_HEADERS, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
 
     def platforms(self):
-        response = requests.get(COOLROM_HOME_URL)
+        response = requests.get(COOLROM_HOME_URL, proxies=self._proxies)
         if response.status_code != 200:
             raise model.GameScrapeException('Unable to scan platforms: {}'.format(response.content))
 
@@ -49,7 +50,8 @@ class CoolRomRepository(HttpRepository):
         if section == '#':
             section = '0'
 
-        response = requests.get(COOLROM_SECTION_URL.format(platform, section))
+        response = requests.get(
+            COOLROM_SECTION_URL.format(platform, section), proxies=self._proxies)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to scan section {}: {}'.format(section, response.content))
@@ -64,8 +66,7 @@ class CoolRomRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.get('class')]
-            game_files = [CoolRomRepository._game_file(
-                game_name, CoolRomRepository._game_url(game_name, game_id))]
+            game_files = [self._game_file(game_name, self._game_url(game_name, game_id))]
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
@@ -75,9 +76,8 @@ class CoolRomRepository(HttpRepository):
         matches = COOLROM_GAME_URL_REGEX.match(element.find('a').get('href'))
         return matches.group(1) if matches else None
 
-    @staticmethod
-    def _game_url(game_name, game_id):
-        response = requests.get(COOLROM_GAME_URL.format(game_id))
+    def _game_url(self, game_name, game_id):
+        response = requests.get(COOLROM_GAME_URL.format(game_id), proxies=self._proxies)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get URL for {}: {}'.format(game_name, response.content))
@@ -85,9 +85,8 @@ class CoolRomRepository(HttpRepository):
         contents = response.content.decode()
         return contents.split('form method="POST" action="')[1].split('"')[0]
 
-    @staticmethod
-    def _game_file(game_name, game_url):
-        response = requests.head(game_url)
+    def _game_file(self, game_name, game_url):
+        response = requests.head(game_url, proxies=self._proxies)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))

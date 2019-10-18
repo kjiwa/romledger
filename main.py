@@ -124,10 +124,20 @@ def parse_arguments():
         help='Allow games with a tag to be downloaded. This option may be used multiple times.')
 
     # Logging arguments.
-    logging_group = repo_group.add_argument_group('logging')
+    logging_group = parser.add_argument_group('logging')
     logging_group.add_argument('--log_level', default='info',
                                choices=['notset', 'debug', 'info', 'warning', 'error', 'critical'],
                                help='The minimum log level to be displayed.')
+
+    # HTTP arguments.
+    http_group = parser.add_argument_group('http')
+    http_group.add_argument(
+        '--proxy_type', choices=['http', 'https', 'socks5'],
+        help='The type of proxy server to use.')
+    http_group.add_argument('--proxy_host', help='The proxy server host address.')
+    http_group.add_argument('--proxy_port', help='The proxy server port.')
+    http_group.add_argument('--proxy_user', help='The proxy server user name.')
+    http_group.add_argument('--proxy_password', help='The proxy server password.')
 
     return parser.parse_args()
 
@@ -145,7 +155,9 @@ def main():
         return
 
     # Ensure the platform is supported by the repository.
-    repo = repository.RepositoryFactory.get_repository(repo_type)
+    repo = repository.RepositoryFactory.get_repository(
+        repo_type, args.proxy_type, args.proxy_host, args.proxy_port, args.proxy_user,
+        args.proxy_password)
     if args.platform not in repo.platforms():
         return
 

@@ -15,19 +15,28 @@ class RepositoryFactory:
     """A factory for the creation of game repository objects."""
 
     @staticmethod
-    def get_repository(repository_type):
+    def get_repository(
+            repository_type, proxy_type=None, proxy_host=None, proxy_port=None, proxy_user=None,
+            proxy_password=None):
         """Creates a repository instance.
 
         Args:
             repository_type: The type of repository to create.
+            proxy_type: The proxy server type (http, https, or socks5).
+            proxy_host: The proxy server host.
+            proxy_port: The proxy server port.
+            proxy_user: The proxy server user.
+            proxy_password: The proxy server password.
 
         Raises:
             RuntimeError: The repository type is not supported.
         """
         # pylint: disable=no-else-return
         if repository_type == RepositoryType.COOLROM:
-            return coolrom.CoolRomRepository()
+            return coolrom.CoolRomRepository(
+                proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
         elif repository_type == RepositoryType.VIMMS_LAIR:
-            return vimms_lair.VimmsLairRepository()
+            return vimms_lair.VimmsLairRepository(
+                proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
 
-        raise RuntimeError('Unknown repository type %s' % repository_type)
+        raise RuntimeError('Unknown repository type {}'.format(repository_type))

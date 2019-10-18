@@ -19,8 +19,9 @@ VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 class VimmsLairRepository(HttpRepository):
     """A class for interacting with Vimm's Lair games."""
 
-    def __init__(self):
-        super().__init__(VIMMS_VAULT_HEADERS)
+    def __init__(self, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
+        super().__init__(
+            VIMMS_VAULT_HEADERS, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
 
     def platforms(self):
         return [
@@ -32,7 +33,8 @@ class VimmsLairRepository(HttpRepository):
             section = 'number'
 
         response = requests.get(
-            VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS)
+            VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS,
+            proxies=self._proxies)
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -46,8 +48,8 @@ class VimmsLairRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_files = [VimmsLairRepository._game_file(game_name, url) for url in
-                          VimmsLairRepository._game_urls(game_id, game_name)]
+            game_files = [self._game_file(game_name, url)
+                          for url in self._game_urls(game_id, game_name)]
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
@@ -60,9 +62,10 @@ class VimmsLairRepository(HttpRepository):
 
         return matches.group(1)
 
-    @staticmethod
-    def _game_urls(game_id, game_name):
-        response = requests.get(VIMMS_VAULT_GAME_URL.format(game_id), headers=VIMMS_VAULT_HEADERS)
+    def _game_urls(self, game_id, game_name):
+        response = requests.get(
+            VIMMS_VAULT_GAME_URL.format(game_id), headers=VIMMS_VAULT_HEADERS,
+            proxies=self._proxies)
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -79,9 +82,9 @@ class VimmsLairRepository(HttpRepository):
 
         return urls
 
-    @staticmethod
-    def _game_file(game_name, game_url):
-        response = requests.get(game_url, headers=VIMMS_VAULT_HEADERS, stream=True)
+    def _game_file(self, game_name, game_url):
+        response = requests.get(
+            game_url, headers=VIMMS_VAULT_HEADERS, proxies=self._proxies, stream=True)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
