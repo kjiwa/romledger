@@ -42,10 +42,13 @@ class HttpRepository(model.Repository):
 
     def download(self, game):
         for gamefile in game.files:
-            # Skip the file if it already exists and has the same size as the remote file.
+            # Skip the file if it already exists and has the same size as the remote file. Only the
+            # existence criteria is used if the game does not specify a file size.
             dirname = os.path.dirname(game.platform + '/')
             path = '{}/{}'.format(dirname, gamefile.filename)
-            while not (os.path.exists(path) and os.path.getsize(path) == gamefile.size_bytes):
+            while not (
+                    os.path.exists(path)
+                    and (not gamefile.size_bytes or os.path.getsize(path) == gamefile.size_bytes)):
                 response = requests.get(gamefile.url, headers=self._headers, proxies=self._proxies)
                 if response.status_code != 200:
                     raise model.GameDownloadException(
@@ -55,7 +58,7 @@ class HttpRepository(model.Repository):
                 if not os.path.exists(dirname):
                     os.makedirs(dirname)
 
-                # Write the file.
+                # Write and validate the file.
                 with open(path, 'wb') as f:
                     f.write(response.content)
 

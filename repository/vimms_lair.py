@@ -91,7 +91,10 @@ class VimmsLairRepository(HttpRepository):
 
         filename = VimmsLairRepository._game_filename(
             game_name, response.headers['Content-Disposition'])
-        size_bytes = int(response.headers['Content-Length'])
+        size_bytes = None
+        if 'Content-Length' in response.headers:
+            size_bytes = int(response.headers['Content-Length'])
+
         response.close()
 
         return model.GameFile(filename, size_bytes, game_url)
