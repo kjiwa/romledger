@@ -66,7 +66,7 @@ class CoolRomRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.get('class')]
-            game_files = [self._game_file(game_name, self._game_url(game_name, game_id))]
+            game_files = set([self._game_file(game_name, self._game_url(game_name, game_id))])
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games

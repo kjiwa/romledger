@@ -48,8 +48,8 @@ class VimmsLairRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_files = [self._game_file(game_name, url)
-                          for url in self._game_urls(game_id, game_name)]
+            game_files = set([self._game_file(game_name, url)
+                              for url in self._game_urls(game_id, game_name)])
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
@@ -75,6 +75,16 @@ class VimmsLairRepository(HttpRepository):
 
         urls = []
         rows = tree.xpath('//table[@id="downloadTable1"]//tr')
+
+        # Some download links are not encapsulated in a table (e.g. "Aidyn Chronicles: The First
+        # Mage" for Nintendo DS). In this case, fall back to searching for download forms.
+        #
+        # Searching for download forms is not the default behavior to prevent excessive downloads,
+        # such as in the case of "Baten Kaitos Origins," which has four images: two for the
+        # scrubbed version of the game, and two for the redump.
+        if not rows:
+            rows = tree.xpath('//form[@action="//download2.vimm.net/download.php"]')
+
         for row in rows:
             inputs = row.xpath('.//input')
             query = {i.name: i.get('value') for i in inputs}

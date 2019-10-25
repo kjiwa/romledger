@@ -19,6 +19,9 @@ class GameFile:
     size_bytes: int
     url: str
 
+    def __eq__(self, other):
+        return self.filename == other.filename
+
 
 @dataclasses.dataclass(frozen=True)
 class Game:
@@ -27,7 +30,7 @@ class Game:
     platform: str
     name: str
     tags: typing.List[str]
-    files: typing.List[GameFile]
+    files: typing.Set[GameFile]
 
 
 class Repository:

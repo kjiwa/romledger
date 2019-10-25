@@ -38,3 +38,15 @@ class TestVimmsLairRepository(unittest.TestCase):
                 if os.path.isfile(path):
                     os.unlink(path)
                     os.rmdir(game.platform)
+
+    def test_games_without_download_tables(self):
+        repo = self.get_repository()
+        games = repo.games('N64', 'a')
+        game = [i for i in games if i.name == 'Aidyn Chronicles: The First Mage'][0]
+        self.assertEqual(len(game.files), 1)
+
+    def test_games_with_multiple_files(self):
+        repo = self.get_repository()
+        games = repo.games('GameCube', 'b')
+        game = [i for i in games if i.name == 'Baten Kaitos Origins'][0]
+        self.assertEqual(len(game.files), 2)
