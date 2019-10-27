@@ -1,6 +1,8 @@
 """A module containing a base class for HTTP repositories."""
 
+import functools
 import os.path
+import time
 
 import requests
 
@@ -10,11 +12,15 @@ from repository import model
 class HttpRepository(model.Repository):
     """A class for interacting with HTTP repositories."""
 
-    def __init__(self, headers, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
+    def __init__(
+            self, headers, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
+            proxy_password):
         """Creates a new HTTP repository instance.
 
         Args:
             headers: Headers to be used for HTTP requests.
+            retries: The number of times to retry HTTP requests.
+            retry_delay: The number of seconds to wait between retries.
             proxy_type: The proxy server type (http, https, or socks5).
             proxy_host: The proxy server host.
             proxy_port: The proxy server port.
@@ -22,6 +28,8 @@ class HttpRepository(model.Repository):
             proxy_password: The proxy server password.
         """
         self._headers = headers
+        self._retries = retries
+        self._retry_delay = retry_delay
         self._proxies = HttpRepository._create_proxies(
             proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
 
@@ -49,7 +57,7 @@ class HttpRepository(model.Repository):
             while not (
                     os.path.exists(path)
                     and (not gamefile.size_bytes or os.path.getsize(path) == gamefile.size_bytes)):
-                response = requests.get(gamefile.url, headers=self._headers, proxies=self._proxies)
+                response = self.retry_get_request(gamefile.url)
                 if response.status_code != 200:
                     raise model.GameDownloadException(
                         'Unable to download game {}: {}'.format(game.name, response.content))
@@ -63,3 +71,23 @@ class HttpRepository(model.Repository):
                     f.write(response.content)
 
                 response.close()
+
+    def retry_get_request(self, url, stream=False):
+        return self._retry_request(functools.partial(
+            requests.get, url, headers=self._headers, proxies=self._proxies, stream=stream))
+
+    def retry_head_request(self, url):
+        return self._retry_request(functools.partial(
+            requests.head, url, headers=self._headers, proxies=self._proxies))
+
+    def _retry_request(self, request):
+        response = None
+        for i in range(0, self._retries):
+            response = request()
+            if response.status_code == 200:
+                break
+
+            # Implement exponential backoff between download attempts.
+            time.sleep((2 ** i) * self._retry_delay)
+
+        return response

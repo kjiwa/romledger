@@ -16,12 +16,14 @@ class RepositoryFactory:
 
     @staticmethod
     def get_repository(
-            repository_type, proxy_type=None, proxy_host=None, proxy_port=None, proxy_user=None,
-            proxy_password=None):
+            repository_type, retries=1, retry_delay=0, proxy_type=None, proxy_host=None,
+            proxy_port=None, proxy_user=None, proxy_password=None):
         """Creates a repository instance.
 
         Args:
             repository_type: The type of repository to create.
+            retries: The number of times to retry HTTP requests.
+            retry_delay: The number of seconds to wait between retries.
             proxy_type: The proxy server type (http, https, or socks5).
             proxy_host: The proxy server host.
             proxy_port: The proxy server port.
@@ -34,9 +36,11 @@ class RepositoryFactory:
         # pylint: disable=no-else-return
         if repository_type == RepositoryType.COOLROM:
             return coolrom.CoolRomRepository(
-                proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
+                retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
+                proxy_password)
         elif repository_type == RepositoryType.VIMMS_LAIR:
             return vimms_lair.VimmsLairRepository(
-                proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
+                retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
+                proxy_password)
 
         raise RuntimeError('Unknown repository type {}'.format(repository_type))

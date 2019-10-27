@@ -19,9 +19,12 @@ VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
 class VimmsLairRepository(HttpRepository):
     """A class for interacting with Vimm's Lair games."""
 
-    def __init__(self, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
+    def __init__(
+            self, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
+            proxy_password):
         super().__init__(
-            VIMMS_VAULT_HEADERS, proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
+            VIMMS_VAULT_HEADERS, retries, retry_delay, proxy_type, proxy_host, proxy_port,
+            proxy_user, proxy_password)
 
     def platforms(self):
         return [
@@ -63,9 +66,7 @@ class VimmsLairRepository(HttpRepository):
         return matches.group(1)
 
     def _game_urls(self, game_id, game_name):
-        response = requests.get(
-            VIMMS_VAULT_GAME_URL.format(game_id), headers=VIMMS_VAULT_HEADERS,
-            proxies=self._proxies)
+        response = self.retry_get_request(VIMMS_VAULT_GAME_URL.format(game_id))
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
@@ -93,8 +94,7 @@ class VimmsLairRepository(HttpRepository):
         return urls
 
     def _game_file(self, game_name, game_url):
-        response = requests.get(
-            game_url, headers=VIMMS_VAULT_HEADERS, proxies=self._proxies, stream=True)
+        response = self.retry_get_request(game_url, stream=True)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))

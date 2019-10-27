@@ -3,7 +3,6 @@
 import argparse
 import logging
 import string
-import time
 
 import repository
 
@@ -46,54 +45,6 @@ def is_download_allowed(game, allowed_tags):
     return True
 
 
-def retry_download(repo, game, retries, retry_delay):
-    """Tries to download a game a specified number of times before failing.
-
-    Args:
-        repo: The repository from which to download the game.
-        game: The game to be downloaded.
-        retries: The number of times to try to download the game.
-        retry_delay: The base number of seconds to wait between retries.
-
-    Raises:
-        GameDownloadException: The game could not be downloaded.
-    """
-    for i in range(0, retries):
-        try:
-            repo.download(game)
-            return
-        except repository.GameDownloadException as ex:
-            if i == retries - 1:
-                raise ex
-
-            # Implement exponential backoff between download attempts.
-            time.sleep((2 ** i) * retry_delay)
-
-
-def retry_scrape_section(repo, platform, section, retries, retry_delay):
-    """Tries to scrape a repository section a specified number of times before failing.
-
-    Args:
-        repo: The repository from which to download the game.
-        platform: The game platform to scrape.
-        section: The section to scrape.
-        retries: The number of times to try to download the game.
-        retry_delay: The base number of seconds to wait between retries.
-
-    Raises:
-        GameScrapeException: The game could not be downloaded.
-    """
-    for i in range(0, retries):
-        try:
-            return repo.games(platform, section)
-        except repository.GameScrapeException as ex:
-            if i == retries - 1:
-                raise ex
-
-            # Implement exponential backoff between download attempts.
-            time.sleep((2 ** i) * retry_delay)
-
-
 def parse_arguments():
     """Parses command line arguments.
 
@@ -115,7 +66,7 @@ def parse_arguments():
     repo_group.add_argument(
         '--pretend', action='store_true', help='Whether to pretend downloading games.')
     repo_group.add_argument(
-        '--retries', default=3, type=int, help='The number of times to try to download a game.')
+        '--retries', default=3, type=int, help='The number of times to retry HTTP requests.')
     repo_group.add_argument(
         '--retry_delay', default=60, type=int,
         help='The number of seconds to wait between retries.')
@@ -156,8 +107,8 @@ def main():
 
     # Ensure the platform is supported by the repository.
     repo = repository.RepositoryFactory.get_repository(
-        repo_type, args.proxy_type, args.proxy_host, args.proxy_port, args.proxy_user,
-        args.proxy_password)
+        repo_type, args.retries, args.retry_delay, args.proxy_type, args.proxy_host,
+        args.proxy_port, args.proxy_user, args.proxy_password)
     if args.platform not in repo.platforms():
         return
 
@@ -174,7 +125,7 @@ def main():
     # Scan each section for games and download them.
     for section in sections:
         logger.info('Scraping section %s.', section)
-        games = retry_scrape_section(repo, args.platform, section, args.retries, args.retry_delay)
+        games = repo.games(args.platform, section)
         for game in games:
             # Check if the game is allowed to be downloaded.
             if not is_download_allowed(game, allowed_tags):
@@ -183,7 +134,7 @@ def main():
 
             # Download the game.
             if not args.pretend:
-                retry_download(repo, game, args.retries, args.retry_delay)
+                repo.download(game)
 
             logger.info('Downloaded game "%s"', game.name)
 
