@@ -7,7 +7,6 @@ USA.
 import re
 
 import lxml.html
-import requests
 
 from repository import model
 from .http_repository import HttpRepository

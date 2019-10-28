@@ -4,7 +4,6 @@ import re
 import urllib.parse
 
 import lxml.html
-import requests
 
 from repository import model
 from .http_repository import HttpRepository
@@ -35,9 +34,7 @@ class VimmsLairRepository(HttpRepository):
         if section == '#':
             section = 'number'
 
-        response = requests.get(
-            VIMMS_VAULT_SECTION_URL.format(platform, section), headers=VIMMS_VAULT_HEADERS,
-            proxies=self._proxies)
+        response = self.retry_get_request(VIMMS_VAULT_SECTION_URL.format(platform, section))
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
