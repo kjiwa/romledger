@@ -50,3 +50,8 @@ class TestVimmsLairRepository(unittest.TestCase):
         games = repo.games('GameCube', 'b')
         game = [i for i in games if i.name == 'Baten Kaitos Origins'][0]
         self.assertEqual(len(game.files), 2)
+
+    def test_wii_games_have_info(self):
+        repo = self.get_repository()
+        games = repo.games('Wii', '#')
+        self.assertGreater(len(games), 0)

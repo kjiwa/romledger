@@ -8,11 +8,16 @@ import lxml.html
 from repository import model
 from .http_repository import HttpRepository
 
-VIMMS_VAULT_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
-VIMMS_VAULT_SECTION_URL = 'https://vimm.net/vault/?p=list&system={}&section={}'
+VIMMS_VAULT_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*',
+    'Connection': 'keep-alive',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'
+}
+
+VIMMS_VAULT_BASE_URL = 'https://vimm.net'
+VIMMS_VAULT_SECTION_URL = VIMMS_VAULT_BASE_URL + '/vault/?p=list&system={}&section={}'
 VIMMS_VAULT_GAME_URL_REGEX = re.compile(r'^/vault/(\d+)$')
-VIMMS_VAULT_GAME_URL = 'https://vimm.net/vault/{}'
-VIMMS_VAULT_GAME_DOWNLOAD_URL = 'https://download2.vimm.net/download.php?'
+VIMMS_VAULT_GAME_URL = VIMMS_VAULT_BASE_URL + '/vault/{}'
 
 
 class VimmsLairRepository(HttpRepository):
@@ -48,7 +53,7 @@ class VimmsLairRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_files = set([self._game_file(game_name, url)
+            game_files = set([self._game_file(game_id, game_name, url)
                               for url in self._game_urls(game_id, game_name)])
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
@@ -72,7 +77,7 @@ class VimmsLairRepository(HttpRepository):
             raise model.GameDownloadException('No download link for {}'.format(game_name))
 
         urls = []
-        rows = tree.xpath('//table[@id="downloadTable1"]//tr')
+        rows = tree.xpath('//table[@id="downloadTable1"]//tr//form[@method="GET"]')
 
         # Some download links are not encapsulated in a table (e.g. "Aidyn Chronicles: The First
         # Mage" for Nintendo DS). In this case, fall back to searching for download forms.
@@ -81,17 +86,20 @@ class VimmsLairRepository(HttpRepository):
         # such as in the case of "Baten Kaitos Origins," which has four images: two for the
         # scrubbed version of the game, and two for the redump.
         if not rows:
-            rows = tree.xpath('//form[@action="//download2.vimm.net/download.php"]')
+            rows = tree.xpath('//div[@id="innerMain"]//form[@method="GET"]')
 
         for row in rows:
+            url = VimmsLairRepository._game_url_from_form_action(row.get('action'))
             inputs = row.xpath('.//input')
             query = {i.name: i.get('value') for i in inputs}
-            urls.append('{}{}'.format(VIMMS_VAULT_GAME_DOWNLOAD_URL, urllib.parse.urlencode(query)))
+            urls.append('{}?{}'.format(url, urllib.parse.urlencode(query)))
 
         return urls
 
-    def _game_file(self, game_name, game_url):
-        response = self.retry_get_request(game_url, stream=True)
+    def _game_file(self, game_id, game_name, game_url):
+        additional_headers = {'Referer': VIMMS_VAULT_GAME_URL.format(game_id)}
+        response = self.retry_get_request(
+            game_url, stream=True, additional_headers=additional_headers)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
@@ -119,3 +127,14 @@ class VimmsLairRepository(HttpRepository):
 
         raise model.GameScrapeException(
             'Unable to determine filename for {}: {}'.format(game_name, content_disposition))
+
+    @staticmethod
+    def _game_url_from_form_action(action):
+        # Form actions on Vimm's Lair can be one of the following:
+        # - //download.vimm.net/download.php
+        # - //download2.vimm.net/download.php
+        # - /mirror.php
+        if action.startswith('//'):
+            return 'https:{}'.format(action)
+
+        return '{}{}'.format(VIMMS_VAULT_BASE_URL, action)

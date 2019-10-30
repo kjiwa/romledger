@@ -72,9 +72,13 @@ class HttpRepository(model.Repository):
 
                 response.close()
 
-    def retry_get_request(self, url, stream=False):
+    def retry_get_request(self, url, stream=False, additional_headers=None):
+        headers = self._headers
+        if additional_headers:
+            headers.update(additional_headers)
+
         return self._retry_request(functools.partial(
-            requests.get, url, headers=self._headers, proxies=self._proxies, stream=stream))
+            requests.get, url, headers=headers, proxies=self._proxies, stream=stream))
 
     def retry_head_request(self, url):
         return self._retry_request(functools.partial(
