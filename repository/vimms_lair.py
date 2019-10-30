@@ -9,7 +9,7 @@ from repository import model
 from .http_repository import HttpRepository
 
 VIMMS_VAULT_HEADERS = {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*',
+    'Accept': '*/*',
     'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'
 }
