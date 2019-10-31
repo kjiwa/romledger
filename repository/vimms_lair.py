@@ -53,8 +53,14 @@ class VimmsLairRepository(HttpRepository):
 
             game_name = i.find('a').text
             game_tags = [i.text for i in i.findall('b')]
-            game_files = set([self._game_file(game_id, game_name, url)
-                              for url in self._game_urls(game_id, game_name)])
+            game_files = set()
+            for url in self._game_urls(game_id, game_name):
+                try:
+                    game_files.add(self._game_file(game_id, game_name, url))
+                except model.GameScrapeException:
+                    # Ignore erroneous download links.
+                    continue
+
             games.append(model.Game(game_id, platform, game_name, game_tags, game_files))
 
         return games
@@ -104,8 +110,14 @@ class VimmsLairRepository(HttpRepository):
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
 
+        # Some download links are broken and point to non-existant links. In those cases, a filename
+        # cannot be determined.
+        if 'Content-Disposition' not in response.headers:
+            raise model.GameScrapeException('Unable to get filename for {}'.format(game_name))
+
         filename = VimmsLairRepository._game_filename(
             game_name, response.headers['Content-Disposition'])
+
         size_bytes = None
         if 'Content-Length' in response.headers:
             size_bytes = int(response.headers['Content-Length'])
