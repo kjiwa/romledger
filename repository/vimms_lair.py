@@ -103,14 +103,18 @@ class VimmsLairRepository(HttpRepository):
         return urls
 
     def _game_file(self, game_id, game_name, game_url):
+        # Some downloads require a "Referer" header for a successful server response.
         additional_headers = {'Referer': VIMMS_VAULT_GAME_URL.format(game_id)}
+
+        # Vimm's Lair does not respond to HEAD requests. Instead, a streaming GET is used so that
+        # file details can be read without downloading the entire file.
         response = self.retry_get_request(
             game_url, stream=True, additional_headers=additional_headers)
         if response.status_code != 200:
             raise model.GameScrapeException(
                 'Unable to get file information for {}: {}'.format(game_name, response.content))
 
-        # Some download links are broken and point to non-existant links. In those cases, a filename
+        # Some download links are broken and point to non-existent links. In those cases, a filename
         # cannot be determined.
         if 'Content-Disposition' not in response.headers:
             raise model.GameScrapeException('Unable to get filename for {}'.format(game_name))
