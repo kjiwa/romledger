@@ -17,7 +17,7 @@ class RepositoryFactory:
     @staticmethod
     def get_repository(
             repository_type, retries=1, retry_delay=0, proxy_type=None, proxy_host=None,
-            proxy_port=None, proxy_user=None, proxy_password=None):
+            proxy_port=None, proxy_user=None, proxy_password=None, chunk_size=1024 * 1024):
         """Creates a repository instance.
 
         Args:
@@ -29,6 +29,7 @@ class RepositoryFactory:
             proxy_port: The proxy server port.
             proxy_user: The proxy server user.
             proxy_password: The proxy server password.
+            chunk_size: The chunk size in bytes to use for large downloads.
 
         Raises:
             RuntimeError: The repository type is not supported.
@@ -37,10 +38,10 @@ class RepositoryFactory:
         if repository_type == RepositoryType.COOLROM:
             return coolrom.CoolRomRepository(
                 retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-                proxy_password)
+                proxy_password, chunk_size)
         elif repository_type == RepositoryType.VIMMS_LAIR:
             return vimms_lair.VimmsLairRepository(
                 retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-                proxy_password)
+                proxy_password, chunk_size)
 
         raise RuntimeError('Unknown repository type {}'.format(repository_type))

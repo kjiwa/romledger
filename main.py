@@ -66,11 +66,6 @@ def parse_arguments():
     repo_group.add_argument(
         '--pretend', action='store_true', help='Whether to pretend downloading games.')
     repo_group.add_argument(
-        '--retries', default=3, type=int, help='The number of times to retry HTTP requests.')
-    repo_group.add_argument(
-        '--retry_delay', default=60, type=int,
-        help='The number of seconds to wait between retries.')
-    repo_group.add_argument(
         '--allow_tag', action='append',
         help='Allow games with a tag to be downloaded. This option may be used multiple times.')
 
@@ -83,12 +78,20 @@ def parse_arguments():
     # HTTP arguments.
     http_group = parser.add_argument_group('http')
     http_group.add_argument(
+        '--retries', default=3, type=int, help='The number of times to retry HTTP requests.')
+    http_group.add_argument(
+        '--retry_delay', default=60, type=int,
+        help='The number of seconds to wait between retries.')
+    http_group.add_argument(
         '--proxy_type', choices=['http', 'https', 'socks5'],
         help='The type of proxy server to use.')
     http_group.add_argument('--proxy_host', help='The proxy server host address.')
     http_group.add_argument('--proxy_port', help='The proxy server port.')
     http_group.add_argument('--proxy_user', help='The proxy server user name.')
     http_group.add_argument('--proxy_password', help='The proxy server password.')
+    http_group.add_argument(
+        '-chunk_size', default=1024 * 1024,
+        help='The chunk size in bytes to use for large downloads.')
 
     return parser.parse_args()
 
@@ -108,7 +111,7 @@ def main():
     # Ensure the platform is supported by the repository.
     repo = repository.RepositoryFactory.get_repository(
         repo_type, args.retries, args.retry_delay, args.proxy_type, args.proxy_host,
-        args.proxy_port, args.proxy_user, args.proxy_password)
+        args.proxy_port, args.proxy_user, args.proxy_password, args.chunk_size)
     if args.platform not in repo.platforms():
         return
 

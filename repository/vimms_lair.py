@@ -25,10 +25,10 @@ class VimmsLairRepository(HttpRepository):
 
     def __init__(
             self, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password):
+            proxy_password, chunk_size):
         super().__init__(
             VIMMS_VAULT_HEADERS, retries, retry_delay, proxy_type, proxy_host, proxy_port,
-            proxy_user, proxy_password)
+            proxy_user, proxy_password, chunk_size)
 
     def platforms(self):
         return [

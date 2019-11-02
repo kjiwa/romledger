@@ -25,10 +25,10 @@ class CoolRomRepository(HttpRepository):
 
     def __init__(
             self, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password):
+            proxy_password, chunk_size):
         super().__init__(
             COOLROM_HEADERS, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password)
+            proxy_password, chunk_size)
 
     def platforms(self):
         response = self.retry_get_request(COOLROM_HOME_URL)

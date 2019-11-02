@@ -14,7 +14,7 @@ class HttpRepository(model.Repository):
 
     def __init__(
             self, headers, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password):
+            proxy_password, chunk_size):
         """Creates a new HTTP repository instance.
 
         Args:
@@ -26,12 +26,14 @@ class HttpRepository(model.Repository):
             proxy_port: The proxy server port.
             proxy_user: The proxy server user.
             proxy_password: The proxy server password.
+            chunk_size: The chunk size in bytes to use for large downloads.
         """
         self._headers = headers
         self._retries = retries
         self._retry_delay = retry_delay
         self._proxies = HttpRepository._create_proxies(
             proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
+        self._chunk_size = chunk_size
 
     @staticmethod
     def _create_proxies(proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
@@ -57,7 +59,7 @@ class HttpRepository(model.Repository):
             while not (
                     os.path.exists(path)
                     and (not gamefile.size_bytes or os.path.getsize(path) == gamefile.size_bytes)):
-                response = self.retry_get_request(gamefile.url)
+                response = self.retry_get_request(gamefile.url, stream=True)
                 if response.status_code != 200:
                     raise model.GameDownloadException(
                         'Unable to download game {}: {}'.format(game.name, response.content))
@@ -68,7 +70,10 @@ class HttpRepository(model.Repository):
 
                 # Write and validate the file.
                 with open(path, 'wb') as f:
-                    f.write(response.content)
+                    # Download the file in chunks to improve memory usage.
+                    for chunk in response.iter_content(chunk_size=self._chunk_size):
+                        if chunk:
+                            f.write(chunk)
 
                 response.close()
 
