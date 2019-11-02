@@ -6,7 +6,10 @@ import string
 
 import repository
 
-SCRAPER_DEFAULT_SECTIONS = ['#'] + list(string.ascii_lowercase)
+SCRAPER_DEFAULT_HTTP_RETRIES = 3
+SCRAPER_DEFAULT_HTTP_RETRY_DELAY_SECONDS = 60
+SCRAPER_DEFAULT_HTTP_CHUNK_SIZE_BYTES = 1024 * 1024  # 1 MiB
+SCRAPER_DEFAULT_REPOSITORY_SECTIONS = ['#'] + list(string.ascii_lowercase)
 SCRAPER_LOG_FORMAT = '%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s'
 SCRAPER_LOG_LEVELS = {
     'notset': logging.NOTSET, 'debug': logging.DEBUG, 'info': logging.INFO,
@@ -61,7 +64,7 @@ def parse_arguments():
     repo_group.add_argument(
         '--platform', required=True, help='The platform for which to download games.')
     repo_group.add_argument(
-        '--section', action='append', choices=['#'] + list(string.ascii_lowercase),
+        '--section', action='append', choices=SCRAPER_DEFAULT_REPOSITORY_SECTIONS,
         help='The sections to scan for games. This option may be used multiple times.')
     repo_group.add_argument(
         '--pretend', action='store_true', help='Whether to pretend downloading games.')
@@ -78,9 +81,10 @@ def parse_arguments():
     # HTTP arguments.
     http_group = parser.add_argument_group('http')
     http_group.add_argument(
-        '--retries', default=3, type=int, help='The number of times to retry HTTP requests.')
+        '--retries', default=SCRAPER_DEFAULT_HTTP_RETRIES, type=int,
+        help='The number of times to retry HTTP requests.')
     http_group.add_argument(
-        '--retry_delay', default=60, type=int,
+        '--retry_delay', default=SCRAPER_DEFAULT_HTTP_RETRY_DELAY_SECONDS, type=int,
         help='The number of seconds to wait between retries.')
     http_group.add_argument(
         '--proxy_type', choices=['http', 'https', 'socks5'],
@@ -90,7 +94,7 @@ def parse_arguments():
     http_group.add_argument('--proxy_user', help='The proxy server user name.')
     http_group.add_argument('--proxy_password', help='The proxy server password.')
     http_group.add_argument(
-        '-chunk_size', default=1024 * 1024,
+        '-chunk_size', default=SCRAPER_DEFAULT_HTTP_CHUNK_SIZE_BYTES,
         help='The chunk size in bytes to use for large downloads.')
 
     return parser.parse_args()
@@ -118,7 +122,7 @@ def main():
     # Set the sections to be scanned.
     sections = args.section
     if not sections:
-        sections = SCRAPER_DEFAULT_SECTIONS
+        sections = SCRAPER_DEFAULT_REPOSITORY_SECTIONS
 
     # Set game tags that are allowed to be downloaded.
     allowed_tags = args.allow_tag

@@ -4,6 +4,10 @@ import enum
 
 from repository import coolrom, vimms_lair
 
+DEFAULT_HTTP_RETRIES = 1
+DEFAULT_HTTP_RETRY_DELAY_SECONDS = 0
+DEFAULT_HTTP_CHUNK_SIZE_BYTES = 1024 * 1024  # 1 MiB
+
 
 class RepositoryType(enum.Enum):
     """An enumeration of supported repository types."""
@@ -16,8 +20,10 @@ class RepositoryFactory:
 
     @staticmethod
     def get_repository(
-            repository_type, retries=1, retry_delay=0, proxy_type=None, proxy_host=None,
-            proxy_port=None, proxy_user=None, proxy_password=None, chunk_size=1024 * 1024):
+            repository_type, retries=DEFAULT_HTTP_RETRIES,
+            retry_delay=DEFAULT_HTTP_RETRY_DELAY_SECONDS, proxy_type=None, proxy_host=None,
+            proxy_port=None, proxy_user=None, proxy_password=None,
+            chunk_size=DEFAULT_HTTP_CHUNK_SIZE_BYTES):
         """Creates a repository instance.
 
         Args:
