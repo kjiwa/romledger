@@ -1,6 +1,7 @@
 """A module containing common repository objects and definitions."""
 
 import dataclasses
+import os.path
 import typing
 
 
@@ -20,7 +21,11 @@ class GameFile:
     url: str
 
     def __eq__(self, other):
-        return self.filename == other.filename
+        # Ignore file extensions when comparing filenames. This is because sometimes file
+        # extensions vary between download mirrors. For example, one download server may serve
+        # game.zip while the other may serve game.7z. Considering these filenames equal prevents
+        # duplicate downloads.
+        return os.path.splitext(self.filename)[0] == os.path.splitext(other.filename)[0]
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,4 +1,10 @@
-"""A module for accessing games on Vimm's Lair."""
+"""A module for accessing games on Vimm's Lair.
+
+The maintainer of Vimm's Lair has gone to lengths to prevent bots from scraping site content and
+downloading its game catalog. Clients wishing to scrape game data must identify themselves as a
+valid web browser (such as Chrome, Firefox, or Internet Explorer). Download requests are further
+complicated by requiring clients submit a valid referrer and the correct input keys for each file.
+"""
 
 import re
 import urllib.parse
@@ -78,22 +84,18 @@ class VimmsLairRepository(HttpRepository):
         if response.status_code != 200:
             raise RuntimeError(response.content)
 
-        tree = lxml.html.fromstring(response.content)
-        if not tree.xpath('//input[@value="Download"]'):
-            raise model.GameDownloadException('No download link for {}'.format(game_name))
-
-        urls = []
-        rows = tree.xpath('//table[@id="downloadTable1"]//tr//form[@method="GET"]')
-
         # Some download links are not encapsulated in a table (e.g. "Aidyn Chronicles: The First
         # Mage" for Nintendo DS). In this case, fall back to searching for download forms.
         #
         # Searching for download forms is not the default behavior to prevent excessive downloads,
         # such as in the case of "Baten Kaitos Origins," which has four images: two for the
         # scrubbed version of the game, and two for the redump.
+        tree = lxml.html.fromstring(response.content)
+        rows = tree.xpath('//table[@id="downloadTable1"]//form[@method="GET"]')
         if not rows:
             rows = tree.xpath('//div[@id="innerMain"]//form[@method="GET"]')
 
+        urls = []
         for row in rows:
             url = VimmsLairRepository._game_url_from_form_action(row.get('action'))
             inputs = row.xpath('.//input')
