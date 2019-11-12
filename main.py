@@ -1,6 +1,7 @@
 """"A program that downloads games from repositories such as Vimm's Lair and CoolROM.com."""
 
 import argparse
+import getpass
 import logging
 import string
 
@@ -112,10 +113,15 @@ def main():
         logger.error('Unsupported platform: %s.', args.platform)
         return
 
+    # Prompt for a proxy password if one is not provided and proxy use is requested.
+    proxy_password = args.proxy_password
+    if args.proxy_type and args.proxy_user and not proxy_password:
+        proxy_password = getpass.getpass('Proxy password: ')
+
     # Ensure the platform is supported by the repository.
     repo = repository.RepositoryFactory.get_repository(
         repo_type, args.retries, args.retry_delay, args.proxy_type, args.proxy_host,
-        args.proxy_port, args.proxy_user, args.proxy_password, args.chunk_size)
+        args.proxy_port, args.proxy_user, proxy_password, args.chunk_size)
     if args.platform not in repo.platforms():
         return
 
