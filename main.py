@@ -7,6 +7,7 @@ import string
 
 import repository
 
+SCRAPER_DEFAULT_HTTP_TIMEOUT_SECONDS = 60
 SCRAPER_DEFAULT_HTTP_RETRIES = 3
 SCRAPER_DEFAULT_HTTP_RETRY_DELAY_SECONDS = 60
 SCRAPER_DEFAULT_HTTP_CHUNK_SIZE_BYTES = 1024 * 1024  # 1 MiB
@@ -82,6 +83,9 @@ def parse_arguments():
     # HTTP arguments.
     http_group = parser.add_argument_group('http')
     http_group.add_argument(
+        '--timeout', default=SCRAPER_DEFAULT_HTTP_TIMEOUT_SECONDS, type=int,
+        help='The number of seconds to wait for data from HTTP requests.')
+    http_group.add_argument(
         '--retries', default=SCRAPER_DEFAULT_HTTP_RETRIES, type=int,
         help='The number of times to retry HTTP requests.')
     http_group.add_argument(
@@ -121,7 +125,7 @@ def main():
     # Ensure the platform is supported by the repository.
     repo = repository.RepositoryFactory.get_repository(
         repo_type, args.retries, args.retry_delay, args.proxy_type, args.proxy_host,
-        args.proxy_port, args.proxy_user, proxy_password, args.chunk_size)
+        args.proxy_port, args.proxy_user, proxy_password, args.chunk_size, args.timeout)
     if args.platform not in repo.platforms():
         return
 

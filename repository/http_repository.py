@@ -14,7 +14,7 @@ class HttpRepository(model.Repository):
 
     def __init__(
             self, headers, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password, chunk_size):
+            proxy_password, chunk_size, timeout):
         """Creates a new HTTP repository instance.
 
         Args:
@@ -27,6 +27,7 @@ class HttpRepository(model.Repository):
             proxy_user: The proxy server user.
             proxy_password: The proxy server password.
             chunk_size: The chunk size in bytes to use for large downloads.
+            timeout: The number of seconds to wait for data from HTTP requests.
         """
         self._headers = headers
         self._retries = retries
@@ -34,6 +35,7 @@ class HttpRepository(model.Repository):
         self._proxies = HttpRepository._create_proxies(
             proxy_type, proxy_host, proxy_port, proxy_user, proxy_password)
         self._chunk_size = chunk_size
+        self._timeout = timeout
 
     @staticmethod
     def _create_proxies(proxy_type, proxy_host, proxy_port, proxy_user, proxy_password):
@@ -83,11 +85,16 @@ class HttpRepository(model.Repository):
             headers.update(additional_headers)
 
         return self._retry_request(functools.partial(
-            requests.get, url, headers=headers, proxies=self._proxies, stream=stream))
+            requests.get, url, headers=headers, proxies=self._proxies, stream=stream,
+            timeout=self._timeout))
 
-    def retry_head_request(self, url):
+    def retry_head_request(self, url, additional_headers=None):
+        headers = self._headers
+        if additional_headers:
+            headers.update(additional_headers)
+
         return self._retry_request(functools.partial(
-            requests.head, url, headers=self._headers, proxies=self._proxies))
+            requests.head, url, headers=headers, proxies=self._proxies, timeout=self._timeout))
 
     def _retry_request(self, request):
         response = None

@@ -31,10 +31,10 @@ class VimmsLairRepository(HttpRepository):
 
     def __init__(
             self, retries, retry_delay, proxy_type, proxy_host, proxy_port, proxy_user,
-            proxy_password, chunk_size):
+            proxy_password, chunk_size, timeout):
         super().__init__(
             VIMMS_VAULT_HEADERS, retries, retry_delay, proxy_type, proxy_host, proxy_port,
-            proxy_user, proxy_password, chunk_size)
+            proxy_user, proxy_password, chunk_size, timeout)
 
     def platforms(self):
         return [
@@ -108,13 +108,16 @@ class VimmsLairRepository(HttpRepository):
         # Some downloads require a "Referer" header for a successful server response.
         additional_headers = {'Referer': VIMMS_VAULT_GAME_URL.format(game_id)}
 
-        # Vimm's Lair does not respond to HEAD requests. Instead, a streaming GET is used so that
-        # file details can be read without downloading the entire file.
-        response = self.retry_get_request(
-            game_url, stream=True, additional_headers=additional_headers)
+        # Some HEAD requests (such as those to downloads hosted in Google Drive) will fail. In
+        # those cases, a streaming GET can be used to get game file information. Since HEAD
+        # requests are faster, they are preferred and tried first.
+        response = self.retry_head_request(game_url, additional_headers=additional_headers)
         if response.status_code != 200:
-            raise model.GameScrapeException(
-                'Unable to get file information for {}: {}'.format(game_name, response.content))
+            response = self.retry_get_request(
+                game_url, stream=True, additional_headers=additional_headers)
+            if response.status_code != 200:
+                raise model.GameScrapeException(
+                    'Unable to get file information for {}: {}'.format(game_name, response.content))
 
         # Some download links are broken and point to non-existent links. In those cases, a filename
         # cannot be determined.

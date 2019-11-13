@@ -55,3 +55,12 @@ class TestVimmsLairRepository(unittest.TestCase):
         repo = self.get_repository()
         games = repo.games('Wii', '#')
         self.assertGreater(len(games), 0)
+
+    def test_n64_games_have_game_file_links(self):
+        # This method tests that streaming GET requests are used to fetch game file information
+        # when HEAD requests fail. An example of a game that cannot be scraped with a HEAD request
+        # is "1080 Snowboarding" for the N64.
+        repo = self.get_repository()
+        games = repo.games('N64', '#')
+        game = [i for i in games if i.name == '1080 TenEighty Snowboarding'][0]
+        self.assertGreater(len(game.files), 0)
