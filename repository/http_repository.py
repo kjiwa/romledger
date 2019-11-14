@@ -94,13 +94,19 @@ class HttpRepository(model.Repository):
             headers.update(additional_headers)
 
         return self._retry_request(functools.partial(
-            requests.head, url, headers=headers, proxies=self._proxies, timeout=self._timeout))
+            requests.head, url, headers=headers, proxies=self._proxies, timeout=self._timeout,
+            allow_redirects=True))
 
     def _retry_request(self, request):
         response = None
         for i in range(0, self._retries):
             response = request()
-            if response.status_code == 200:
+
+            # Vimm's Lair prevents clients from downloading multiple files at once by responding
+            # with 401 Unauthorized when another download is active. Sometimes a download may be
+            # complete, but Vimm's Lair thinks the connection is still active. In those cases, wait
+            # for some time and retry.
+            if response.status_code != 401:
                 break
 
             # Implement exponential backoff between download attempts.
