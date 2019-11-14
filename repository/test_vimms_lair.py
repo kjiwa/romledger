@@ -54,7 +54,7 @@ class TestVimmsLairRepository(unittest.TestCase):
     def test_wii_games_have_info(self):
         repo = self.get_repository()
         games = repo.games('Wii', '#')
-        self.assertGreater(len(games), 0)
+        self.assertTrue(games)
 
     def test_n64_games_have_game_file_links(self):
         # This method tests that streaming GET requests are used to fetch game file information
@@ -63,4 +63,4 @@ class TestVimmsLairRepository(unittest.TestCase):
         repo = self.get_repository()
         games = repo.games('N64', '#')
         game = [i for i in games if i.name == '1080 TenEighty Snowboarding'][0]
-        self.assertGreater(len(game.files), 0)
+        self.assertTrue(game.files)

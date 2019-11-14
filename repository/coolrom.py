@@ -12,9 +12,10 @@ from repository import model
 from .http_repository import HttpRepository
 
 COOLROM_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/75.0.3770.142'}
-COOLROM_HOME_URL = 'https://coolrom.com.au/roms/'
-COOLROM_SECTION_URL = 'https://coolrom.com.au/roms/{}/{}/'
-COOLROM_GAME_URL = 'https://coolrom.com.au/dlpop.php?id={}'
+COOLROM_BASE_URL = 'https://coolrom.com.au'
+COOLROM_HOME_URL = COOLROM_BASE_URL + '/roms/'
+COOLROM_SECTION_URL = COOLROM_BASE_URL + '/roms/{}/{}/'
+COOLROM_GAME_URL = COOLROM_BASE_URL + '/dlpop.php?id={}'
 COOLROM_PLATFORM_URL_REGEX = re.compile(r'^/roms/(.+)/$')
 COOLROM_GAME_URL_REGEX = re.compile(r'^/roms/\S+/(\d+)/.+.php$')
 COOLROM_GAME_FILENAME_REGEX = re.compile(r'^attachment; filename="(\S+)"$')

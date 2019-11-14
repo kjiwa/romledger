@@ -4,6 +4,11 @@ The maintainer of Vimm's Lair has gone to lengths to prevent bots from scraping 
 downloading its game catalog. Clients wishing to scrape game data must identify themselves as a
 valid web browser (such as Chrome, Firefox, or Internet Explorer). Download requests are further
 complicated by requiring clients submit a valid referrer and the correct input keys for each file.
+
+Vimm's Lair supports the following game tags:
+  H: hacked
+  T: translated
+  U: unlicensed
 """
 
 import re
@@ -133,7 +138,7 @@ class VimmsLairRepository(HttpRepository):
 
         response.close()
 
-        return model.GameFile(filename, size_bytes, game_url)
+        return model.GameFile(filename, size_bytes, response.url)
 
     @staticmethod
     def _game_filename(game_name, content_disposition):

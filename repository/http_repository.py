@@ -54,8 +54,8 @@ class HttpRepository(model.Repository):
 
     def download(self, game):
         for gamefile in game.files:
-            # Skip the file if it already exists and has the same size as the remote file. Only the
-            # existence criteria is used if the game does not specify a file size.
+            # Skip the file if it already exists and, if the remote file size is known, if the
+            # local file size matches the remote file size.
             dirname = os.path.dirname(game.platform + '/')
             path = '{}/{}'.format(dirname, gamefile.filename)
             while not (
@@ -80,6 +80,16 @@ class HttpRepository(model.Repository):
                 response.close()
 
     def retry_get_request(self, url, stream=False, additional_headers=None):
+        """Retries a GET request with exponential backoff.
+
+        Args:
+            url: The URL endpoint.
+            stream: Whether to execute a streaming GET, where data is not downloaded immediately.
+            additional_headers: Additional HTTP headers to send with the request.
+
+        Returns:
+            An HTTP response.
+        """
         headers = self._headers
         if additional_headers:
             headers.update(additional_headers)
@@ -89,10 +99,20 @@ class HttpRepository(model.Repository):
             timeout=self._timeout))
 
     def retry_head_request(self, url, additional_headers=None):
+        """Retries a HEAD request with exponential backoff.
+
+        Args:
+            url: The URL endpoint.
+            additional_headers: Additional HTTP headers to send with the request.
+
+        Returns:
+            An HTTP response.
+        """
         headers = self._headers
         if additional_headers:
             headers.update(additional_headers)
 
+        # Redirects are explicitly allowed because they are off by default for HEAD requests.
         return self._retry_request(functools.partial(
             requests.head, url, headers=headers, proxies=self._proxies, timeout=self._timeout,
             allow_redirects=True))
