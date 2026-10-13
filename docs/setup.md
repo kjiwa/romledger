@@ -136,7 +136,7 @@ their relative path:
 
 A name collision there gets `.1`, `.2`, ... before the extension. Output lists
 `moved <slug> <n>`, `duplicates <n>`, and `unmatched <n>`; an inbox with nothing to do prints
-`inbox is empty`. `--dry-run` prints what would be filed and the unmatched files, and changes
+`inbox is empty`. `--dry-run` prints what would be filed (it cannot tell duplicates from new games, so its counts include games the library already has) and the unmatched files, and changes
 nothing; duplicates are only known after filing, so it does not list them.
 
 Exit status is 0, 1 if an `after_import` hook failed (everything else still completed), or 2 for

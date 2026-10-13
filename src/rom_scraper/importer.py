@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rom_scraper import dats, igir, scan
-from rom_scraper.config import Config
+from rom_scraper.config import Config, ConfigError
 
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]
@@ -34,6 +34,10 @@ def import_inboxes(
     hook: RunHook = run_hook,
 ) -> ImportResult:
     slugs = list(config.platforms)
+    if not slugs:
+        raise ConfigError(
+            "no platforms configured. Add a [platforms.<slug>] table; see docs/setup.md."
+        )
     scan.require_dats(config, slugs, data_dir)
     dat_files = [dats.dat_path(data_dir, config.platforms[slug].dat) for slug in slugs]
     inboxes = config.library.inboxes
@@ -44,11 +48,11 @@ def import_inboxes(
         return ImportResult({}, [], [], [])
     if dry_run:
         return ImportResult(
-            _moved(config, before, lambda _: True), [], _paths(before, scan.UNUSED), []
+            _moved(config, data_dir, before, lambda _: True), [], _paths(before, scan.UNUSED), []
         )
     igir_move(dat_files, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
     after = igir_report(dat_files, inboxes, cache, None, excludes)
-    moved = _moved(config, before, lambda path: not path.exists())
+    moved = _moved(config, data_dir, before, lambda path: not path.exists())
     duplicates = _relocate(_paths(after, scan.FOUND), inboxes, igir.DUPLICATES_DIR)
     unmatched = _relocate(_paths(after, scan.UNUSED), inboxes, igir.UNMATCHED_DIR)
     for slug in moved:
@@ -60,8 +64,13 @@ def _paths(rows: Sequence[igir.ReportRow], status: str) -> list[Path]:
     return list(dict.fromkeys(Path(row.path) for row in rows if row.status == status and row.path))
 
 
-def _moved(config: Config, rows: Sequence[igir.ReportRow], gone: PathTest) -> dict[str, int]:
-    slugs = {platform.dat.partition("/")[2]: slug for slug, platform in config.platforms.items()}
+def _moved(
+    config: Config, data_dir: Path, rows: Sequence[igir.ReportRow], gone: PathTest
+) -> dict[str, int]:
+    slugs = {
+        dats.name_of(dats.dat_path(data_dir, platform.dat)): slug
+        for slug, platform in config.platforms.items()
+    }
     files: dict[str, set[Path]] = {}
     for row in rows:
         if row.status == scan.FOUND and row.dat in slugs and gone(Path(row.path)):

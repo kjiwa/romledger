@@ -86,3 +86,12 @@ def test_atomic_write_leaves_no_temp_on_failure(
     with client(serving(BODY)) as http_client, pytest.raises(OSError, match="disk full"):
         dats.update(tmp_path, {"nes": "no-intro/Nintendo"}, http_client)
     assert list((tmp_path / "dats" / "no-intro").iterdir()) == []
+
+
+def test_name_of_reads_header_name_or_falls_back_to_stem(tmp_path: Path) -> None:
+    named = tmp_path / "A.dat"
+    named.write_text('clrmamepro (\n\tname "Header Name"\n)\n')
+    bare = tmp_path / "B.dat"
+    bare.write_text("nothing")
+    assert dats.name_of(named) == "Header Name"
+    assert dats.name_of(bare) == "B"

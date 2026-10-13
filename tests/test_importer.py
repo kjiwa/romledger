@@ -81,6 +81,13 @@ def test_missing_dat(tmp_path: Path) -> None:
         env.run()
 
 
+def test_no_platforms_configured(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.config = config.Config(env.config.library, {}, env.config.hooks)
+    with pytest.raises(config.ConfigError, match="no platforms configured"):
+        env.run()
+
+
 def test_empty_inbox(tmp_path: Path) -> None:
     env = Env(tmp_path, (("true",),))
     env.reports = [[row("MISSING", "A"), row("MISSING", "B")]]

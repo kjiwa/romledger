@@ -277,3 +277,21 @@ def test_import_hook_failure_exits_1(
 def test_import_without_dat_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run(make_config(tmp_path), "import") == 2
     assert "no DAT for nes" in capsys.readouterr().err
+
+
+def test_config_lists_hooks(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = make_config(tmp_path)
+    path.write_text(path.read_text() + '[hooks]\nafter_import = [["touch", "/x"]]\n')
+    assert run(path, "config") == 0
+    assert "hook:    after_import touch /x" in capsys.readouterr().out
+
+
+def test_os_error_is_a_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def failing(args: object) -> int:
+        raise PermissionError("denied")
+
+    monkeypatch.setitem(cli.HANDLERS, "status", failing)
+    assert run(make_config(tmp_path), "status") == 2
+    assert capsys.readouterr().err == "rom-scraper: error: denied\n"

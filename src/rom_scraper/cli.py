@@ -93,6 +93,8 @@ def show_config(args: argparse.Namespace) -> int:
         print(f"{slug}: {platform.dat}")
         print(f"  regions: {', '.join(platform.regions)}")
         print(f"  languages: {', '.join(platform.languages)}")
+    for argv in context.config.hooks.after_import:
+        print(f"hook:    after_import {' '.join(argv)}")
     return 0
 
 
@@ -213,3 +215,6 @@ def main(argv: list[str] | None = None) -> int:
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
+    except OSError as error:
+        print(f"rom-scraper: error: {error}", file=sys.stderr)
+        return 2
