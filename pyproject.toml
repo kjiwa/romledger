@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "Track which retro games you have and which are missing, verified against No-Intro and Redump DATs."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+]
 
 [project.scripts]
 rom-scraper = "rom_scraper.cli:main"
@@ -35,7 +37,8 @@ files = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=rom_scraper --cov-report=term-missing"
+addopts = "--cov=rom_scraper --cov-report=term-missing -m 'not igir'"
+markers = ["igir: runs the real igir (needs Node.js)"]
 
 [tool.coverage.report]
 fail_under = 90

@@ -1,0 +1,160 @@
+# One table per RomM platform slug (verified with igir's {romm} token on 2026-10-13).
+# dat: <set>/<name> under libretro-database metadat. vimm, coolrom: site system codes.
+
+[atari2600]
+dat = "no-intro/Atari - 2600"
+vimm = "Atari2600"
+coolrom = "atari2600"
+
+[atari5200]
+dat = "no-intro/Atari - 5200"
+vimm = "Atari5200"
+coolrom = "atari5200"
+
+[atari7800]
+dat = "no-intro/Atari - 7800"
+vimm = "Atari7800"
+coolrom = "atari7800"
+
+[jaguar]
+dat = "no-intro/Atari - Jaguar"
+vimm = "Jaguar"
+coolrom = "atarijaguar"
+
+[atari-jaguar-cd]
+dat = "redump/Atari - Jaguar CD"
+vimm = "JaguarCD"
+
+[lynx]
+dat = "no-intro/Atari - Lynx"
+vimm = "Lynx"
+coolrom = "atarilynx"
+
+[sega32]
+dat = "no-intro/Sega - 32X"
+vimm = "32X"
+
+[sms]
+dat = "no-intro/Sega - Master System - Mark III"
+vimm = "SMS"
+coolrom = "mastersystem"
+
+[genesis]
+dat = "no-intro/Sega - Mega Drive - Genesis"
+vimm = "Genesis"
+coolrom = "genesis"
+
+[gamegear]
+dat = "no-intro/Sega - Game Gear"
+vimm = "GG"
+coolrom = "gamegear"
+
+[segacd]
+dat = "redump/Sega - Mega-CD - Sega CD"
+vimm = "SegaCD"
+coolrom = "segacd"
+
+[saturn]
+dat = "redump/Sega - Saturn"
+vimm = "Saturn"
+coolrom = "saturn"
+
+[dc]
+dat = "redump/Sega - Dreamcast"
+vimm = "Dreamcast"
+coolrom = "dc"
+
+[nes]
+dat = "no-intro/Nintendo - Nintendo Entertainment System"
+vimm = "NES"
+
+[snes]
+dat = "no-intro/Nintendo - Super Nintendo Entertainment System"
+vimm = "SNES"
+
+[n64]
+dat = "no-intro/Nintendo - Nintendo 64"
+vimm = "N64"
+
+[gb]
+dat = "no-intro/Nintendo - Game Boy"
+vimm = "GB"
+
+[gbc]
+dat = "no-intro/Nintendo - Game Boy Color"
+vimm = "GBC"
+
+[gba]
+dat = "no-intro/Nintendo - Game Boy Advance"
+vimm = "GBA"
+
+[nds]
+dat = "no-intro/Nintendo - Nintendo DS"
+vimm = "DS"
+
+[3ds]
+dat = "no-intro/Nintendo - Nintendo 3DS"
+vimm = "3DS"
+
+[virtualboy]
+dat = "no-intro/Nintendo - Virtual Boy"
+vimm = "VB"
+
+[ngc]
+dat = "redump/Nintendo - GameCube"
+vimm = "GameCube"
+
+[wii]
+dat = "redump/Nintendo - Wii"
+vimm = "Wii"
+
+[wiiu]
+dat = "no-intro/Nintendo - Wii U (Digital)"
+vimm = "WiiU"
+
+[tg16]
+dat = "no-intro/NEC - PC Engine - TurboGrafx 16"
+vimm = "TG16"
+
+[turbografx-cd]
+dat = "redump/NEC - PC Engine CD - TurboGrafx-CD"
+vimm = "TGCD"
+
+[neo-geo-pocket]
+dat = "no-intro/SNK - Neo Geo Pocket"
+coolrom = "neogeopocket"
+
+[neo-geo-pocket-color]
+dat = "no-intro/SNK - Neo Geo Pocket Color"
+
+[psx]
+dat = "redump/Sony - PlayStation"
+vimm = "PS1"
+coolrom = "psx"
+
+[ps2]
+dat = "redump/Sony - PlayStation 2"
+vimm = "PS2"
+coolrom = "ps2"
+
+[ps3]
+dat = "redump/Sony - PlayStation 3"
+vimm = "PS3"
+coolrom = "ps3"
+
+[psp]
+dat = "redump/Sony - PlayStation Portable"
+vimm = "PSP"
+coolrom = "psp"
+
+[philips-cd-i]
+dat = "redump/Philips - CD-i"
+vimm = "CDi"
+
+[xbox]
+dat = "redump/Microsoft - Xbox"
+vimm = "Xbox"
+
+[xbox360]
+dat = "redump/Microsoft - Xbox 360"
+vimm = "Xbox360"

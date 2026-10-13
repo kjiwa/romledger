@@ -5,7 +5,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from rom_scraper import registry
+
 CONFIG_ENV = "ROM_SCRAPER_CONFIG"
+DATA_ENV = "ROM_SCRAPER_DATA"
+
+REGIONS = [
+    *("ARG", "ASI", "AUS", "BEL", "BRA", "CAN", "CHN", "DAN", "EUR", "FRA", "FYN", "GER"),
+    *("GRE", "HK", "HOL", "ITA", "JPN", "KOR", "MEX", "NOR", "NZ", "POR", "RUS", "SPA"),
+    *("SWE", "TAI", "UK", "UNK", "USA", "WORLD"),
+]
+LANGUAGES = [
+    *("DA", "DE", "EL", "EN", "ES", "FI", "FR", "IT"),
+    *("JA", "KO", "NL", "NO", "PT", "RU", "SV", "ZH"),
+]
 
 EXAMPLE = """\
 [library]
@@ -13,7 +26,6 @@ roms = "/mnt/roms/roms"
 inboxes = ["/mnt/roms/inbox"]
 
 [platforms.nes]
-dat = "no-intro/Nintendo - Nintendo Entertainment System"
 """
 
 
@@ -30,8 +42,8 @@ class Library:
 @dataclass(frozen=True)
 class Platform:
     dat: str
-    regions: tuple[str, ...] = ("USA", "World")
-    languages: tuple[str, ...] = ("En",)
+    regions: tuple[str, ...] = ("USA", "WORLD")
+    languages: tuple[str, ...] = ("EN",)
 
 
 @dataclass(frozen=True)
@@ -57,7 +69,20 @@ def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
     return path
 
 
-def load(path: Path) -> Config:
+def data_dir(env: Mapping[str, str] | None = None) -> Path:
+    env = os.environ if env is None else env
+    if env.get(DATA_ENV):
+        directory = Path(env[DATA_ENV]).expanduser()
+        if not directory.is_absolute():
+            raise ConfigError(f"{DATA_ENV} {env[DATA_ENV]!r} is not absolute. Use a full path.")
+        return directory
+    base = env.get("XDG_DATA_HOME", "")
+    if not os.path.isabs(base):
+        base = str(Path.home() / ".local" / "share")
+    return Path(base) / "rom-scraper"
+
+
+def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config:
     try:
         with path.open("rb") as handle:
             data = tomllib.load(handle)
@@ -72,7 +97,10 @@ def load(path: Path) -> Config:
     platforms = _table(path, data, "platforms", required=False)
     return Config(
         library=_parse_library(path, library),
-        platforms={slug: _parse_platform(path, slug, raw) for slug, raw in platforms.items()},
+        platforms={
+            slug: _parse_platform(path, slug, raw, platforms_registry)
+            for slug, raw in platforms.items()
+        },
     )
 
 
@@ -97,17 +125,39 @@ def _parse_library(path: Path, table: dict[str, Any]) -> Library:
     )
 
 
-def _parse_platform(path: Path, slug: str, raw: object) -> Platform:
+def _parse_platform(
+    path: Path, slug: str, raw: object, platforms_registry: Mapping[str, registry.Entry]
+) -> Platform:
     key = f"platforms.{slug}"
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: {key} must be a table. Write it as [{key}].")
     _reject_unknown(path, f"{key}.", raw, {"dat", "regions", "languages"})
     defaults = Platform(dat="")
     return Platform(
-        dat=_string(path, raw, f"{key}.dat", "dat"),
-        regions=_strings(path, raw, f"{key}.regions", "regions", default=defaults.regions),
-        languages=_strings(path, raw, f"{key}.languages", "languages", default=defaults.languages),
+        dat=_dat(path, slug, raw, platforms_registry),
+        regions=_codes(path, raw, f"{key}.regions", "regions", defaults.regions, REGIONS),
+        languages=_codes(path, raw, f"{key}.languages", "languages", defaults.languages, LANGUAGES),
     )
+
+
+def _dat(
+    path: Path, slug: str, raw: dict[str, Any], platforms_registry: Mapping[str, registry.Entry]
+) -> str:
+    key = f"platforms.{slug}.dat"
+    if "dat" not in raw:
+        if slug not in platforms_registry:
+            raise ConfigError(
+                f"{path}: unknown platform {slug!r}. Use one of: "
+                f"{', '.join(sorted(platforms_registry))}; or set dat."
+            )
+        return platforms_registry[slug].dat
+    dat = _string(path, raw, key, "dat")
+    dat_set, _, name = dat.partition("/")
+    if dat_set not in registry.DAT_SETS or not name:
+        raise ConfigError(
+            f"{path}: {key} {dat!r} must look like <{'|'.join(registry.DAT_SETS)}>/<name>."
+        )
+    return dat
 
 
 def _directory(path: Path, dotted: str, value: str) -> Path:
@@ -165,3 +215,23 @@ def _strings(
     if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
         raise ConfigError(f'{path}: {dotted} must be a list of non-empty strings, e.g. ["a", "b"].')
     return tuple(value)
+
+
+def _codes(
+    path: Path,
+    table: dict[str, Any],
+    dotted: str,
+    key: str,
+    default: tuple[str, ...],
+    allowed: list[str],
+) -> tuple[str, ...]:
+    codes = _strings(path, table, dotted, key, default=default)
+    if not codes:
+        raise ConfigError(f"{path}: {dotted} is empty. List at least one code.")
+    for code in codes:
+        if code not in allowed:
+            hint = " Use upper case." if code.upper() in allowed else ""
+            raise ConfigError(
+                f"{path}: {dotted} has unknown code {code!r}.{hint} Allowed: {', '.join(allowed)}."
+            )
+    return codes
