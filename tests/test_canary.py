@@ -74,7 +74,7 @@ def keys(report: canary.Report) -> list[str]:
 
 def test_all_clear(world: World, fake_throttle: FakeThrottle) -> None:
     report = world.run(fake_throttle)
-    assert report == canary.Report([], [])
+    assert report == canary.Report([], [], [])
     dat_requests = [key for method, key in world.requests if method == "HEAD"]
     assert len(dat_requests) == len(registry.load())
     assert all(key.startswith("raw.githubusercontent.com/") for key in dat_requests)
@@ -105,9 +105,17 @@ def test_coolrom_missing_registry_code(world: World, fake_throttle: FakeThrottle
     assert isinstance(index, httpx.Response)
     world.pages["coolrom.com/roms/"] = html(index.text.replace('href="/roms/psx/"', 'href="/x/"'))
     report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:platform-links"]
-    assert "psx" in report.findings[0].detail
+    assert keys(report) == ["coolrom:missing-platform:psx"]
     assert report.findings[0].title.isascii()
+
+
+def test_coolrom_empty_platform_index_is_page_drift(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages["coolrom.com/roms/"] = html("<html>moved</html>")
+    report = world.run(fake_throttle)
+    assert keys(report) == ["coolrom:contract:platform-links"]
+    assert report.inconclusive == []
 
 
 def test_coolrom_new_platform_proposes_a_registry_line(
@@ -161,8 +169,23 @@ def test_vimm_missing_registry_code(world: World, fake_throttle: FakeThrottle) -
     assert isinstance(page, httpx.Response)
     world.pages["vimm.net/vault/"] = html(page.text.replace('href="/vault/PS3"', 'href="/x"'))
     report = world.run(fake_throttle)
-    assert keys(report) == ["vimm:contract:platform-links"]
+    assert keys(report) == ["vimm:missing-platform:PS3"]
     assert "PS3" in report.findings[0].detail
+
+
+def test_missing_and_new_keys_never_collide(world: World, fake_throttle: FakeThrottle) -> None:
+    page = world.pages["vimm.net/vault/"]
+    assert isinstance(page, httpx.Response)
+    text = page.text.replace('href="/vault/PS3"', 'href="/vault/PS4"')
+    text = text.replace('href="/vault/PS2"', 'href="/vault/PS5"')
+    world.pages["vimm.net/vault/"] = html(text)
+    found = keys(world.run(fake_throttle))
+    assert found == [
+        "vimm:missing-platform:PS2",
+        "vimm:missing-platform:PS3",
+        "vimm:new-platform:PS4",
+        "vimm:new-platform:PS5",
+    ]
 
 
 def test_vimm_new_platform_ignores_numeric_links_and_ignored_codes(
@@ -264,6 +287,9 @@ SITES = {
 }
 
 
+GROUPS = {"coolrom": "coolrom", "vimm": "vimm", "archive": "internet-archive"}
+
+
 @pytest.mark.parametrize("site", SITES)
 @pytest.mark.parametrize(
     "page",
@@ -280,6 +306,7 @@ def test_inconclusive_site_is_a_note_not_a_finding(
     assert len(report.notes) == 1
     assert first in report.notes[0]
     assert report.notes[0].isascii()
+    assert report.inconclusive[0] == GROUPS[site]
     assert any(key.startswith("api.github.com") for key in world.requested())
 
 
@@ -347,7 +374,7 @@ def test_a_game_title_in_json_is_not_a_challenge(world: World, fake_throttle: Fa
     world.pages[ARCHIVE_METADATA] = httpx.Response(
         200, text=body, headers={"Content-Type": "application/json"}
     )
-    assert world.run(fake_throttle) == canary.Report([], [])
+    assert world.run(fake_throttle) == canary.Report([], [], [])
 
 
 @pytest.mark.live
@@ -364,4 +391,84 @@ def test_the_cloudflare_beacon_on_a_normal_page_is_not_a_challenge(
     assert isinstance(page, httpx.Response)
     beacon = '<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>'
     world.pages["coolrom.com/roms/"] = html(page.text.replace("</body>", f"{beacon}</body>"))
-    assert world.run(fake_throttle) == canary.Report([], [])
+    assert world.run(fake_throttle) == canary.Report([], [], [])
+
+
+def test_inconclusive_lists_the_group_and_every_skipped_check(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages["coolrom.com/roms/"] = httpx.Response(403)
+    assert world.run(fake_throttle).inconclusive == [
+        "coolrom",
+        "coolrom:contract:platform-links",
+        "coolrom:missing-platform",
+        "coolrom:new-platform",
+        "coolrom:contract:section",
+        "coolrom:contract:download-link",
+    ]
+
+
+def test_inconclusive_section_skips_the_download_check(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages[COOLROM_SECTION] = httpx.Response(503)
+    assert world.run(fake_throttle).inconclusive == [
+        "coolrom",
+        "coolrom:contract:section",
+        "coolrom:contract:download-link",
+    ]
+
+
+def test_section_drift_leaves_the_download_check_unverified(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages[COOLROM_SECTION] = html("<html></html>")
+    report = world.run(fake_throttle)
+    assert keys(report) == ["coolrom:contract:section"]
+    assert report.notes == []
+    assert report.inconclusive == ["coolrom:contract:download-link"]
+
+
+def test_unverified_dat_prefixes_cover_the_skipped_dats(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    slugs = list(registry.load())
+    first = dats.url(registry.load()[slugs[1]].dat).split("//")[1]
+    world.pages[first] = httpx.Response(503)
+    report = world.run(fake_throttle)
+    assert report.inconclusive == ["dat", *(f"dat:missing:{slug}" for slug in slugs[1:])]
+
+
+@pytest.mark.parametrize("status", [301, 400, 403, 500])
+def test_dat_statuses_other_than_404_are_notes(
+    world: World, fake_throttle: FakeThrottle, status: int
+) -> None:
+    first = dats.url(next(iter(registry.load().values())).dat).split("//")[1]
+    world.pages[first] = httpx.Response(status)
+    report = world.run(fake_throttle)
+    assert report.findings == []
+    assert report.notes == [f"https://{first}: HTTP {status}"]
+    assert report.inconclusive[0] == "dat"
+
+
+def test_igir_request_does_not_follow_redirects_and_keeps_the_token_local(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    seen: list[tuple[str, str | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.headers.get("Authorization")))
+        if request.url.host == "api.github.com":
+            return httpx.Response(302, headers={"Location": "https://evil.example/x"})
+        return world.handle(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    throttle, _ = fake_throttle(1.0)
+    secret = "t0ken"  # noqa: S105
+    report = canary.run(client, throttle, registry.load(), registry.ignored(), token=secret)
+    assert report.findings == []
+    assert report.notes == [f"{canary.IGIR_RELEASE_URL}: HTTP 302"]
+    assert report.inconclusive == ["igir", "igir:contract:release", "igir:update"]
+    assert [auth for host, auth in seen if auth] == ["Bearer t0ken"]
+    assert all(host != "evil.example" for host, _ in seen)
+    assert "Authorization" not in client.headers

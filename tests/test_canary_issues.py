@@ -26,6 +26,13 @@ FINDINGS = [
 ]
 
 
+LIST = "issue list --label canary --state all --limit 500 --json number,title,state,stateReason"
+
+
+def issue(number: int, key: str, state: str = "OPEN", reason: str = "") -> dict[str, object]:
+    return {"number": number, "title": f"canary: {key}", "state": state, "stateReason": reason}
+
+
 class Harness:
     def __init__(self, tmp_path: Path) -> None:
         self.bin = tmp_path / "bin"
@@ -44,8 +51,15 @@ class Harness:
         }
         self.write(FINDINGS, [])
 
-    def write(self, findings: list[dict[str, str]], issues: list[dict[str, object]]) -> None:
-        self.findings.write_text(json.dumps(findings))
+    def write(
+        self,
+        findings: list[dict[str, str]],
+        issues: list[dict[str, object]],
+        inconclusive: tuple[str, ...] = (),
+    ) -> None:
+        self.findings.write_text(
+            json.dumps({"findings": findings, "inconclusive": list(inconclusive)})
+        )
         self.issues.write_text(json.dumps(issues))
 
     def run(self, *args: str, path: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -73,7 +87,7 @@ def test_creates_an_issue_per_new_finding(harness: Harness) -> None:
     assert result.returncode == 0, result.stderr
     commands = harness.commands()
     assert commands[0].startswith("label create canary --color ")
-    assert commands[1] == "issue list --label canary --state open --limit 200 --json number,title"
+    assert commands[1] == LIST
     creates = [command for command in commands if command.startswith("issue create")]
     assert len(creates) == 2
     assert "--title canary: vimm:new-platform:Amiga" in creates[0]
@@ -84,7 +98,7 @@ def test_creates_an_issue_per_new_finding(harness: Harness) -> None:
 
 
 def test_existing_issue_is_left_alone(harness: Harness) -> None:
-    harness.write(FINDINGS, [{"number": 7, "title": "canary: vimm:new-platform:Amiga"}])
+    harness.write(FINDINGS, [issue(7, "vimm:new-platform:Amiga")])
     assert harness.run().returncode == 0
     creates = [command for command in harness.commands() if command.startswith("issue create")]
     assert len(creates) == 1
@@ -95,9 +109,10 @@ def test_resolved_issue_is_closed_with_a_comment(harness: Harness) -> None:
     harness.write(
         FINDINGS[:1],
         [
-            {"number": 7, "title": "canary: vimm:new-platform:Amiga"},
-            {"number": 9, "title": "canary: igir:update:v8.0.0"},
-            {"number": 11, "title": "unrelated issue"},
+            issue(7, "vimm:new-platform:Amiga"),
+            issue(9, "igir:update:v8.0.0"),
+            issue(11, "igir:update:v7.0.0", "CLOSED", "COMPLETED"),
+            {"number": 12, "title": "unrelated issue", "state": "OPEN", "stateReason": ""},
         ],
     )
     assert harness.run().returncode == 0
@@ -110,7 +125,7 @@ def test_resolved_issue_is_closed_with_a_comment(harness: Harness) -> None:
 def test_no_findings_closes_every_open_canary_issue(harness: Harness) -> None:
     harness.write(
         [],
-        [{"number": 7, "title": "canary: a:b"}, {"number": 8, "title": "canary: c:d"}],
+        [issue(7, "a:b"), issue(8, "c:d")],
     )
     assert harness.run().returncode == 0
     closes = [command for command in harness.commands() if command.startswith("issue close")]
@@ -120,7 +135,7 @@ def test_no_findings_closes_every_open_canary_issue(harness: Harness) -> None:
 def test_dry_run_prints_instead_of_running(harness: Harness) -> None:
     harness.write(
         FINDINGS[:1],
-        [{"number": 9, "title": "canary: igir:update:v8.0.0"}],
+        [issue(9, "igir:update:v8.0.0")],
     )
     result = harness.run("--dry-run")
     assert result.returncode == 0, result.stderr
@@ -129,9 +144,67 @@ def test_dry_run_prints_instead_of_running(harness: Harness) -> None:
     assert any(line.startswith("dry-run: gh issue create --label canary") for line in lines)
     assert "dry-run: gh issue close 9 --comment The canary no longer reports this finding." in lines
     assert all(line.isascii() for line in lines)
-    assert harness.commands() == [
-        "issue list --label canary --state open --limit 200 --json number,title"
-    ]
+    assert harness.commands() == [LIST]
+
+
+def test_closed_issue_is_recreated_unless_not_planned(harness: Harness) -> None:
+    harness.write(
+        FINDINGS,
+        [
+            issue(7, "vimm:new-platform:Amiga", "CLOSED", "NOT_PLANNED"),
+            issue(8, "igir:update:v9.0.0", "CLOSED", "COMPLETED"),
+        ],
+    )
+    assert harness.run().returncode == 0
+    commands = harness.commands()
+    creates = [command for command in commands if command.startswith("issue create")]
+    assert len(creates) == 1
+    assert "igir:update:v9.0.0" in creates[0]
+    assert not [command for command in commands if command.startswith("issue close")]
+
+
+def test_unverified_prefix_keeps_the_issue_open(harness: Harness) -> None:
+    harness.write(
+        [],
+        [
+            issue(7, "vimm:new-platform:Amiga"),
+            issue(8, "coolrom:contract:section"),
+            issue(9, "igir:update:v8.0.0"),
+        ],
+        ("vimm", "coolrom:contract:download-link"),
+    )
+    result = harness.run()
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["skip close vimm:new-platform:Amiga (unverified)"]
+    closes = [command for command in harness.commands() if command.startswith("issue close")]
+    assert [command.split()[2] for command in closes] == ["8", "9"]
+
+
+def test_unverified_skip_is_also_printed_in_dry_run(harness: Harness) -> None:
+    harness.write([], [issue(7, "igir:update:v8.0.0")], ("igir",))
+    result = harness.run("--dry-run")
+    assert "skip close igir:update:v8.0.0 (unverified)" in result.stdout
+    assert "dry-run: gh issue close" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        "[]",
+        '{"inconclusive": []}',
+        '{"findings": {}, "inconclusive": []}',
+        '{"findings": []}',
+        '{"findings": [], "inconclusive": "igir"}',
+    ],
+)
+def test_malformed_input_exits_two_before_touching_github(harness: Harness, content: str) -> None:
+    harness.findings.write_text(content)
+    result = harness.run()
+    assert result.returncode == 2
+    assert result.stderr.startswith("canary-issues: ")
+    assert "array" in result.stderr
+    assert harness.commands() == []
 
 
 def test_label_that_already_exists_is_fine(harness: Harness) -> None:

@@ -25,6 +25,7 @@ jobs:
           if [ "$status" -gt 1 ]; then
             exit "$status"
           fi
+          jq -e 'type == "object"' findings.json > /dev/null
       - name: Sync issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

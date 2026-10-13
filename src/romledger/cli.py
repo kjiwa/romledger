@@ -265,12 +265,20 @@ def run_canary(args: argparse.Namespace) -> int:
             token=os.environ.get("GITHUB_TOKEN"),
         )
     if args.json:
-        print(json.dumps([dataclasses.asdict(finding) for finding in report.findings], indent=2))
+        payload = {
+            "findings": [dataclasses.asdict(finding) for finding in report.findings],
+            "inconclusive": report.inconclusive,
+        }
+        print(json.dumps(payload, indent=2))
     else:
         for finding in report.findings:
             print(f"finding {finding.key}: {finding.title}")
+    diagnostics = sys.stderr if args.json else sys.stdout
     for note in report.notes:
-        print(f"note: {note}", file=sys.stderr if args.json else sys.stdout)
+        print(f"note: {note}", file=diagnostics)
+    if not args.json:
+        for prefix in report.inconclusive:
+            print(f"unverified {prefix}")
     return 1 if report.findings else 0
 
 

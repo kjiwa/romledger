@@ -61,13 +61,25 @@ It checks that:
 - The latest igir release matches `IGIR_VERSION`.
 
 A finding means a site, the registry, or a pin needs a change. Each has a stable key such as
-`vimm:new-platform:Amiga`, `coolrom:contract:section`, `dat:missing:nes`, or `igir:update:v5.8.0`.
-The command exits 1 when there are findings. The workflow opens one issue titled `canary: <key>`
-per finding, leaves an open one alone, and closes it with a comment once the finding is gone.
+`vimm:new-platform:Amiga`, `vimm:missing-platform:PS3`, `coolrom:contract:section`,
+`dat:missing:nes`, or `igir:update:v5.8.0`. `contract` keys mean a page changed shape; a platform
+index page with no platform links at all is `<site>:contract:platform-links`, while a registry code
+absent from an otherwise normal index is `<site>:missing-platform:<code>`. `dat:missing` means HTTP
+404. The command exits 1 when there are findings.
 
-A note means a check could not conclude: a network error, HTTP 403, 429, or 5xx, a bot challenge
-page, or a robots.txt refusal. Notes are not findings, open no issue, and leave the exit status at
-0. The rest of that site's checks are skipped; the next run tries again.
+A note means a check could not conclude: a network error, HTTP 403, 429, or 5xx, any other
+unexpected status, a bot challenge page, a robots.txt refusal, or (for GitHub's API) a redirect.
+Notes are not findings and leave the exit status at 0. The rest of that site's checks are skipped
+and listed as unverified: `--json` prints `{"findings": [...], "inconclusive": [...]}`, where
+`inconclusive` holds the key prefixes (`coolrom`, `vimm`, `internet-archive`, `dat`, `igir`, and
+the skipped checks' keys) that were not verified; without `--json` they print as
+`unverified <prefix>`. The CoolROM download check is also unverified when the section page gave no
+row to use. The next run tries again.
+
+The workflow runs `scripts/canary-issues.sh` on the JSON. It opens one issue titled
+`canary: <key>` per finding, leaves an open one alone, and closes an open one with a comment once
+its finding is gone, unless its key starts with an unverified prefix. A finding whose issue was
+closed as completed opens a new issue; close the issue as "not planned" to silence it.
 
 To support a platform a site lists, add its code to that platform's row in
 `src/romledger/platforms.toml`, or add a new row with `dat`, `vimm`, and `coolrom` keys. To decline

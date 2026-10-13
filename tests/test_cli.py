@@ -507,11 +507,11 @@ def test_dats_update_uses_the_configured_proxy(
     assert proxies == ["http://proxy.example:3128"]
 
 
-def fake_canary(monkeypatch: pytest.MonkeyPatch, report: canary.Report) -> list[tuple[object, ...]]:
-    calls: list[tuple[object, ...]] = []
+def fake_canary(monkeypatch: pytest.MonkeyPatch, report: canary.Report) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
 
     def run(*args: object, **kwargs: object) -> canary.Report:
-        calls.append((*args, kwargs))
+        calls.append(kwargs)
         return report
 
     monkeypatch.setattr(canary, "run", run)
@@ -519,54 +519,60 @@ def fake_canary(monkeypatch: pytest.MonkeyPatch, report: canary.Report) -> list[
 
 
 FINDING = canary.Finding("vimm:new-platform:Amiga", "vimm lists Amiga", "Add it.")
+NOTE = "https://a.example/: HTTP 403"
 
 
 def test_canary_all_clear(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "t0ken")
-    calls = fake_canary(monkeypatch, canary.Report([], []))
+    calls = fake_canary(monkeypatch, canary.Report([], [], []))
     assert cli.main(["canary"]) == 0
     captured = capsys.readouterr()
     assert (captured.out, captured.err) == ("", "")
-    assert calls[0][-1] == {"token": "t0ken"}
+    assert calls == [{"token": "t0ken"}]
 
 
 def test_canary_findings_exit_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    fake_canary(monkeypatch, canary.Report([FINDING], ["https://a.example/: HTTP 403"]))
+    fake_canary(monkeypatch, canary.Report([FINDING], [NOTE], ["vimm", "vimm:contract:list"]))
     assert cli.main(["canary"]) == 1
     assert capsys.readouterr().out.splitlines() == [
         "finding vimm:new-platform:Amiga: vimm lists Amiga",
-        "note: https://a.example/: HTTP 403",
+        f"note: {NOTE}",
+        "unverified vimm",
+        "unverified vimm:contract:list",
     ]
 
 
 def test_canary_notes_alone_exit_zero(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    fake_canary(monkeypatch, canary.Report([], ["https://a.example/: HTTP 403"]))
+    fake_canary(monkeypatch, canary.Report([], [NOTE], ["igir"]))
     assert cli.main(["canary"]) == 0
-    assert capsys.readouterr().out == "note: https://a.example/: HTTP 403\n"
+    assert capsys.readouterr().out == f"note: {NOTE}\nunverified igir\n"
 
 
 def test_canary_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    fake_canary(monkeypatch, canary.Report([FINDING], ["https://a.example/: HTTP 403"]))
+    fake_canary(monkeypatch, canary.Report([FINDING], [NOTE], ["igir"]))
     assert cli.main(["canary", "--json"]) == 1
     captured = capsys.readouterr()
-    assert json.loads(captured.out) == [
-        {"key": "vimm:new-platform:Amiga", "title": "vimm lists Amiga", "detail": "Add it."}
-    ]
-    assert captured.err == "note: https://a.example/: HTTP 403\n"
+    assert json.loads(captured.out) == {
+        "findings": [
+            {"key": "vimm:new-platform:Amiga", "title": "vimm lists Amiga", "detail": "Add it."}
+        ],
+        "inconclusive": ["igir"],
+    }
+    assert captured.err == f"note: {NOTE}\n"
 
 
-def test_canary_json_without_findings_is_an_empty_list(
+def test_canary_json_without_findings(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    fake_canary(monkeypatch, canary.Report([], []))
+    fake_canary(monkeypatch, canary.Report([], [], []))
     assert cli.main(["canary", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == []
+    assert json.loads(capsys.readouterr().out) == {"findings": [], "inconclusive": []}
 
 
 def test_canary_usage_error(capsys: pytest.CaptureFixture[str]) -> None:

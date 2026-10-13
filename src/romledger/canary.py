@@ -20,7 +20,6 @@ COOLROM_PLATFORM_LINK = re.compile(r'href="/roms/([a-z0-9]+)/"')
 VIMM_PLATFORM_LINK = re.compile(r'href="/vault/([A-Za-z0-9-]+)"')
 VIMM_ROW_LINK = re.compile(r'href="/vault/\d+"')
 CHALLENGE_MARKERS = ("just a moment", "checking if you are human")
-TRANSIENT_STATUSES = (httpx.codes.FORBIDDEN, httpx.codes.TOO_MANY_REQUESTS)
 
 
 @dataclass(frozen=True)
@@ -34,9 +33,14 @@ class Finding:
 class Report:
     findings: list[Finding]
     notes: list[str]
+    inconclusive: list[str]
 
 
 class Inconclusive(Exception):
+    pass
+
+
+class Skipped(Exception):
     pass
 
 
@@ -45,6 +49,12 @@ class Drift(Exception):
 
 
 Check = Callable[[], list[Finding]]
+
+
+@dataclass(frozen=True)
+class Step:
+    check: Check
+    keys: tuple[str, ...]
 
 
 def run(
@@ -57,11 +67,11 @@ def run(
 ) -> Report:
     return _merge(
         [
-            _run_checks(_coolrom_checks(client, throttle, entries, ignored["coolrom"])),
-            _run_checks(_vimm_checks(client, throttle, entries, ignored["vimm"])),
-            _run_checks(_archive_checks(client, throttle)),
-            _run_checks(_dat_checks(client, throttle, entries)),
-            _run_checks(_igir_checks(client, throttle, pinned_igir, token)),
+            _run_steps("coolrom", _coolrom_steps(client, throttle, entries, ignored["coolrom"])),
+            _run_steps("vimm", _vimm_steps(client, throttle, entries, ignored["vimm"])),
+            _run_steps("internet-archive", _archive_steps(client, throttle)),
+            _run_steps("dat", _dat_steps(client, throttle, entries)),
+            _run_steps("igir", _igir_steps(client, throttle, pinned_igir, token)),
         ]
     )
 
@@ -70,20 +80,26 @@ def _merge(reports: Sequence[Report]) -> Report:
     return Report(
         [finding for report in reports for finding in report.findings],
         [note for report in reports for note in report.notes],
+        [prefix for report in reports for prefix in report.inconclusive],
     )
 
 
-def _run_checks(checks: Sequence[Check]) -> Report:
-    findings: list[Finding] = []
-    for check in checks:
+def _run_steps(group: str, steps: Sequence[Step]) -> Report:
+    report = Report([], [], [])
+    for index, step in enumerate(steps):
         try:
-            findings.extend(check())
+            report.findings.extend(step.check())
+        except Skipped:
+            report.inconclusive.extend(step.keys)
         except Inconclusive as note:
-            return Report(findings, [str(note)])
-    return Report(findings, [])
+            report.notes.append(str(note))
+            report.inconclusive.append(group)
+            report.inconclusive.extend(key for later in steps[index:] for key in later.keys)
+            break
+    return report
 
 
-def _guarded(key: str, title: str, check: Check) -> Check:
+def _step(keys: tuple[str, ...], title: str, check: Check) -> Step:
     def guarded() -> list[Finding]:
         try:
             return check()
@@ -91,32 +107,36 @@ def _guarded(key: str, title: str, check: Check) -> Check:
             detail = str(error)
         except SourceChanged as error:
             detail = f"{error.url}: {error.what}"
-        return [Finding(key, title, detail)]
+        return [Finding(keys[0], title, detail)]
 
-    return guarded
+    return Step(guarded, keys)
 
 
-def _coolrom_checks(
+def _coolrom_steps(
     client: httpx.Client,
     throttle: http.Throttle,
     entries: Mapping[str, registry.Entry],
     ignored: frozenset[str],
-) -> list[Check]:
+) -> list[Step]:
     site = Site(coolrom.BASE_URL, coolrom.HOSTS, coolrom.MIN_GAP, client, throttle)
     first_rows: list[coolrom.Row] = []
     return [
-        _guarded(
-            "coolrom:contract:platform-links",
+        _step(
+            (
+                "coolrom:contract:platform-links",
+                "coolrom:missing-platform",
+                "coolrom:new-platform",
+            ),
             "CoolROM platform list changed",
             partial(_coolrom_platforms, site, entries, ignored),
         ),
-        _guarded(
-            "coolrom:contract:section",
+        _step(
+            ("coolrom:contract:section",),
             "CoolROM section page changed",
             partial(_coolrom_section, site, first_rows),
         ),
-        _guarded(
-            "coolrom:contract:download-link",
+        _step(
+            ("coolrom:contract:download-link",),
             "CoolROM download page changed",
             partial(_coolrom_download, site, first_rows),
         ),
@@ -142,27 +162,28 @@ def _coolrom_section(site: Site, first_rows: list[coolrom.Row]) -> list[Finding]
 
 
 def _coolrom_download(site: Site, first_rows: list[coolrom.Row]) -> list[Finding]:
-    if first_rows:
-        url = f"{coolrom.BASE_URL}/dlpop.php?id={first_rows[0].id}"
-        coolrom.parse_signed_link(_page(site, url).text, url)
+    if not first_rows:
+        raise Skipped
+    url = f"{coolrom.BASE_URL}/dlpop.php?id={first_rows[0].id}"
+    coolrom.parse_signed_link(_page(site, url).text, url)
     return []
 
 
-def _vimm_checks(
+def _vimm_steps(
     client: httpx.Client,
     throttle: http.Throttle,
     entries: Mapping[str, registry.Entry],
     ignored: frozenset[str],
-) -> list[Check]:
+) -> list[Step]:
     site = Site(VIMM_URL, VIMM_HOSTS, http.DEFAULT_GAP, client, throttle)
     return [
-        _guarded(
-            "vimm:contract:platform-links",
+        _step(
+            ("vimm:contract:platform-links", "vimm:missing-platform", "vimm:new-platform"),
             "Vimm's Lair platform list changed",
             partial(_vimm_platforms, site, entries, ignored),
         ),
-        _guarded(
-            "vimm:contract:list",
+        _step(
+            ("vimm:contract:list",),
             "Vimm's Lair list page changed",
             partial(_vimm_list, site),
         ),
@@ -189,36 +210,36 @@ def _vimm_list(site: Site) -> list[Finding]:
 def _platform_findings(
     site: str, url: str, found: set[str], mapped: set[str], ignored: frozenset[str]
 ) -> list[Finding]:
-    findings = []
-    missing = sorted(mapped - found)
-    if missing:
-        findings.append(
-            Finding(
-                f"{site}:contract:platform-links",
-                f"{site} no longer lists platforms: {', '.join(missing)}",
-                f"{url} has no link for registry codes {', '.join(missing)}. "
-                f"Correct the {site} codes in src/romledger/platforms.toml.",
-            )
+    if not found:
+        raise Drift(f"{url}: no platform links found")
+    findings = [
+        Finding(
+            f"{site}:missing-platform:{code}",
+            f"{site} no longer lists a registry platform: {code}",
+            f"{url} has no link for {code}. Correct the {site} code in "
+            "src/romledger/platforms.toml.",
         )
-    for code in sorted(found - mapped - ignored):
-        findings.append(
-            Finding(
-                f"{site}:new-platform:{code}",
-                f"{site} lists a platform missing from the registry: {code}",
-                f'{url} links {code}. Add `{site} = "{code}"` to its platform in '
-                f"src/romledger/platforms.toml, or add it to [ignore] {site}.",
-            )
+        for code in sorted(mapped - found)
+    ]
+    findings.extend(
+        Finding(
+            f"{site}:new-platform:{code}",
+            f"{site} lists a platform missing from the registry: {code}",
+            f'{url} links {code}. Add `{site} = "{code}"` to its platform in '
+            f"src/romledger/platforms.toml, or add it to [ignore] {site}.",
         )
+        for code in sorted(found - mapped - ignored)
+    )
     return findings
 
 
-def _archive_checks(client: httpx.Client, throttle: http.Throttle) -> list[Check]:
+def _archive_steps(client: httpx.Client, throttle: http.Throttle) -> list[Step]:
     site = Site(
         internet_archive.BASE_URL, internet_archive.HOSTS, http.DEFAULT_GAP, client, throttle
     )
     return [
-        _guarded(
-            "internet-archive:contract:metadata",
+        _step(
+            ("internet-archive:contract:metadata",),
             "Internet Archive metadata changed",
             partial(_archive_metadata, site),
         )
@@ -233,10 +254,13 @@ def _archive_metadata(site: Site) -> list[Finding]:
     return []
 
 
-def _dat_checks(
+def _dat_steps(
     client: httpx.Client, throttle: http.Throttle, entries: Mapping[str, registry.Entry]
-) -> list[Check]:
-    return [partial(_dat_exists, client, throttle, entry) for entry in entries.values()]
+) -> list[Step]:
+    return [
+        Step(partial(_dat_exists, client, throttle, entry), (f"dat:missing:{entry.slug}",))
+        for entry in entries.values()
+    ]
 
 
 def _dat_exists(
@@ -246,21 +270,23 @@ def _dat_exists(
     status = _send(client, throttle, "HEAD", url).status_code
     if status == httpx.codes.OK:
         return []
+    if status != httpx.codes.NOT_FOUND:
+        raise Inconclusive(f"{url}: HTTP {status}")
     return [
         Finding(
             f"dat:missing:{entry.slug}",
             f"libretro-database has no DAT for {entry.slug}",
-            f"{url}: HTTP {status}. Correct dat for {entry.slug} in src/romledger/platforms.toml.",
+            f"{url}: HTTP 404. Correct dat for {entry.slug} in src/romledger/platforms.toml.",
         )
     ]
 
 
-def _igir_checks(
+def _igir_steps(
     client: httpx.Client, throttle: http.Throttle, pinned: str, token: str | None
-) -> list[Check]:
+) -> list[Step]:
     return [
-        _guarded(
-            "igir:contract:release",
+        _step(
+            ("igir:contract:release", "igir:update"),
             "igir release lookup changed",
             partial(_igir_update, client, throttle, pinned, token),
         )
@@ -273,7 +299,9 @@ def _igir_update(
     headers = {"Accept": "application/vnd.github+json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    response = _send(client, throttle, "GET", IGIR_RELEASE_URL, headers)
+    response = _send(client, throttle, "GET", IGIR_RELEASE_URL, headers, follow_redirects=False)
+    if response.status_code != httpx.codes.OK:
+        raise Inconclusive(f"{IGIR_RELEASE_URL}: HTTP {response.status_code}")
     tag = _release_tag(response)
     if tag.removeprefix("v") == pinned:
         return []
@@ -317,18 +345,14 @@ def _send(
     method: str,
     url: str,
     headers: Mapping[str, str] | None = None,
+    *,
+    follow_redirects: bool = True,
 ) -> httpx.Response:
     throttle.wait(url)
     try:
-        response = client.request(method, url, headers=headers)
+        return client.request(method, url, headers=headers, follow_redirects=follow_redirects)
     except httpx.HTTPError as error:
         raise Inconclusive(_unreachable(url, error)) from error
-    if (
-        response.status_code in TRANSIENT_STATUSES
-        or response.status_code >= httpx.codes.INTERNAL_SERVER_ERROR
-    ):
-        raise Inconclusive(f"{url}: HTTP {response.status_code}")
-    return response
 
 
 def _unreachable(url: str, error: httpx.HTTPError) -> str:
