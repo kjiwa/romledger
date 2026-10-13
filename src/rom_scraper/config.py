@@ -72,8 +72,13 @@ def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
 def data_dir(env: Mapping[str, str] | None = None) -> Path:
     env = os.environ if env is None else env
     if env.get(DATA_ENV):
-        return Path(env[DATA_ENV]).expanduser()
-    base = env.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+        directory = Path(env[DATA_ENV]).expanduser()
+        if not directory.is_absolute():
+            raise ConfigError(f"{DATA_ENV} {env[DATA_ENV]!r} is not absolute. Use a full path.")
+        return directory
+    base = env.get("XDG_DATA_HOME", "")
+    if not os.path.isabs(base):
+        base = str(Path.home() / ".local" / "share")
     return Path(base) / "rom-scraper"
 
 
@@ -221,6 +226,8 @@ def _codes(
     allowed: list[str],
 ) -> tuple[str, ...]:
     codes = _strings(path, table, dotted, key, default=default)
+    if not codes:
+        raise ConfigError(f"{path}: {dotted} is empty. List at least one code.")
     for code in codes:
         if code not in allowed:
             hint = " Use upper case." if code.upper() in allowed else ""

@@ -63,3 +63,24 @@ igir on `PATH`.
 
 Cause: igir failed; the last 20 lines of its output follow the message. Fix: read them. Common
 causes are an unreadable directory, an old Node.js, or no network for the first `npx` download.
+
+## `igir finished without writing a report` or `igir report lacks columns`
+
+Cause: igir exited cleanly but wrote no CSV or a different format, usually a newer or older
+igir on `PATH`. Fix: remove it from `PATH` so rom-scraper uses its pinned version, or run
+igir by hand to see why.
+
+## `cannot run igir: ...`
+
+Cause: the `igir` or `npx` on `PATH` exists but cannot be executed. Fix: check its
+permissions or reinstall it.
+
+## `platforms.X.regions is empty`
+
+Cause: `regions` or `languages` is `[]`, which would filter out every game. Fix: list at least
+one code or remove the key to use the default.
+
+## `ROM_SCRAPER_DATA ... is not absolute`
+
+Cause: a relative data directory depends on the working directory, so `scan` and `status`
+would disagree. Fix: set it to a full path.

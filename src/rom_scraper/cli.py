@@ -66,7 +66,7 @@ def selected(context: Context, names: Sequence[str]) -> list[str]:
                 f"unknown platform {name!r}. Configured platforms: "
                 f"{', '.join(configured) or 'none'}."
             )
-    return list(names) or configured
+    return list(dict.fromkeys(names)) or configured
 
 
 def show_config(args: argparse.Namespace) -> int:

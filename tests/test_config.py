@@ -262,3 +262,21 @@ def test_data_dir_default_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     assert config.data_dir({}) == tmp_path / ".local" / "share" / "rom-scraper"
     assert not (tmp_path / ".local").exists()
+
+
+def test_data_dir_rejects_relative_env() -> None:
+    with pytest.raises(config.ConfigError, match="not absolute"):
+        config.data_dir({config.DATA_ENV: "data"})
+
+
+def test_data_dir_ignores_relative_xdg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert (
+        config.data_dir({"XDG_DATA_HOME": "rel"}) == tmp_path / ".local" / "share" / "rom-scraper"
+    )
+
+
+def test_empty_regions_rejected(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + "regions = []\n"
+    with pytest.raises(config.ConfigError, match="regions is empty"):
+        load(write(tmp_path, text))

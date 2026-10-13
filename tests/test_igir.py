@@ -95,10 +95,34 @@ def test_nonzero_exit_includes_last_20_lines(
     assert "line 9\n" not in message
 
 
-def test_missing_report_file_means_no_rows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_report_file_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutil, "which", fake_which({"igir"}))
 
     def quiet(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(argv, 0, "", "")
 
-    assert igir.report(Path("a.dat"), [], ("USA",), ("EN",), tmp_path / "c", quiet) == []
+    with pytest.raises(igir.ToolError, match="without writing a report"):
+        igir.report(Path("a.dat"), [], ("USA",), ("EN",), tmp_path / "c", quiet)
+
+
+def test_report_with_unexpected_columns_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(shutil, "which", fake_which({"igir"}))
+
+    def odd(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        Path(argv[argv.index("--report-output") + 1]).write_text("Foo,Bar\n1,2\n")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    with pytest.raises(igir.ToolError, match="lacks columns"):
+        igir.report(Path("a.dat"), [], ("USA",), ("EN",), tmp_path / "c", odd)
+
+
+def test_unrunnable_tool_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", fake_which({"igir"}))
+
+    def broken(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        raise PermissionError("denied")
+
+    with pytest.raises(igir.ToolError, match="cannot run igir"):
+        igir.report(Path("a.dat"), [], ("USA",), ("EN",), tmp_path / "c", broken)

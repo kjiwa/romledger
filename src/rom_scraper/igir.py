@@ -9,6 +9,7 @@ from typing import Any
 
 IGIR_VERSION = "5.7.2"
 TAIL_LINES = 20
+REPORT_COLUMNS = {"Status", "Game Name", "ROM Files"}
 
 
 class ToolError(Exception):
@@ -48,7 +49,12 @@ def report(
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "report.csv"
         argv = _argv(command(), dat, inputs, regions, languages, cache_path, output)
-        result = runner(argv, capture_output=True, text=True, check=False)
+        try:
+            result = runner(argv, capture_output=True, text=True, check=False)
+        except OSError as error:
+            raise ToolError(
+                f"cannot run {argv[0]}: {error}. Check that it is executable."
+            ) from error
         if result.returncode != 0:
             raise ToolError(_failure(argv, result))
         return _parse(output)
@@ -93,10 +99,14 @@ def _failure(argv: list[str], result: Any) -> str:
 
 def _parse(output: Path) -> list[ReportRow]:
     if not output.is_file():
-        return []
+        raise ToolError(
+            "igir finished without writing a report. Re-run with igir directly to see why."
+        )
     with output.open(newline="", encoding="utf-8") as handle:
-        return [_row(row) for row in csv.DictReader(handle)]
-
-
-def _row(row: dict[str, str]) -> ReportRow:
-    return ReportRow(row["Status"], row["Game Name"], row["ROM Files"])
+        reader = csv.DictReader(handle)
+        missing = REPORT_COLUMNS - set(reader.fieldnames or ())
+        if missing:
+            raise ToolError(
+                f"igir report lacks columns {sorted(missing)}; igir {IGIR_VERSION} expected."
+            )
+        return [ReportRow(row["Status"], row["Game Name"], row["ROM Files"]) for row in reader]

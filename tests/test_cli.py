@@ -168,7 +168,7 @@ def test_scan_runs_each_platform(
     dat.write_text("x")
     scanned: list[str] = []
     monkeypatch.setattr(scan, "scan_platform", lambda cfg, slug, data: scanned.append(slug))
-    assert run(path, "scan", "nes") == 0
+    assert run(path, "scan", "nes", "nes") == 0
     captured = capsys.readouterr()
     assert scanned == ["nes"]
     assert captured.err == "scanning nes ...\n"
