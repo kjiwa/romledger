@@ -3,16 +3,16 @@
 ## Requirements
 
 - Python 3.11+
-- Node.js 22.22+ with `npx`, or [igir](https://igir.io) on `PATH`. rom-scraper runs
+- Node.js 22.22+ with `npx`, or [igir](https://igir.io) on `PATH`. romledger runs
   `igir@5.7.2` through `npx` when `igir` is not on `PATH`.
 
 ## Config file
 
-rom-scraper reads the first of these:
+romledger reads the first of these:
 
 1. `--config FILE`
-2. `$ROM_SCRAPER_CONFIG`
-3. `$XDG_CONFIG_HOME/rom-scraper/config.toml` (default `~/.config/rom-scraper/config.toml`)
+2. `$ROMLEDGER_CONFIG`
+3. `$XDG_CONFIG_HOME/romledger/config.toml` (default `~/.config/romledger/config.toml`)
 
 Unknown keys and wrong types are errors. Paths must be absolute; `~` is expanded.
 
@@ -36,7 +36,7 @@ after_import = [["touch", "/mnt/roms/.imported"]]
 | --- | --- | --- |
 | `library.roms` | yes | RomM library roms directory. Games for `<slug>` live in `<roms>/<slug>/`. |
 | `library.inboxes` | yes | One or more mixed-platform directories where new files arrive. |
-| `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to rom-scraper. |
+| `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
 | `platforms.<slug>.regions` | no | Wanted regions, igir codes. Default `["USA", "WORLD"]`. |
 | `platforms.<slug>.languages` | no | Wanted languages, igir codes. Default `["EN"]`. |
 | `hooks.after_import` | no | Commands to run after `import` moved at least one file. Each is an argument list, run without a shell. Default none. |
@@ -58,15 +58,15 @@ listed regions and languages.
 
 DATs, the igir hash cache, and scan results live in the first of these:
 
-1. `$ROM_SCRAPER_DATA`
-2. `$XDG_DATA_HOME/rom-scraper` (default `~/.local/share/rom-scraper`)
+1. `$ROMLEDGER_DATA`
+2. `$XDG_DATA_HOME/romledger` (default `~/.local/share/romledger`)
 
 The directory is created on first use.
 
 ## Verify
 
 ```sh
-rom-scraper config
+romledger config
 ```
 
 It prints the resolved config file, data directory, library paths, and platforms. If a path
@@ -75,7 +75,7 @@ is not a directory, mount the share and run it again.
 ## dats update
 
 ```sh
-rom-scraper dats update [PLATFORM...]
+romledger dats update [PLATFORM...]
 ```
 
 Downloads the DAT of each configured platform (all by default) from libretro-database. Prints
@@ -85,7 +85,7 @@ whenever you want new releases to show up as missing.
 ## scan
 
 ```sh
-rom-scraper scan [PLATFORM...]
+romledger scan [PLATFORM...]
 ```
 
 Hashes the files in `<library.roms>/<slug>` and in every inbox, and matches them to the DAT.
@@ -102,7 +102,7 @@ Files under `<inbox>/unmatched/` and `<inbox>/duplicates/` are ignored, as are A
 ## status
 
 ```sh
-rom-scraper status
+romledger status
 ```
 
 Prints one row per configured platform: `wanted` is have + inbox + missing, `done` is
@@ -111,7 +111,7 @@ have as a percent of wanted. Platforms never scanned show `-`.
 ## missing
 
 ```sh
-rom-scraper missing PLATFORM [--links]
+romledger missing PLATFORM [--links]
 ```
 
 Prints one missing game per line. `--links` appends a tab and a Vimm's Lair search URL for
@@ -120,7 +120,7 @@ platforms Vimm's Lair carries.
 ## import
 
 ```sh
-rom-scraper import [--dry-run]
+romledger import [--dry-run]
 ```
 
 Files every inbox game that matches a DAT of a configured platform into
@@ -143,6 +143,6 @@ Exit status is 0, 1 if an `after_import` hook failed (everything else still comp
 errors.
 
 Manual downloads from Vimm's Lair: download in a browser into an inbox, then run
-`rom-scraper import`. Partial downloads are skipped until the browser renames them.
+`romledger import`. Partial downloads are skipped until the browser renames them.
 
 Disc images: igir can read CHD; matching Redump CHDs is unverified.

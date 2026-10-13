@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper.state import Counts, Item, State
+from romledger.state import Counts, Item, State
 
 ITEMS = [
     Item("Beta (USA)", "missing", None),

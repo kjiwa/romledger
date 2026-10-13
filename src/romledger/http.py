@@ -1,8 +1,8 @@
 import httpx
 
-from rom_scraper import __version__
+from romledger import __version__
 
-USER_AGENT = f"rom-scraper/{__version__} (+https://github.com/kjiwa/rom-scraper)"
+USER_AGENT = f"romledger/{__version__} (+https://github.com/kjiwa/romledger)"
 
 
 def client() -> httpx.Client:

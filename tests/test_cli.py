@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import __version__, cli, config, dats, importer, scan, state
+from romledger import __version__, cli, config, dats, importer, scan, state
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +29,7 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         cli.main(["--version"])
     assert exit_info.value.code == 0
-    assert capsys.readouterr().out.strip() == f"rom-scraper {__version__}"
+    assert capsys.readouterr().out.strip() == f"romledger {__version__}"
 
 
 def test_config_summary(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -47,7 +47,7 @@ def test_config_error_exit_code(tmp_path: Path, capsys: pytest.CaptureFixture[st
     path = make_config(tmp_path, mkdirs=False)
     assert cli.main(["--config", str(path), "config"]) == 2
     captured = capsys.readouterr()
-    assert captured.err.startswith("rom-scraper: error: ")
+    assert captured.err.startswith("romledger: error: ")
     assert "NAS share mounted" in captured.err
     assert "Traceback" not in captured.err
     assert captured.out == ""
@@ -88,7 +88,7 @@ def test_status_golden(tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFix
         "platform  wanted  have  inbox  missing  unmatched  done\n"
         "nes            4     1      1        2          1   25%\n"
         "snes           -     -      -        -          -     -\n"
-        "run: rom-scraper scan\n"
+        "run: romledger scan\n"
     )
 
 
@@ -138,7 +138,7 @@ def test_missing_links_without_vimm_code(
 
 def test_missing_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run(make_config(tmp_path), "missing", "nes") == 2
-    assert "nes has not been scanned. run: rom-scraper scan" in capsys.readouterr().err
+    assert "nes has not been scanned. run: romledger scan" in capsys.readouterr().err
 
 
 def test_unknown_platform_lists_configured(
@@ -152,8 +152,8 @@ def test_unknown_platform_lists_configured(
 def test_scan_without_dat_prints_fix(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run(make_config(tmp_path), "scan") == 2
     err = capsys.readouterr().err
-    assert err.startswith("rom-scraper: error: no DAT for nes")
-    assert err.rstrip().endswith("run: rom-scraper dats update")
+    assert err.startswith("romledger: error: no DAT for nes")
+    assert err.rstrip().endswith("run: romledger dats update")
 
 
 def test_scan_runs_each_platform(
@@ -200,7 +200,7 @@ def test_dats_error_exit_code(
 
     monkeypatch.setattr(dats, "update", fail)
     assert run(make_config(tmp_path), "dats", "update") == 2
-    assert "rom-scraper: error: http://x: HTTP 404" in capsys.readouterr().err
+    assert "romledger: error: http://x: HTTP 404" in capsys.readouterr().err
 
 
 def test_broken_pipe_exits_quietly(
@@ -271,7 +271,7 @@ def test_import_hook_failure_exits_1(
     assert run(make_config(tmp_path), "import") == 1
     captured = capsys.readouterr()
     assert captured.out == "moved nes 1\n"
-    assert captured.err == "rom-scraper: error: after_import hook failed: touch x: exit status 1\n"
+    assert captured.err == "romledger: error: after_import hook failed: touch x: exit status 1\n"
 
 
 def test_import_without_dat_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -294,4 +294,4 @@ def test_os_error_is_a_clean_error(
 
     monkeypatch.setitem(cli.HANDLERS, "status", failing)
     assert run(make_config(tmp_path), "status") == 2
-    assert capsys.readouterr().err == "rom-scraper: error: denied\n"
+    assert capsys.readouterr().err == "romledger: error: denied\n"

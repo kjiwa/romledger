@@ -5,8 +5,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from rom_scraper import dats, igir, scan
-from rom_scraper.config import Config, ConfigError
+from romledger import dats, igir, scan
+from romledger.config import Config, ConfigError
 
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]
@@ -84,7 +84,7 @@ def _relocate(paths: Sequence[Path], inboxes: Sequence[Path], directory: str) ->
         inbox = next((inbox for inbox in inboxes if path.is_relative_to(inbox)), None)
         if inbox is None:
             print(
-                f"rom-scraper: warning: {path} is not under any inbox; left in place",
+                f"romledger: warning: {path} is not under any inbox; left in place",
                 file=sys.stderr,
             )
             continue

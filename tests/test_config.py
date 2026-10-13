@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import config, registry
+from romledger import config, registry
 
 VALID = """\
 [library]
@@ -158,7 +158,7 @@ def test_resolve_env_over_xdg(tmp_path: Path) -> None:
 
 
 def test_resolve_xdg(tmp_path: Path) -> None:
-    target = tmp_path / "rom-scraper" / "config.toml"
+    target = tmp_path / "romledger" / "config.toml"
     target.parent.mkdir()
     target.write_text("")
     assert config.resolve_path(None, {"XDG_CONFIG_HOME": str(tmp_path)}) == target
@@ -166,7 +166,7 @@ def test_resolve_xdg(tmp_path: Path) -> None:
 
 def test_resolve_default_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    target = tmp_path / ".config" / "rom-scraper" / "config.toml"
+    target = tmp_path / ".config" / "romledger" / "config.toml"
     target.parent.mkdir(parents=True)
     target.write_text("")
     assert config.resolve_path(None, {}) == target
@@ -176,7 +176,7 @@ def test_resolve_missing_file(tmp_path: Path) -> None:
     with pytest.raises(config.ConfigError) as error:
         config.resolve_path(None, {"XDG_CONFIG_HOME": str(tmp_path)})
     message = str(error.value)
-    assert str(tmp_path / "rom-scraper" / "config.toml") in message
+    assert str(tmp_path / "romledger" / "config.toml") in message
     assert "not found" in message
     assert "[library]" in message
 
@@ -278,12 +278,12 @@ def test_data_dir_env_first() -> None:
 
 
 def test_data_dir_xdg() -> None:
-    assert config.data_dir({"XDG_DATA_HOME": "/y"}) == Path("/y/rom-scraper")
+    assert config.data_dir({"XDG_DATA_HOME": "/y"}) == Path("/y/romledger")
 
 
 def test_data_dir_default_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    assert config.data_dir({}) == tmp_path / ".local" / "share" / "rom-scraper"
+    assert config.data_dir({}) == tmp_path / ".local" / "share" / "romledger"
     assert not (tmp_path / ".local").exists()
 
 
@@ -294,9 +294,7 @@ def test_data_dir_rejects_relative_env() -> None:
 
 def test_data_dir_ignores_relative_xdg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert (
-        config.data_dir({"XDG_DATA_HOME": "rel"}) == tmp_path / ".local" / "share" / "rom-scraper"
-    )
+    assert config.data_dir({"XDG_DATA_HOME": "rel"}) == tmp_path / ".local" / "share" / "romledger"
 
 
 def test_empty_regions_rejected(tmp_path: Path) -> None:

@@ -14,7 +14,7 @@ class Entry:
 
 
 def load() -> dict[str, Entry]:
-    text = files("rom_scraper").joinpath("platforms.toml").read_text(encoding="utf-8")
+    text = files("romledger").joinpath("platforms.toml").read_text(encoding="utf-8")
     return {slug: _entry(slug, raw) for slug, raw in tomllib.loads(text).items()}
 
 

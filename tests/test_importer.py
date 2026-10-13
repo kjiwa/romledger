@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import config, dats, igir, importer, scan
+from romledger import config, dats, igir, importer, scan
 
 DAT_NAME = "Nintendo - Nintendo Entertainment System"
 Row = igir.ReportRow

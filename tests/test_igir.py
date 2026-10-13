@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from rom_scraper import igir
+from romledger import igir
 
 REPORT = (
     "DAT Name,Game Name,Status,ROM Files,Patched,BIOS,Retail Release\n"

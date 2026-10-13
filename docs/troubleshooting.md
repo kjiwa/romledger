@@ -1,10 +1,10 @@
 # Troubleshooting
 
-Errors print as `rom-scraper: error: <message>` and exit with status 2.
+Errors print as `romledger: error: <message>` and exit with status 2.
 
 ## `config file not found`
 
-Cause: no file at the path. Fix: pass `--config`, set `ROM_SCRAPER_CONFIG`, or create the
+Cause: no file at the path. Fix: pass `--config`, set `ROMLEDGER_CONFIG`, or create the
 file from the example in the message.
 
 ## `not a directory. Is the NAS share mounted?`
@@ -44,15 +44,15 @@ case-sensitive file names under `metadat/no-intro` and `metadat/redump`.
 ## `<url>: request failed (...)`
 
 Cause: no network, a blocked host, or a timeout. Fix: check the connection and `HTTPS_PROXY`,
-then run `rom-scraper dats update` again.
+then run `romledger dats update` again.
 
-## `no DAT for X (...). run: rom-scraper dats update`
+## `no DAT for X (...). run: romledger dats update`
 
-Cause: `scan` or `import` ran before the DAT was downloaded. Fix: run `rom-scraper dats update`.
+Cause: `scan` or `import` ran before the DAT was downloaded. Fix: run `romledger dats update`.
 
-## `X has not been scanned. run: rom-scraper scan`
+## `X has not been scanned. run: romledger scan`
 
-Cause: `missing X` ran before the first scan. Fix: run `rom-scraper scan X`.
+Cause: `missing X` ran before the first scan. Fix: run `romledger scan X`.
 
 ## `igir not found and Node.js 22.22+ (with npx) is required to run it`
 
@@ -67,7 +67,7 @@ causes are an unreadable directory, an old Node.js, or no network for the first 
 ## `igir finished without writing a report` or `igir report lacks columns`
 
 Cause: igir exited cleanly but wrote no CSV or a different format, usually a newer or older
-igir on `PATH`. Fix: remove it from `PATH` so rom-scraper uses its pinned version, or run
+igir on `PATH`. Fix: remove it from `PATH` so romledger uses its pinned version, or run
 igir by hand to see why.
 
 ## `cannot run igir: ...`
@@ -100,7 +100,7 @@ Cause: a hook returned non-zero, or could not start (the message then names the 
 The files were already imported and rescanned; `import` exits with status 1. Fix: run the
 command by hand. Hooks run only when a file moved, so re-running `import` does not retry it.
 
-## `ROM_SCRAPER_DATA ... is not absolute`
+## `ROMLEDGER_DATA ... is not absolute`
 
 Cause: a relative data directory depends on the working directory, so `scan` and `status`
 would disagree. Fix: set it to a full path.

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import cli, config, igir
-from rom_scraper.igir import ReportRow
+from romledger import cli, config, igir
+from romledger.igir import ReportRow
 
 pytestmark = pytest.mark.igir
 

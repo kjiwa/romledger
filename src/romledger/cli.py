@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from rom_scraper import (
+from romledger import (
     __version__,
     config,
     dats,
@@ -23,7 +23,7 @@ VIMM_URL = "https://vimm.net/vault/?p=list&system={system}&q={query}"
 TAGS = re.compile(r"\s*\([^)]*\)")
 MIN_QUERY = 3
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
-SCAN_HINT = "run: rom-scraper scan"
+SCAN_HINT = "run: romledger scan"
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ class Context:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rom-scraper",
+        prog="romledger",
         description="Track which retro games you have and which are missing.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -126,7 +126,7 @@ def import_games(args: argparse.Namespace) -> int:
     for line in import_lines(result, dry_run=args.dry_run):
         print(line)
     for failure in result.hook_failures:
-        print(f"rom-scraper: error: after_import hook failed: {failure}", file=sys.stderr)
+        print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
     return 1 if result.hook_failures else 0
 
 
@@ -210,11 +210,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return HANDLERS[args.command](args)
     except (config.ConfigError, dats.DatError, igir.ToolError) as error:
-        print(f"rom-scraper: error: {error}", file=sys.stderr)
+        print(f"romledger: error: {error}", file=sys.stderr)
         return 2
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
     except OSError as error:
-        print(f"rom-scraper: error: {error}", file=sys.stderr)
+        print(f"romledger: error: {error}", file=sys.stderr)
         return 2
