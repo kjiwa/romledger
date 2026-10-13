@@ -72,8 +72,9 @@ def normalize(title: str) -> str:
 
 
 def letter_of(title: str) -> str | None:
+    decomposed = unicodedata.normalize("NFKD", title).lower()
     first = next(
-        (char for char in title.lower() if char in "abcdefghijklmnopqrstuvwxyz0123456789"), None
+        (char for char in decomposed if char in "abcdefghijklmnopqrstuvwxyz0123456789"), None
     )
     return None if first is None else ("0" if first.isdigit() else first)
 
@@ -97,7 +98,10 @@ def parse_section(html: str, code: str, url: str) -> list[Row]:
 
 def parse_signed_link(html: str, url: str) -> str:
     for assignment in ASSIGNMENT.finditer(html):
-        link = SIGNED_LINK.search(json.loads(assignment[1]))
+        try:
+            link = SIGNED_LINK.search(json.loads(assignment[1]))
+        except ValueError as error:
+            raise SourceChanged(url, "download script is not a JSON string") from error
         if link:
             return link[1]
     raise SourceChanged(url, "no download link found")

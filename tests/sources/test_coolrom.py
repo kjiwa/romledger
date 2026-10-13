@@ -112,6 +112,12 @@ def test_parse_signed_link_missing_is_source_changed(html: str) -> None:
         coolrom.parse_signed_link(html, "https://coolrom.com/dlpop.php?id=1")
 
 
+def test_parse_signed_link_with_a_non_json_script_is_source_changed() -> None:
+    html = 'document.getElementById("dl").innerHTML = "<a href=\\x22u\\x22>";'
+    with pytest.raises(SourceChanged, match="not a JSON string"):
+        coolrom.parse_signed_link(html, "https://coolrom.com/dlpop.php?id=1")
+
+
 def test_parse_signed_link_handles_escaped_quotes() -> None:
     html = (
         'document.getElementById("dl").innerHTML = '
@@ -141,7 +147,7 @@ def test_normalize(title: str, expected: str) -> None:
         ("'89 Dennou", "0"),
         ("... Zero", "z"),
         ("(!) ", None),
-        ("Éclair", "c"),
+        ("Éclair", "e"),
     ],
 )
 def test_letter_of(title: str, expected: str | None) -> None:

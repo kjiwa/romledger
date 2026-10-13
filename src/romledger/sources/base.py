@@ -72,10 +72,13 @@ def fetch_to(
     name = _safe_name(candidate.filename)
     final = inbox / name
     part = inbox / f"{name}{PARTIAL}"
+    inbox.mkdir(parents=True, exist_ok=True)
     url = candidate.url_resolver()
     offset = part.stat().st_size if part.is_file() else 0
     throttle.wait(url)
-    headers = {"Range": f"bytes={offset}-"} if offset else {}
+    headers = {"Accept-Encoding": "identity"}
+    if offset:
+        headers["Range"] = f"bytes={offset}-"
     with client.stream("GET", url, headers=headers) as response:
         resumed = _check_response(response, url, offset, part)
         expected = _expected_size(response, offset if resumed else 0, candidate)

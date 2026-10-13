@@ -95,10 +95,12 @@ class _Run:
                 failure = str(error)
             except (FetchError, httpx.HTTPError, OSError) as error:
                 failure = str(error) or type(error).__name__
+        if blocked and failure is None:
+            failure = "blocked by robots.txt"
         if failure is not None:
             print(f"failed {game}: {failure}")
             self.result.failed.append((game, failure))
-        elif not blocked:
+        else:
             print(f"not found {game}")
             self.result.not_found.append(game)
 

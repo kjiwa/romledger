@@ -24,13 +24,13 @@ class InternetArchiveSource:
         entry = self._listing().get(f"{game}.zip")
         if entry is None:
             return None
-        url = f"{BASE_URL}/download/{self._item}/{quote(entry['name'])}"
+        url = f"{BASE_URL}/download/{self._item}/{quote(entry['name'], safe='/')}"
         size = str(entry.get("size", ""))
         md5 = entry.get("md5")
         return Candidate(
             game,
             lambda: url,
-            entry["name"],
+            entry["name"].rsplit("/", 1)[-1],
             int(size) if size.isdigit() else None,
             md5 if isinstance(md5, str) else None,
         )
@@ -49,8 +49,8 @@ def _index(response: httpx.Response, url: str, item: str) -> dict[str, dict[str,
         raise SourceChanged(url, "response is not the expected JSON object") from error
     if not isinstance(files, list) or not files:
         raise SourceChanged(url, f"no files listed for item {item!r}")
-    return {
-        entry["name"]: entry
-        for entry in files
-        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
-    }
+    index: dict[str, dict[str, Any]] = {}
+    for entry in files:
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+            index.setdefault(entry["name"].rsplit("/", 1)[-1], entry)
+    return index

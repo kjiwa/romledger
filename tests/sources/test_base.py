@@ -45,6 +45,14 @@ def test_fetch_writes_final_file_atomically(tmp_path: Path) -> None:
     assert "Range" not in seen[0].headers
 
 
+def test_fetch_creates_the_inbox_and_asks_for_an_unencoded_body(tmp_path: Path) -> None:
+    seen: list[httpx.Request] = []
+    inbox = tmp_path / "new" / "inbox"
+    final = run(inbox, serve(httpx.Response(200, content=BODY), seen))
+    assert final.read_bytes() == BODY
+    assert seen[0].headers["Accept-Encoding"] == "identity"
+
+
 def test_fetch_resumes_a_partial_file(tmp_path: Path) -> None:
     (tmp_path / "Game (USA).zip.part").write_bytes(BODY[:4])
     seen: list[httpx.Request] = []

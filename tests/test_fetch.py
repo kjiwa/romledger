@@ -158,7 +158,9 @@ def test_a_failure_survives_a_later_miss(inbox: Path, data_dir: Path) -> None:
 
 def test_an_unwritable_inbox_fails_each_game(data_dir: Path, tmp_path: Path) -> None:
     source = FakeSource("coolrom", {game: found(game) for game in GAMES})
-    result = run(tmp_path / "missing", data_dir, [source])
+    blocker = tmp_path / "a-file"
+    blocker.write_text("x")
+    result = run(blocker, data_dir, [source])
     assert [game for game, _ in result.failed] == GAMES
 
 
@@ -189,7 +191,7 @@ def test_blocked_source_is_skipped(
     blocked = FakeSource("coolrom", {"Alpha (USA)": SourceBlocked("https://c/x", "robots")})
     result = run(inbox, data_dir, [blocked])
     assert result.blocked == ["https://c/x: not fetched, robots"]
-    assert result.failed == []
+    assert result.failed == [("Alpha (USA)", "blocked by robots.txt")]
     assert result.not_found == []
     assert blocked.asked == ["Alpha (USA)"]
     assert "https://c/x: not fetched, robots" in capsys.readouterr().err

@@ -79,6 +79,16 @@ def test_entries_without_size_or_md5() -> None:
     assert (numeric.size, numeric.md5) == (5, None)
 
 
+def test_files_in_subfolders_match_by_name() -> None:
+    files = [{"name": "Roms/Sub dir/A (USA).zip", "size": "3"}]
+    candidate = Archive(json.dumps({"files": files})).source().find("A (USA)")
+    assert candidate is not None
+    assert candidate.filename == "A (USA).zip"
+    assert candidate.url_resolver() == (
+        "https://archive.org/download/No-Intro_NES/Roms/Sub%20dir/A%20%28USA%29.zip"
+    )
+
+
 @pytest.mark.live
 def test_live_metadata() -> None:
     with http.client() as client:
