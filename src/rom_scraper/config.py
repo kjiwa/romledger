@@ -63,6 +63,10 @@ def load(path: Path) -> Config:
             data = tomllib.load(handle)
     except tomllib.TOMLDecodeError as error:
         raise ConfigError(f"{path}: invalid TOML ({error}). Fix the syntax.") from error
+    except (OSError, UnicodeDecodeError) as error:
+        raise ConfigError(
+            f"{path}: cannot read the file ({error}). Fix its permissions."
+        ) from error
     _reject_unknown(path, "", data, {"library", "platforms"})
     library = _table(path, data, "library", required=True)
     platforms = _table(path, data, "platforms", required=False)
@@ -88,8 +92,8 @@ def _parse_library(path: Path, table: dict[str, Any]) -> Library:
     if not inboxes:
         raise ConfigError(f"{path}: library.inboxes is empty. List at least one inbox directory.")
     return Library(
-        roms=Path(roms).expanduser(),
-        inboxes=tuple(Path(inbox).expanduser() for inbox in inboxes),
+        roms=_directory(path, "library.roms", roms),
+        inboxes=tuple(_directory(path, "library.inboxes", inbox) for inbox in inboxes),
     )
 
 
@@ -104,6 +108,16 @@ def _parse_platform(path: Path, slug: str, raw: object) -> Platform:
         regions=_strings(path, raw, f"{key}.regions", "regions", default=defaults.regions),
         languages=_strings(path, raw, f"{key}.languages", "languages", default=defaults.languages),
     )
+
+
+def _directory(path: Path, dotted: str, value: str) -> Path:
+    try:
+        directory = Path(value).expanduser()
+    except RuntimeError as error:
+        raise ConfigError(f"{path}: {dotted} {value!r}: {error}. Use an absolute path.") from error
+    if not directory.is_absolute():
+        raise ConfigError(f"{path}: {dotted} {value!r} is not absolute. Use a full path or ~/...")
+    return directory
 
 
 def _table(path: Path, data: dict[str, Any], name: str, *, required: bool) -> dict[str, Any]:
@@ -148,6 +162,6 @@ def _strings(
             raise ConfigError(f"{path}: missing {dotted}. Add it as a list of strings.")
         return default
     value = table[key]
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ConfigError(f'{path}: {dotted} must be a list of strings, e.g. ["a", "b"].')
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        raise ConfigError(f'{path}: {dotted} must be a list of non-empty strings, e.g. ["a", "b"].')
     return tuple(value)

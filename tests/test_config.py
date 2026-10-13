@@ -61,7 +61,9 @@ def test_unknown_top_level_key(tmp_path: Path) -> None:
 
 def test_wrong_type(tmp_path: Path) -> None:
     text = valid_text(tmp_path).replace('inboxes = ["', 'inboxes = "').replace('"]', '"')
-    with pytest.raises(config.ConfigError, match=r"library\.inboxes must be a list of strings"):
+    with pytest.raises(
+        config.ConfigError, match=r"library\.inboxes must be a list of non-empty strings"
+    ):
         config.load(write(tmp_path, text))
 
 
@@ -169,3 +171,28 @@ def test_check_library_missing_inbox(tmp_path: Path) -> None:
     loaded = config.load(write(tmp_path, valid_text(tmp_path)))
     with pytest.raises(config.ConfigError, match=r"inbox: not a directory"):
         config.check_library(loaded)
+
+
+def test_relative_path_rejected(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace(str(tmp_path / "roms"), "roms")
+    with pytest.raises(config.ConfigError, match=r"library\.roms 'roms' is not absolute"):
+        config.load(write(tmp_path, text))
+
+
+def test_unknown_user_home_rejected(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace(str(tmp_path / "roms"), "~no-such-user-xyz/roms")
+    with pytest.raises(config.ConfigError, match=r"library\.roms"):
+        config.load(write(tmp_path, text))
+
+
+def test_empty_list_item_rejected(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + 'regions = [""]\n'
+    with pytest.raises(config.ConfigError, match="non-empty strings"):
+        config.load(write(tmp_path, text))
+
+
+def test_non_utf8_file_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_bytes(b"\xff\xfe\x00")
+    with pytest.raises(config.ConfigError, match="cannot read the file"):
+        config.load(path)

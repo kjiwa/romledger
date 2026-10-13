@@ -1,11 +1,5 @@
 # Setup
 
-## Install
-
-```sh
-uv tool install git+ssh://git@github.com/kjiwa/rom-scraper
-```
-
 ## Config file
 
 rom-scraper reads the first of these:
@@ -14,7 +8,7 @@ rom-scraper reads the first of these:
 2. `$ROM_SCRAPER_CONFIG`
 3. `$XDG_CONFIG_HOME/rom-scraper/config.toml` (default `~/.config/rom-scraper/config.toml`)
 
-Unknown keys and wrong types are errors. `~` is expanded in paths.
+Unknown keys and wrong types are errors. Paths must be absolute; `~` is expanded.
 
 ```toml
 [library]

@@ -29,7 +29,9 @@ def test_config_summary(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     assert cli.main(["--config", str(path), "config"]) == 0
     out = capsys.readouterr().out
     assert str(path) in out
-    assert "nes: no-intro/Nintendo - Nintendo Entertainment System [USA, World]" in out
+    assert "nes: no-intro/Nintendo - Nintendo Entertainment System" in out
+    assert "  regions: USA, World" in out
+    assert "  languages: En" in out
     assert out.isascii()
 
 

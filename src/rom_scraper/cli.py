@@ -25,7 +25,9 @@ def show_config(config_arg: str | None) -> None:
     for inbox in loaded.library.inboxes:
         print(f"inbox:   {inbox}")
     for slug, platform in loaded.platforms.items():
-        print(f"{slug}: {platform.dat} [{', '.join(platform.regions)}]")
+        print(f"{slug}: {platform.dat}")
+        print(f"  regions: {', '.join(platform.regions)}")
+        print(f"  languages: {', '.join(platform.languages)}")
 
 
 def main(argv: list[str] | None = None) -> int:
