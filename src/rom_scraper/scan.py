@@ -1,0 +1,63 @@
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
+from pathlib import Path
+
+from rom_scraper import dats, igir, state
+from rom_scraper.config import Config, Platform
+
+FOUND = "FOUND"
+MISSING = "MISSING"
+UNUSED = "UNUSED"
+
+IgirReport = Callable[..., list[igir.ReportRow]]
+
+
+def classify(
+    library_rows: Sequence[igir.ReportRow], inbox_rows: Sequence[igir.ReportRow]
+) -> tuple[list[state.Item], list[str]]:
+    items = {
+        row.game: state.Item(row.game, "have", row.path)
+        for row in library_rows
+        if row.status == FOUND
+    }
+    for row in inbox_rows:
+        if row.status == FOUND and row.game not in items:
+            items[row.game] = state.Item(row.game, "inbox", row.path)
+    for row in library_rows:
+        if row.status == MISSING and row.game not in items:
+            items[row.game] = state.Item(row.game, "missing", None)
+    unmatched = [row.path for row in library_rows if row.status == UNUSED]
+    return list(items.values()), unmatched
+
+
+def cache_path(data_dir: Path) -> Path:
+    return data_dir / "igir.cache"
+
+
+def scan_platform(
+    config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
+) -> None:
+    platform = config.platforms[slug]
+    dat = dats.dat_path(data_dir, platform.dat)
+    inbox_rows = _report(igir_report, dat, config.library.inboxes, platform, data_dir)
+    library = config.library.roms / slug
+    if library.is_dir():
+        library_rows = _report(igir_report, dat, [library], platform, data_dir)
+    else:
+        # No library directory yet: everything the inbox lacks is missing.
+        library_rows = [row for row in inbox_rows if row.status == MISSING]
+    items, unmatched = classify(library_rows, inbox_rows)
+    with state.State(data_dir / "state.db") as database:
+        database.replace_platform(
+            slug, items, unmatched, dats.version_of(dat), datetime.now(UTC).isoformat()
+        )
+
+
+def _report(
+    igir_report: IgirReport,
+    dat: Path,
+    inputs: Sequence[Path],
+    platform: Platform,
+    data_dir: Path,
+) -> list[igir.ReportRow]:
+    return igir_report(dat, inputs, platform.regions, platform.languages, cache_path(data_dir))
