@@ -48,7 +48,7 @@ then run `rom-scraper dats update` again.
 
 ## `no DAT for X (...). run: rom-scraper dats update`
 
-Cause: `scan` ran before the DAT was downloaded. Fix: run `rom-scraper dats update`.
+Cause: `scan` or `import` ran before the DAT was downloaded. Fix: run `rom-scraper dats update`.
 
 ## `X has not been scanned. run: rom-scraper scan`
 
@@ -79,6 +79,26 @@ permissions or reinstall it.
 
 Cause: `regions` or `languages` is `[]`, which would filter out every game. Fix: list at least
 one code or remove the key to use the default.
+
+## `hooks.after_import must be a list of commands`
+
+Cause: the value is not a list of argument lists, or an argument is empty. Fix: write
+`after_import = [["touch", "/mnt/roms/.imported"]]`.
+
+## `unknown key hooks.X`
+
+Cause: `[hooks]` supports only `after_import`. Fix: remove the key.
+
+## `warning: <path> is not under any inbox; left in place`
+
+Cause: igir reported a file outside every configured inbox, so `import` will not move it. Fix:
+move it by hand, or add its directory to `library.inboxes`.
+
+## `after_import hook failed: <command>: exit status N`
+
+Cause: a hook returned non-zero, or could not start (the message then names the OS error).
+The files were already imported and rescanned; `import` exits with status 1. Fix: run the
+command by hand. Hooks run only when a file moved, so re-running `import` does not retry it.
 
 ## `ROM_SCRAPER_DATA ... is not absolute`
 

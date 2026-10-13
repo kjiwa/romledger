@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import __version__, cli, config, dats, scan, state
+from rom_scraper import __version__, cli, config, dats, importer, scan, state
 
 
 @pytest.fixture(autouse=True)
@@ -214,3 +214,66 @@ def test_broken_pipe_exits_quietly(
     monkeypatch.setitem(cli.HANDLERS, "status", broken)
     assert run(make_config(tmp_path), "status") == 0
     assert len(redirected) == 1
+
+
+def fake_import(result: importer.ImportResult, calls: list[bool]) -> object:
+    def import_inboxes(cfg: config.Config, data: Path, dry_run: bool) -> importer.ImportResult:
+        calls.append(dry_run)
+        return result
+
+    return import_inboxes
+
+
+def test_import_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+    result = importer.ImportResult({"nes": 2, "snes": 1}, [Path("a")], [Path("b"), Path("c")], [])
+    monkeypatch.setattr(importer, "import_inboxes", fake_import(result, calls))
+    assert run(make_config(tmp_path), "import") == 0
+    out = capsys.readouterr().out
+    assert out == (
+        "moved nes 2\nmoved snes 1\n"
+        "duplicates 1 (moved to <inbox>/duplicates)\n"
+        "unmatched 2 (moved to <inbox>/unmatched)\n"
+    )
+    assert out.isascii()
+    assert calls == [False]
+
+
+def test_import_dry_run_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+    result = importer.ImportResult({"nes": 2}, [], [Path("b")], [])
+    monkeypatch.setattr(importer, "import_inboxes", fake_import(result, calls))
+    assert run(make_config(tmp_path), "import", "--dry-run") == 0
+    assert capsys.readouterr().out == (
+        "would move nes 2\nunmatched 1 (would move to <inbox>/unmatched)\n"
+    )
+    assert calls == [True]
+
+
+def test_import_empty_inbox(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = importer.ImportResult({}, [], [], [])
+    monkeypatch.setattr(importer, "import_inboxes", fake_import(result, []))
+    assert run(make_config(tmp_path), "import") == 0
+    assert capsys.readouterr().out == "inbox is empty\n"
+
+
+def test_import_hook_failure_exits_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = importer.ImportResult({"nes": 1}, [], [], ["touch x: exit status 1"])
+    monkeypatch.setattr(importer, "import_inboxes", fake_import(result, []))
+    assert run(make_config(tmp_path), "import") == 1
+    captured = capsys.readouterr()
+    assert captured.out == "moved nes 1\n"
+    assert captured.err == "rom-scraper: error: after_import hook failed: touch x: exit status 1\n"
+
+
+def test_import_without_dat_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(make_config(tmp_path), "import") == 2
+    assert "no DAT for nes" in capsys.readouterr().err

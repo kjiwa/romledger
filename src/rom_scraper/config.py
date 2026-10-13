@@ -47,9 +47,15 @@ class Platform:
 
 
 @dataclass(frozen=True)
+class Hooks:
+    after_import: tuple[tuple[str, ...], ...] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     library: Library
     platforms: dict[str, Platform]
+    hooks: Hooks = Hooks()
 
 
 def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
@@ -92,15 +98,17 @@ def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config
         raise ConfigError(
             f"{path}: cannot read the file ({error}). Fix its permissions."
         ) from error
-    _reject_unknown(path, "", data, {"library", "platforms"})
+    _reject_unknown(path, "", data, {"library", "platforms", "hooks"})
     library = _table(path, data, "library", required=True)
     platforms = _table(path, data, "platforms", required=False)
+    hooks = _table(path, data, "hooks", required=False)
     return Config(
         library=_parse_library(path, library),
         platforms={
             slug: _parse_platform(path, slug, raw, platforms_registry)
             for slug, raw in platforms.items()
         },
+        hooks=_parse_hooks(path, hooks),
     )
 
 
@@ -123,6 +131,20 @@ def _parse_library(path: Path, table: dict[str, Any]) -> Library:
         roms=_directory(path, "library.roms", roms),
         inboxes=tuple(_directory(path, "library.inboxes", inbox) for inbox in inboxes),
     )
+
+
+def _parse_hooks(path: Path, table: dict[str, Any]) -> Hooks:
+    _reject_unknown(path, "hooks.", table, {"after_import"})
+    commands = table.get("after_import", [])
+    if not isinstance(commands, list) or not all(
+        isinstance(argv, list) and argv and all(isinstance(arg, str) and arg for arg in argv)
+        for argv in commands
+    ):
+        raise ConfigError(
+            f"{path}: hooks.after_import must be a list of commands, each a non-empty list of "
+            'non-empty strings, e.g. [["touch", "/mnt/roms/.imported"]].'
+        )
+    return Hooks(after_import=tuple(tuple(argv) for argv in commands))
 
 
 def _parse_platform(

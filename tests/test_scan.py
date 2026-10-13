@@ -1,4 +1,7 @@
+from collections.abc import Sequence
 from pathlib import Path
+
+import pytest
 
 from rom_scraper import config, dats, igir, registry, scan, state
 
@@ -6,7 +9,7 @@ ReportRow = igir.ReportRow
 
 
 def row(status: str, game: str = "", path: str = "") -> ReportRow:
-    return ReportRow(status, game, path)
+    return ReportRow("Nintendo", status, game, path)
 
 
 def test_library_found_is_have() -> None:
@@ -46,17 +49,17 @@ def make_config(tmp_path: Path, *, library: bool) -> config.Config:
     )
 
 
-def fake_report(calls: list[list[Path]]) -> scan.IgirReport:
+def fake_report(calls: list[tuple[list[Path], Sequence[str]]]) -> scan.IgirReport:
     def report(
-        dat: Path,
+        dats: list[Path],
         inputs: list[Path],
-        regions: tuple[str, ...],
-        languages: tuple[str, ...],
         cache: Path,
+        filters: igir.Filters | None,
+        excludes: Sequence[str],
     ) -> list[ReportRow]:
-        calls.append(list(inputs))
-        assert regions == ("USA", "WORLD")
-        assert languages == ("EN",)
+        calls.append((list(inputs), excludes))
+        assert len(dats) == 1
+        assert filters == igir.Filters(("USA", "WORLD"), ("EN",))
         if inputs[0].name == "inbox":
             return [row("FOUND", "B", "/i/B"), row("MISSING", "A"), row("MISSING", "C")]
         return [row("FOUND", "A", "/l/A"), row("MISSING", "B"), row("UNUSED", path="/l/x")]
@@ -73,9 +76,13 @@ def write_dat(tmp_path: Path, cfg: config.Config) -> None:
 def test_scan_platform_with_library(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=True)
     write_dat(tmp_path, cfg)
-    calls: list[list[Path]] = []
+    calls: list[tuple[list[Path], Sequence[str]]] = []
     scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report(calls))
-    assert calls == [[tmp_path / "inbox"], [tmp_path / "roms" / "nes"]]
+    inbox = tmp_path / "inbox"
+    assert calls == [
+        ([inbox], (f"{inbox}/unmatched/**", f"{inbox}/duplicates/**")),
+        ([tmp_path / "roms" / "nes"], ()),
+    ]
     with state.State(tmp_path / "data" / "state.db") as database:
         assert database.counts()["nes"] == state.Counts(have=1, inbox=1, missing=0, unmatched=1)
 
@@ -83,8 +90,16 @@ def test_scan_platform_with_library(tmp_path: Path) -> None:
 def test_scan_platform_without_library_dir(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=False)
     write_dat(tmp_path, cfg)
-    calls: list[list[Path]] = []
+    calls: list[tuple[list[Path], Sequence[str]]] = []
     scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report(calls))
-    assert calls == [[tmp_path / "inbox"]]
+    assert [inputs for inputs, _ in calls] == [[tmp_path / "inbox"]]
     with state.State(tmp_path / "data" / "state.db") as database:
         assert database.counts()["nes"] == state.Counts(have=0, inbox=1, missing=2, unmatched=0)
+
+
+def test_require_dats(tmp_path: Path) -> None:
+    cfg = make_config(tmp_path, library=True)
+    with pytest.raises(config.ConfigError, match=r"no DAT for nes .*dats update"):
+        scan.require_dats(cfg, ["nes"], tmp_path / "data")
+    write_dat(tmp_path, cfg)
+    scan.require_dats(cfg, ["nes"], tmp_path / "data")

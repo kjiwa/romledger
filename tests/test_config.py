@@ -59,8 +59,31 @@ def test_unknown_key(tmp_path: Path) -> None:
 
 
 def test_unknown_top_level_key(tmp_path: Path) -> None:
-    with pytest.raises(config.ConfigError, match="unknown key hooks"):
-        load(write(tmp_path, valid_text(tmp_path) + "\n[hooks]\n"))
+    with pytest.raises(config.ConfigError, match="unknown key bogus"):
+        load(write(tmp_path, "bogus = 1\n" + valid_text(tmp_path)))
+
+
+def test_hooks_default_empty(tmp_path: Path) -> None:
+    assert load(write(tmp_path, valid_text(tmp_path))).hooks.after_import == ()
+
+
+def test_hooks_parsed(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + '\n[hooks]\nafter_import = [["touch", "/x"], ["true"]]\n'
+    assert load(write(tmp_path, text)).hooks.after_import == (("touch", "/x"), ("true",))
+
+
+def test_unknown_hooks_key(tmp_path: Path) -> None:
+    with pytest.raises(config.ConfigError, match=r"unknown key hooks\.before_import"):
+        load(write(tmp_path, valid_text(tmp_path) + "\n[hooks]\nbefore_import = []\n"))
+
+
+@pytest.mark.parametrize(
+    "value", ['"touch x"', '["touch"]', "[[]]", '[[""]]', "[[1]]", '[["a"], "b"]']
+)
+def test_invalid_hooks(tmp_path: Path, value: str) -> None:
+    text = valid_text(tmp_path) + f"\n[hooks]\nafter_import = {value}\n"
+    with pytest.raises(config.ConfigError, match=r"hooks\.after_import must be a list of commands"):
+        load(write(tmp_path, text))
 
 
 def test_wrong_type(tmp_path: Path) -> None:

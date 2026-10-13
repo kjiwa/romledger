@@ -9,7 +9,10 @@ from typing import Any
 
 IGIR_VERSION = "5.7.2"
 TAIL_LINES = 20
-REPORT_COLUMNS = {"Status", "Game Name", "ROM Files"}
+REPORT_COLUMNS = {"DAT Name", "Status", "Game Name", "ROM Files"}
+JUNK_EXCLUDES = ("**/._*", "**/.DS_Store", "**/*.part", "**/*.crdownload", "**/*.download")
+UNMATCHED_DIR = "unmatched"
+DUPLICATES_DIR = "duplicates"
 
 
 class ToolError(Exception):
@@ -18,9 +21,16 @@ class ToolError(Exception):
 
 @dataclass(frozen=True)
 class ReportRow:
+    dat: str
     status: str
     game: str
     path: str
+
+
+@dataclass(frozen=True)
+class Filters:
+    regions: Sequence[str]
+    languages: Sequence[str]
 
 
 Runner = Callable[..., Any]
@@ -37,56 +47,76 @@ def command() -> list[str]:
     )
 
 
+def inbox_excludes(inboxes: Sequence[Path]) -> tuple[str, ...]:
+    return tuple(
+        f"{inbox}/{name}/**" for inbox in inboxes for name in (UNMATCHED_DIR, DUPLICATES_DIR)
+    )
+
+
 def report(
-    dat: Path,
+    dats: Sequence[Path],
     inputs: Sequence[Path],
-    regions: Sequence[str],
-    languages: Sequence[str],
     cache_path: Path,
+    filters: Filters | None = None,
+    excludes: Sequence[str] = (),
     runner: Runner = subprocess.run,
 ) -> list[ReportRow]:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "report.csv"
-        argv = _argv(command(), dat, inputs, regions, languages, cache_path, output)
-        try:
-            result = runner(argv, capture_output=True, text=True, check=False)
-        except OSError as error:
-            raise ToolError(
-                f"cannot run {argv[0]}: {error}. Check that it is executable."
-            ) from error
-        if result.returncode != 0:
-            raise ToolError(_failure(argv, result))
+        argv = _argv("report", dats, inputs, excludes, cache_path)
+        if filters:
+            argv += _filter_args(filters)
+        argv += ["--report-output", str(output)]
+        _run(argv, runner)
         return _parse(output)
 
 
-def _argv(
-    base: list[str],
-    dat: Path,
+def move(
+    dats: Sequence[Path],
     inputs: Sequence[Path],
-    regions: Sequence[str],
-    languages: Sequence[str],
+    output_template: str,
     cache_path: Path,
-    output: Path,
+    excludes: Sequence[str] = (),
+    runner: Runner = subprocess.run,
+) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    argv = _argv("move", dats, inputs, excludes, cache_path)
+    _run([*argv, "--output", output_template], runner)
+
+
+def _run(argv: list[str], runner: Runner) -> None:
+    try:
+        result = runner(argv, capture_output=True, text=True, check=False)
+    except OSError as error:
+        raise ToolError(f"cannot run {argv[0]}: {error}. Check that it is executable.") from error
+    if result.returncode != 0:
+        raise ToolError(_failure(argv, result))
+
+
+def _argv(
+    verb: str,
+    dats: Sequence[Path],
+    inputs: Sequence[Path],
+    excludes: Sequence[str],
+    cache_path: Path,
 ) -> list[str]:
-    argv = [*base, "report", "--dat", str(dat)]
+    argv = [*command(), verb]
+    for dat in dats:
+        argv += ["--dat", str(dat)]
     for directory in inputs:
         argv += ["--input", str(directory)]
+    patterns = [f"{directory}/{junk}" for directory in inputs for junk in JUNK_EXCLUDES]
+    for pattern in (*patterns, *excludes):
+        argv += ["--input-exclude", pattern]
+    return [*argv, "--cache-path", str(cache_path)]
+
+
+def _filter_args(filters: Filters) -> list[str]:
+    regions, languages = ",".join(filters.regions), ",".join(filters.languages)
     return [
-        *argv,
-        "--single",
-        "--filter-region",
-        ",".join(regions),
-        "--filter-language",
-        ",".join(languages),
-        "--prefer-region",
-        ",".join(regions),
-        "--prefer-language",
-        ",".join(languages),
-        "--cache-path",
-        str(cache_path),
-        "--report-output",
-        str(output),
+        *("--single", "--filter-region", regions, "--filter-language", languages),
+        *("--prefer-region", regions, "--prefer-language", languages),
     ]
 
 
@@ -109,4 +139,7 @@ def _parse(output: Path) -> list[ReportRow]:
             raise ToolError(
                 f"igir report lacks columns {sorted(missing)}; igir {IGIR_VERSION} expected."
             )
-        return [ReportRow(row["Status"], row["Game Name"], row["ROM Files"]) for row in reader]
+        return [
+            ReportRow(row["DAT Name"], row["Status"], row["Game Name"], row["ROM Files"])
+            for row in reader
+        ]

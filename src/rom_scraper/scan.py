@@ -3,11 +3,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rom_scraper import dats, igir, state
-from rom_scraper.config import Config, Platform
+from rom_scraper.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
 MISSING = "MISSING"
 UNUSED = "UNUSED"
+DATS_HINT = "run: rom-scraper dats update"
 
 IgirReport = Callable[..., list[igir.ReportRow]]
 
@@ -34,15 +35,23 @@ def cache_path(data_dir: Path) -> Path:
     return data_dir / "igir.cache"
 
 
+def require_dats(config: Config, slugs: Sequence[str], data_dir: Path) -> None:
+    for slug in slugs:
+        dat = dats.dat_path(data_dir, config.platforms[slug].dat)
+        if not dat.is_file():
+            raise ConfigError(f"no DAT for {slug} ({dat}). {DATS_HINT}")
+
+
 def scan_platform(
     config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
 ) -> None:
     platform = config.platforms[slug]
     dat = dats.dat_path(data_dir, platform.dat)
-    inbox_rows = _report(igir_report, dat, config.library.inboxes, platform, data_dir)
+    excludes = igir.inbox_excludes(config.library.inboxes)
+    inbox_rows = _report(igir_report, dat, config.library.inboxes, platform, data_dir, excludes)
     library = config.library.roms / slug
     if library.is_dir():
-        library_rows = _report(igir_report, dat, [library], platform, data_dir)
+        library_rows = _report(igir_report, dat, [library], platform, data_dir, ())
     else:
         # No library directory yet: everything the inbox lacks is missing.
         library_rows = [row for row in inbox_rows if row.status == MISSING]
@@ -59,5 +68,7 @@ def _report(
     inputs: Sequence[Path],
     platform: Platform,
     data_dir: Path,
+    excludes: Sequence[str],
 ) -> list[igir.ReportRow]:
-    return igir_report(dat, inputs, platform.regions, platform.languages, cache_path(data_dir))
+    filters = igir.Filters(platform.regions, platform.languages)
+    return igir_report([dat], inputs, cache_path(data_dir), filters, excludes)
