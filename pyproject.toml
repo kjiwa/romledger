@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rom-scraper"
+version = "0.1.0"
+description = "Track which retro games you have and which are missing, verified against No-Intro and Redump DATs."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+rom-scraper = "rom_scraper.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov", "mypy", "ruff"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rom_scraper"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=rom_scraper --cov-report=term-missing"
+
+[tool.coverage.report]
+fail_under = 90
