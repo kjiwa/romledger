@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rom_scraper import config, dats, igir, registry, scan, state
+from romledger import config, dats, igir, registry, scan, state
 
 ReportRow = igir.ReportRow
 

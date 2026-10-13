@@ -2,13 +2,13 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rom_scraper import dats, igir, state
-from rom_scraper.config import Config, ConfigError, Platform
+from romledger import dats, igir, state
+from romledger.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
 MISSING = "MISSING"
 UNUSED = "UNUSED"
-DATS_HINT = "run: rom-scraper dats update"
+DATS_HINT = "run: romledger dats update"
 
 IgirReport = Callable[..., list[igir.ReportRow]]
 

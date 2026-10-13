@@ -4,7 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from rom_scraper import dats
+from romledger import dats
 
 BODY = b'clrmamepro (\n\tname "Nintendo"\n\tversion "2026.10.01"\n)\n'
 

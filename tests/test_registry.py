@@ -2,11 +2,11 @@ from importlib.resources import files
 
 import pytest
 
-from rom_scraper import registry
+from romledger import registry
 
 
 def test_data_file_is_packaged() -> None:
-    assert files("rom_scraper").joinpath("platforms.toml").is_file()
+    assert files("romledger").joinpath("platforms.toml").is_file()
 
 
 def test_load_entries() -> None:

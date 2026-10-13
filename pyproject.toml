@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "rom-scraper"
+name = "romledger"
 version = "0.1.0"
 description = "Track which retro games you have and which are missing, verified against No-Intro and Redump DATs."
 readme = "README.md"
@@ -13,13 +13,13 @@ dependencies = [
 ]
 
 [project.scripts]
-rom-scraper = "rom_scraper.cli:main"
+romledger = "romledger.cli:main"
 
 [dependency-groups]
 dev = ["pytest", "pytest-cov", "mypy", "ruff"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/rom_scraper"]
+packages = ["src/romledger"]
 
 [tool.ruff]
 line-length = 100
@@ -37,7 +37,7 @@ files = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=rom_scraper --cov-report=term-missing -m 'not igir'"
+addopts = "--cov=romledger --cov-report=term-missing -m 'not igir'"
 markers = ["igir: runs the real igir (needs Node.js)"]
 
 [tool.coverage.report]

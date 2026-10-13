@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from rom_scraper import registry
+from romledger import registry
 
-CONFIG_ENV = "ROM_SCRAPER_CONFIG"
-DATA_ENV = "ROM_SCRAPER_DATA"
+CONFIG_ENV = "ROMLEDGER_CONFIG"
+DATA_ENV = "ROMLEDGER_DATA"
 
 REGIONS = [
     *("ARG", "ASI", "AUS", "BEL", "BRA", "CAN", "CHN", "DAN", "EUR", "FRA", "FYN", "GER"),
@@ -66,7 +66,7 @@ def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
         path = Path(env[CONFIG_ENV]).expanduser()
     else:
         base = env.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-        path = Path(base) / "rom-scraper" / "config.toml"
+        path = Path(base) / "romledger" / "config.toml"
     if not path.is_file():
         raise ConfigError(
             f"{path}: config file not found. Pass --config, set {CONFIG_ENV}, "
@@ -85,7 +85,7 @@ def data_dir(env: Mapping[str, str] | None = None) -> Path:
     base = env.get("XDG_DATA_HOME", "")
     if not os.path.isabs(base):
         base = str(Path.home() / ".local" / "share")
-    return Path(base) / "rom-scraper"
+    return Path(base) / "romledger"
 
 
 def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config:
