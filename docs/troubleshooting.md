@@ -188,3 +188,37 @@ above). The rest of the games use the remaining sources.
 Not an error: the proxy URL has a user name and no password, and `fetch` or `dats update` is
 running on a terminal. Type the password; it is not shown. Without a terminal, put the password in
 the URL or in `HTTPS_PROXY`.
+
+## `finding <key>: <title>`
+
+Cause: `canary` found drift; the exit status is 1. Run `romledger canary --json` for the detail. Fix by
+key:
+
+- `<site>:new-platform:<code>`: the site lists a platform the registry does not know. Add
+  `<site> = "<code>"` to that platform in `src/romledger/platforms.toml`, or add the code to
+  `[ignore]` there.
+- `<site>:missing-platform:<code>`: the site's platform list no longer has a registry code. Correct
+  the code in `platforms.toml`.
+- `<site>:contract:platform-links`: the site's platform index page has no platform links. Update
+  romledger or report it.
+- `coolrom:contract:section`, `coolrom:contract:download-link`, `vimm:contract:list`,
+  `internet-archive:contract:metadata`: a page no longer has what romledger expects, so `fetch` for
+  that source will fail the same way. Update romledger or report it.
+- `dat:missing:<slug>`: libretro-database has no such DAT. Correct `dat` for that platform in
+  `platforms.toml`.
+- `igir:update:<tag>`: a newer igir exists. Run `uv run pytest -m igir --no-cov`, then update
+  `IGIR_VERSION` in `src/romledger/igir.py`.
+- `igir:contract:release`: GitHub's release answer has no tag name. Report it.
+
+## `unverified <prefix>`
+
+Not an error: `canary` could not check the keys that start with the prefix, because a site did not
+answer (see the `note:` lines) or an earlier page did not give it what it needed. Open issues for
+those keys stay open. Run it again later.
+
+## `note: <url>: ...`
+
+Not an error: `canary` could not conclude for that site (`HTTP 403`, `HTTP 429`, `HTTP 5xx`, any
+other unexpected status, `request failed (...)`, `bot challenge page`, or a robots.txt refusal) and skipped its other
+checks. The exit status is not affected. Run it again later. A rate limit on GitHub's API clears
+by itself; set `GITHUB_TOKEN` to raise it.

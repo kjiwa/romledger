@@ -1,5 +1,7 @@
 import argparse
+import dataclasses
 import functools
+import json
 import os
 import re
 import sys
@@ -10,6 +12,7 @@ from urllib.parse import quote_plus
 
 from romledger import (
     __version__,
+    canary,
     config,
     dats,
     fetch,
@@ -72,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-import", action="store_true", help="leave the downloads in the inbox"
     )
     fetch_parser.add_argument("--source", metavar="NAME", help="use only this configured source")
+    canary_parser = commands.add_parser(
+        "canary", help="check that the supported sites and upstream pins still match"
+    )
+    canary_parser.add_argument(
+        "--json", action="store_true", help="print findings as JSON; notes go to stderr"
+    )
     missing = commands.add_parser("missing", help="list the games a platform is missing")
     missing.add_argument("platform", metavar="PLATFORM")
     missing.add_argument("--links", action="store_true", help="append a Vimm's Lair search URL")
@@ -246,6 +255,33 @@ def vimm_link(system: str, game: str) -> str | None:
     return VIMM_URL.format(system=system, query=quote_plus(query))
 
 
+def run_canary(args: argparse.Namespace) -> int:
+    with http.client() as client:
+        report = canary.run(
+            client,
+            http.Throttle(),
+            registry.load(),
+            registry.ignored(),
+            token=os.environ.get("GITHUB_TOKEN"),
+        )
+    if args.json:
+        payload = {
+            "findings": [dataclasses.asdict(finding) for finding in report.findings],
+            "inconclusive": report.inconclusive,
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        for finding in report.findings:
+            print(f"finding {finding.key}: {finding.title}")
+    diagnostics = sys.stderr if args.json else sys.stdout
+    for note in report.notes:
+        print(f"note: {note}", file=diagnostics)
+    if not args.json:
+        for prefix in report.inconclusive:
+            print(f"unverified {prefix}")
+    return 1 if report.findings else 0
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "config": show_config,
     "dats update": update_dats,
@@ -254,6 +290,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "fetch": fetch_games,
     "status": show_status,
     "missing": show_missing,
+    "canary": run_canary,
 }
 
 
