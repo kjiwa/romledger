@@ -301,3 +301,101 @@ def test_empty_regions_rejected(tmp_path: Path) -> None:
     text = valid_text(tmp_path) + "regions = []\n"
     with pytest.raises(config.ConfigError, match="regions is empty"):
         load(write(tmp_path, text))
+
+
+def sources_text(tmp_path: Path, lines: str) -> str:
+    return valid_text(tmp_path) + lines
+
+
+def test_sources_default_to_none(tmp_path: Path) -> None:
+    platform = load(write(tmp_path, valid_text(tmp_path))).platforms["nes"]
+    assert platform.sources == ()
+    assert platform.archive_item is None
+    assert platform.coolrom is None
+
+
+def test_sources_parsed(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace("platforms.nes", "platforms.atari7800").splitlines()
+    text = [line for line in text if not line.startswith("dat")]
+    text.extend(['sources = ["coolrom", "internet-archive", "coolrom"]', 'archive_item = "x"'])
+    platform = load(write(tmp_path, "\n".join(text))).platforms["atari7800"]
+    assert platform.sources == ("coolrom", "internet-archive")
+    assert platform.archive_item == "x"
+    assert platform.coolrom == "atari7800"
+
+
+def test_unknown_source(tmp_path: Path) -> None:
+    text = sources_text(tmp_path, 'sources = ["vimm"]\n')
+    with pytest.raises(
+        config.ConfigError, match=r"platforms\.nes\.sources has unknown source 'vimm'"
+    ):
+        load(write(tmp_path, text))
+
+
+def test_archive_item_required_for_internet_archive(tmp_path: Path) -> None:
+    text = sources_text(tmp_path, 'sources = ["internet-archive"]\n')
+    with pytest.raises(config.ConfigError, match=r"missing platforms\.nes\.archive_item"):
+        load(write(tmp_path, text))
+
+
+def test_archive_item_without_internet_archive_is_kept(tmp_path: Path) -> None:
+    text = sources_text(tmp_path, 'archive_item = "x"\n')
+    assert load(write(tmp_path, text)).platforms["nes"].archive_item == "x"
+
+
+@pytest.mark.parametrize("slug", ["nes", "custom"])
+def test_coolrom_requires_a_registry_code(tmp_path: Path, slug: str) -> None:
+    text = valid_text(tmp_path).replace("[platforms.nes]", f"[platforms.{slug}]")
+    text = text.replace("no-intro/Nintendo - Nintendo Entertainment System", "no-intro/Custom")
+    with pytest.raises(config.ConfigError, match=rf"platforms\.{slug}\.sources lists coolrom"):
+        load(write(tmp_path, text + 'sources = ["coolrom"]\n'))
+
+
+def test_no_network_by_default(tmp_path: Path) -> None:
+    assert load(write(tmp_path, valid_text(tmp_path))).network.proxy is None
+
+
+@pytest.mark.parametrize(
+    "proxy",
+    ["http://p:3128", "https://p", "socks5://u@p:1080", "socks5h://u:pw@p:1080"],
+)
+def test_proxy_parsed(tmp_path: Path, proxy: str) -> None:
+    text = valid_text(tmp_path) + f'\n[network]\nproxy = "{proxy}"\n'
+    assert load(write(tmp_path, text)).network.proxy == proxy
+
+
+@pytest.mark.parametrize("proxy", ["ftp://p:21", "p:3128", "http://", "socks4://p:1080"])
+def test_proxy_scheme_is_validated(tmp_path: Path, proxy: str) -> None:
+    text = valid_text(tmp_path) + f'\n[network]\nproxy = "{proxy}"\n'
+    with pytest.raises(config.ConfigError, match=r"network\.proxy .* http, https, socks5, socks5h"):
+        load(write(tmp_path, text))
+
+
+def test_proxy_error_does_not_leak_credentials(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + '\n[network]\nproxy = "ftp://alice:hunter2@p:21"\n'
+    with pytest.raises(config.ConfigError) as error:
+        load(write(tmp_path, text))
+    assert "hunter2" not in str(error.value)
+    assert "alice" not in str(error.value)
+
+
+def test_proxy_with_a_bad_port(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + '\n[network]\nproxy = "http://p:notaport"\n'
+    with pytest.raises(config.ConfigError, match=r"network\.proxy is not a valid URL"):
+        load(write(tmp_path, text))
+
+
+def test_proxy_must_be_a_string(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + "\n[network]\nproxy = 5\n"
+    with pytest.raises(config.ConfigError, match=r"network\.proxy must be a non-empty string"):
+        load(write(tmp_path, text))
+
+
+def test_unknown_network_key(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + "\n[network]\nretries = 3\n"
+    with pytest.raises(config.ConfigError, match=r"unknown key network\.retries"):
+        load(write(tmp_path, text))
+
+
+def test_empty_network_table(tmp_path: Path) -> None:
+    assert load(write(tmp_path, valid_text(tmp_path) + "\n[network]\n")).network.proxy is None

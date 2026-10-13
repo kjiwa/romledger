@@ -1,0 +1,94 @@
+{
+  "files": [
+    {
+      "name": "'89 Dennou Kyuusei Uranai (Japan).zip",
+      "source": "original",
+      "mtime": "1775054300",
+      "size": "129656",
+      "md5": "0cbe4f016e568f5491bc61a5866a8cc8",
+      "crc32": "aa928765",
+      "sha1": "ebeed2c501ff4650c2340f5d4e52a5494c486b05",
+      "format": "ZIP",
+      "filecount": "1",
+      "viruscheck": "1775090771"
+    },
+    {
+      "name": "'93 Chaoji Hun (Contra '93) (Asia) (Pirate).zip",
+      "source": "original",
+      "mtime": "1775054303",
+      "size": "92410",
+      "md5": "38f4a185769b9709d0a3200f23ed7e6d",
+      "crc32": "d3aa56d7",
+      "sha1": "3bccfda912138849d44e0721f2bc28f680ace12e",
+      "format": "ZIP",
+      "filecount": "1",
+      "viruscheck": "1775090771"
+    },
+    {
+      "name": "10-Yard Fight (USA) (Retro-Bit Generations).zip",
+      "source": "original",
+      "mtime": "1775054163",
+      "size": "16708",
+      "md5": "4ae6903902a0d4fdf096c9b454806461",
+      "crc32": "d813aaae",
+      "sha1": "d38b6c68e4819974878eba0cde5aedb33b251804",
+      "format": "ZIP",
+      "filecount": "1",
+      "viruscheck": "1775090771"
+    },
+    {
+      "name": "1943 - The Battle of Midway (USA) (Retro-Bit Generations).zip",
+      "source": "original",
+      "mtime": "1775054543",
+      "size": "79912",
+      "md5": "1f0c5537c9bff8f5f07869aa84de2e44",
+      "crc32": "312ebb6d",
+      "sha1": "d96ded8c884c1be2414026b91478da2440321474",
+      "format": "ZIP",
+      "filecount": "1",
+      "viruscheck": "1775090771"
+    },
+    {
+      "name": "1943 - The Battle of Midway (USA).zip",
+      "source": "original",
+      "mtime": "1775054545",
+      "size": "79885",
+      "md5": "4ee40a38972efa92ea9d454e01568202",
+      "crc32": "d99933a2",
+      "sha1": "75d4879a4a5e3a258a76c0cb64983137110d79a1",
+      "format": "ZIP",
+      "filecount": "1",
+      "viruscheck": "1775090771"
+    },
+    {
+      "name": "No-Intro_NES_archive.torrent",
+      "source": "metadata",
+      "btih": "8893e9b720e90c0f3f07292b3b5af2a6c60c55d8",
+      "mtime": "1775141140",
+      "size": "1063870",
+      "md5": "e62472fc0b76011d11e0905cb25fab3d",
+      "crc32": "45f1ea9a",
+      "sha1": "5af8bea035afbc24156f01f7b8fee287ae33484c",
+      "format": "Archive BitTorrent"
+    },
+    {
+      "name": "No-Intro_NES_files.xml",
+      "source": "original",
+      "format": "Metadata",
+      "md5": "546e275fce02284d88242e9cce4bb840",
+      "summation": "md5"
+    },
+    {
+      "name": "No-Intro_NES_meta.sqlite",
+      "source": "original",
+      "mtime": "1775140520",
+      "size": "11022336",
+      "md5": "74372c8f008ccacc34af67eeefef85c0",
+      "crc32": "481efd1c",
+      "sha1": "130fe634103ca3ec2498abf360ffb35838c45c70",
+      "format": "Metadata"
+    }
+  ],
+  "files_count": 8,
+  "dir": "/9/items/No-Intro_NES"
+}

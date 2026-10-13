@@ -12,10 +12,9 @@ Works today:
 - Show progress per platform (`romledger status`)
 - List missing games, with Vimm's Lair search links (`romledger missing nes --links`)
 - Import from the inboxes into a RomM layout (`romledger import`)
+- Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
 
-Planned:
-
-- Automatic downloads from supported sources
+Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
 
 ## How it fits
 
@@ -54,5 +53,6 @@ romledger scan
 romledger status
 ```
 
-See [docs/setup.md](docs/setup.md) for all options and
+See [docs/setup.md](docs/setup.md) for all options,
+[docs/sources.md](docs/sources.md) for download sources and
 [docs/troubleshooting.md](docs/troubleshooting.md) for error messages.

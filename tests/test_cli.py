@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 
+import httpx
 import pytest
 
-from romledger import __version__, cli, config, dats, importer, scan, state
+from romledger import __version__, cli, config, dats, fetch, http, importer, scan, state
 
 
 @pytest.fixture(autouse=True)
@@ -295,3 +296,211 @@ def test_os_error_is_a_clean_error(
     monkeypatch.setitem(cli.HANDLERS, "status", failing)
     assert run(make_config(tmp_path), "status") == 2
     assert capsys.readouterr().err == "romledger: error: denied\n"
+
+
+def sources_config(tmp_path: Path, extra: str = "") -> Path:
+    path = make_config(tmp_path)
+    sources = (
+        '[platforms.atari7800]\nsources = ["coolrom", "internet-archive"]\n'
+        'archive_item = "No-Intro_Atari7800"\n'
+    )
+    path.write_text(path.read_text().replace("[platforms.nes]\n", sources) + extra)
+    return path
+
+
+def test_config_lists_sources_and_proxy(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = sources_config(tmp_path, '[network]\nproxy = "http://alice:secret@proxy.example:3128"\n')
+    assert run(path, "config") == 0
+    out = capsys.readouterr().out
+    assert "  sources: coolrom, internet-archive" in out
+    assert "  archive_item: No-Intro_Atari7800" in out
+    assert "proxy:   http://***@proxy.example:3128" in out
+    assert "secret" not in out
+    assert out.isascii()
+
+
+def test_config_without_sources_prints_neither(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(make_config(tmp_path), "config") == 0
+    out = capsys.readouterr().out
+    assert "sources:" not in out
+    assert "proxy:" not in out
+
+
+def test_fetch_requires_sources(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(make_config(tmp_path), "fetch", "nes") == 2
+    assert capsys.readouterr().err == (
+        "romledger: error: nes has no sources configured; set platforms.nes.sources\n"
+    )
+
+
+def test_fetch_unknown_platform(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(sources_config(tmp_path), "fetch", "snes") == 2
+    assert "unknown platform 'snes'" in capsys.readouterr().err
+
+
+def test_fetch_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(sources_config(tmp_path), "fetch", "atari7800") == 2
+    assert capsys.readouterr().err.rstrip().endswith("run: romledger scan")
+
+
+def test_fetch_source_must_be_configured(
+    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = sources_config(tmp_path)
+    path.write_text(path.read_text().replace('["coolrom", "internet-archive"]', '["coolrom"]'))
+    seed(data_dir, "atari7800", [state.Item("A (USA)", "missing", None)])
+    assert run(path, "fetch", "atari7800", "--source", "internet-archive") == 2
+    assert "does not list source 'internet-archive'" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("limit", ["0", "-1", "x"])
+def test_fetch_limit_must_be_positive(limit: str, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["fetch", "nes", "--limit", limit])
+    assert exit_info.value.code == 2
+    assert "positive integer" in capsys.readouterr().err
+
+
+class FetchHarness:
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, result: fetch.FetchResult) -> None:
+        self.calls: list[tuple[object, ...]] = []
+        self.imports: list[bool] = []
+        self.hook_failures: list[str] = []
+
+        def fake_fetch(*args: object) -> fetch.FetchResult:
+            self.calls.append(args)
+            return result
+
+        def fake_import(cfg: object, data: object, dry_run: bool) -> importer.ImportResult:
+            self.imports.append(dry_run)
+            return importer.ImportResult({"atari7800": 1}, [], [], self.hook_failures)
+
+        monkeypatch.setattr(fetch, "fetch_platform", fake_fetch)
+        monkeypatch.setattr(importer, "import_inboxes", fake_import)
+
+
+def harness(monkeypatch: pytest.MonkeyPatch, **fields: list[str]) -> FetchHarness:
+    return FetchHarness(monkeypatch, fetch.FetchResult(**fields))  # type: ignore[arg-type]
+
+
+def test_fetch_imports_after_a_successful_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    assert (
+        run(sources_config(tmp_path), "fetch", "atari7800", "--limit", "5", "--source", "coolrom")
+        == 0
+    )
+    assert fake.imports == [False]
+    args = fake.calls[0]
+    assert args[1:4] == ("atari7800", config.data_dir(), 5)
+    assert args[4] is False
+    assert args[-1] == "coolrom"
+    assert capsys.readouterr().out == "moved atari7800 1\n"
+
+
+def test_fetch_exit_code_when_a_game_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    fake_failed = fetch.FetchResult(["A (USA)"], [], [("B (USA)", "boom")], [])
+    monkeypatch.setattr(fetch, "fetch_platform", lambda *args: fake_failed)
+    assert run(sources_config(tmp_path), "fetch", "atari7800") == 1
+    assert fake.imports == [False]
+
+
+def test_fetch_without_downloads_does_not_import(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = harness(monkeypatch, not_found=["A (USA)"])
+    assert run(sources_config(tmp_path), "fetch", "atari7800") == 0
+    assert fake.imports == []
+
+
+def test_fetch_no_import(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    assert run(sources_config(tmp_path), "fetch", "atari7800", "--no-import") == 0
+    assert fake.imports == []
+
+
+def test_fetch_dry_run_does_not_import(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    assert run(sources_config(tmp_path), "fetch", "atari7800", "--dry-run") == 0
+    assert fake.imports == []
+    assert fake.calls[0][4] is True
+
+
+def test_fetch_blocked_source_is_not_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = harness(monkeypatch, blocked=["https://c/x: not fetched, robots"])
+    assert run(sources_config(tmp_path), "fetch", "atari7800") == 0
+    assert fake.imports == []
+
+
+def test_fetch_reports_a_failed_import_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    fake.hook_failures.append("touch x: exit status 1")
+    assert run(sources_config(tmp_path), "fetch", "atari7800") == 1
+    assert "after_import hook failed" in capsys.readouterr().err
+
+
+def test_fetch_end_to_end(
+    tmp_path: Path,
+    data_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    seed(
+        data_dir,
+        "atari7800",
+        [state.Item("A (USA)", "missing", None), state.Item("B (USA)", "missing", None)],
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        if request.url.path == "/metadata/No-Intro_Atari7800":
+            return httpx.Response(200, json={"files": [{"name": "A (USA).zip", "size": "3"}]})
+        return httpx.Response(200, content=b"abc")
+
+    monkeypatch.setattr(
+        http, "client", lambda proxy=None: httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    throttle = http.Throttle
+    monkeypatch.setattr(http, "Throttle", lambda: throttle(sleep=lambda _: None))
+    monkeypatch.setattr(
+        importer, "import_inboxes", lambda *args: importer.ImportResult({}, [], [], [])
+    )
+    path = sources_config(tmp_path)
+    path.write_text(
+        path.read_text().replace('["coolrom", "internet-archive"]', '["internet-archive"]')
+    )
+    assert run(path, "fetch", "atari7800", "--no-import") == 0
+    assert (tmp_path / "inbox" / "A (USA).zip").read_bytes() == b"abc"
+    assert capsys.readouterr().out.splitlines() == [
+        "fetched A (USA) (internet-archive)",
+        "not found B (USA)",
+        "fetched 1, not found 1, failed 0",
+    ]
+
+
+def test_dats_update_uses_the_configured_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    proxies: list[str | None] = []
+
+    def fake_client(proxy: str | None = None) -> httpx.Client:
+        proxies.append(proxy)
+        return httpx.Client()
+
+    monkeypatch.setattr(http, "client", fake_client)
+    monkeypatch.setattr(dats, "update", lambda *args: {})
+    path = make_config(tmp_path)
+    path.write_text(path.read_text() + '[network]\nproxy = "http://proxy.example:3128"\n')
+    assert run(path, "dats", "update") == 0
+    assert proxies == ["http://proxy.example:3128"]

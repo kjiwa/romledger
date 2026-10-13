@@ -9,6 +9,7 @@ FOUND = "FOUND"
 MISSING = "MISSING"
 UNUSED = "UNUSED"
 DATS_HINT = "run: romledger dats update"
+SCAN_HINT = "run: romledger scan"
 
 IgirReport = Callable[..., list[igir.ReportRow]]
 
@@ -40,6 +41,13 @@ def require_dats(config: Config, slugs: Sequence[str], data_dir: Path) -> None:
         dat = dats.dat_path(data_dir, config.platforms[slug].dat)
         if not dat.is_file():
             raise ConfigError(f"no DAT for {slug} ({dat}). {DATS_HINT}")
+
+
+def missing_games(data_dir: Path, slug: str) -> list[str]:
+    with state.State(data_dir / "state.db") as database:
+        if database.scanned_at(slug) is None:
+            raise ConfigError(f"{slug} has not been scanned. {SCAN_HINT}")
+        return database.missing(slug)
 
 
 def scan_platform(

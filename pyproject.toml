@@ -9,7 +9,7 @@ description = "Track which retro games you have and which are missing, verified 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "httpx>=0.28.1",
+    "httpx[socks]>=0.28.1",
 ]
 
 [project.scripts]
@@ -37,8 +37,11 @@ files = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=romledger --cov-report=term-missing -m 'not igir'"
-markers = ["igir: runs the real igir (needs Node.js)"]
+addopts = "--cov=romledger --cov-report=term-missing -m 'not igir and not live'"
+markers = [
+    "igir: runs the real igir (needs Node.js)",
+    "live: requests real sites (one page per source, never a ROM)",
+]
 
 [tool.coverage.report]
 fail_under = 90
