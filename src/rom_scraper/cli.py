@@ -7,14 +7,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from rom_scraper import __version__, config, dats, http, igir, registry, scan, state
+from rom_scraper import (
+    __version__,
+    config,
+    dats,
+    http,
+    igir,
+    importer,
+    registry,
+    scan,
+    state,
+)
 
 VIMM_URL = "https://vimm.net/vault/?p=list&system={system}&q={query}"
 TAGS = re.compile(r"\s*\([^)]*\)")
 MIN_QUERY = 3
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
 SCAN_HINT = "run: rom-scraper scan"
-DATS_HINT = "run: rom-scraper dats update"
 
 
 @dataclass(frozen=True)
@@ -42,6 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan_parser = commands.add_parser("scan", help="match library and inbox files to DATs")
     scan_parser.add_argument(
         "platforms", nargs="*", metavar="PLATFORM", help="default: all configured"
+    )
+    import_parser = commands.add_parser("import", help="file inbox games into the library")
+    import_parser.add_argument(
+        "--dry-run", action="store_true", help="show what would happen; move nothing"
     )
     commands.add_parser("status", help="show have/missing counts per platform")
     missing = commands.add_parser("missing", help="list the games a platform is missing")
@@ -80,6 +93,8 @@ def show_config(args: argparse.Namespace) -> int:
         print(f"{slug}: {platform.dat}")
         print(f"  regions: {', '.join(platform.regions)}")
         print(f"  languages: {', '.join(platform.languages)}")
+    for argv in context.config.hooks.after_import:
+        print(f"hook:    after_import {' '.join(argv)}")
     return 0
 
 
@@ -97,15 +112,34 @@ def update_dats(args: argparse.Namespace) -> int:
 def scan_platforms(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     slugs = selected(context, args.platforms)
-    for slug in slugs:
-        dat = dats.dat_path(context.data_dir, context.config.platforms[slug].dat)
-        if not dat.is_file():
-            raise config.ConfigError(f"no DAT for {slug} ({dat}). {DATS_HINT}")
+    scan.require_dats(context.config, slugs, context.data_dir)
     for slug in slugs:
         print(f"scanning {slug} ...", file=sys.stderr)
         scan.scan_platform(context.config, slug, context.data_dir)
     print(f"scanned {len(slugs)} platform(s)")
     return 0
+
+
+def import_games(args: argparse.Namespace) -> int:
+    context = load_context(args.config)
+    result = importer.import_inboxes(context.config, context.data_dir, args.dry_run)
+    for line in import_lines(result, dry_run=args.dry_run):
+        print(line)
+    for failure in result.hook_failures:
+        print(f"rom-scraper: error: after_import hook failed: {failure}", file=sys.stderr)
+    return 1 if result.hook_failures else 0
+
+
+def import_lines(result: importer.ImportResult, *, dry_run: bool) -> list[str]:
+    verb, moved_to = ("would move", "would move to") if dry_run else ("moved", "moved to")
+    lines = [f"{verb} {slug} {count}" for slug, count in result.moved.items()]
+    if result.duplicates:
+        lines.append(
+            f"duplicates {len(result.duplicates)} ({moved_to} <inbox>/{igir.DUPLICATES_DIR})"
+        )
+    if result.unmatched:
+        lines.append(f"unmatched {len(result.unmatched)} ({moved_to} <inbox>/{igir.UNMATCHED_DIR})")
+    return lines or ["inbox is empty"]
 
 
 def show_status(args: argparse.Namespace) -> int:
@@ -165,6 +199,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "config": show_config,
     "dats update": update_dats,
     "scan": scan_platforms,
+    "import": import_games,
     "status": show_status,
     "missing": show_missing,
 }
@@ -180,3 +215,6 @@ def main(argv: list[str] | None = None) -> int:
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
+    except OSError as error:
+        print(f"rom-scraper: error: {error}", file=sys.stderr)
+        return 2

@@ -10,6 +10,7 @@ import httpx
 
 BASE_URL = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat"
 VERSION = re.compile(r'^\s*version\s+"([^"]*)"', re.MULTILINE)
+NAME = re.compile(r'^\s*name\s+"([^"]*)"', re.MULTILINE)
 
 
 class DatError(Exception):
@@ -38,6 +39,11 @@ def update(data_dir: Path, dats: Mapping[str, str], client: httpx.Client) -> dic
 def version_of(path: Path) -> str:
     match = VERSION.search(path.read_text(encoding="utf-8", errors="replace")[:4096])
     return match.group(1) if match else "unknown"
+
+
+def name_of(path: Path) -> str:
+    match = NAME.search(path.read_text(encoding="utf-8", errors="replace")[:4096])
+    return match.group(1) if match else path.stem
 
 
 def _update_one(data_dir: Path, dat: str, client: httpx.Client) -> Result:

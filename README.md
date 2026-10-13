@@ -11,10 +11,10 @@ Works today:
 - Match your library and inboxes to the DATs (`rom-scraper scan`)
 - Show progress per platform (`rom-scraper status`)
 - List missing games, with Vimm's Lair search links (`rom-scraper missing nes --links`)
+- Import from the inboxes into a RomM layout (`rom-scraper import`)
 
 Planned:
 
-- Import from inbox into a RomM layout
 - Automatic downloads from supported sources
 
 ## How it fits
