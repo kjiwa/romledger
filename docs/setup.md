@@ -25,11 +25,18 @@ inboxes = ["/mnt/roms/inbox"]
 regions = ["USA", "WORLD"]
 languages = ["EN"]
 
+[platforms.atari7800]
+sources = ["coolrom", "internet-archive"]
+archive_item = "No-Intro_Atari7800"
+
 [platforms.custom-system]
 dat = "no-intro/Some - Custom System"
 
 [hooks]
 after_import = [["touch", "/mnt/roms/.imported"]]
+
+[network]
+proxy = "socks5h://proxy.example:1080"
 ```
 
 | Key | Required | Meaning |
@@ -39,6 +46,9 @@ after_import = [["touch", "/mnt/roms/.imported"]]
 | `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
 | `platforms.<slug>.regions` | no | Wanted regions, igir codes. Default `["USA", "WORLD"]`. |
 | `platforms.<slug>.languages` | no | Wanted languages, igir codes. Default `["EN"]`. |
+| `platforms.<slug>.sources` | no | Sources `fetch` tries, in order: `coolrom`, `internet-archive`. Default none. `coolrom` needs a platform CoolROM carries. |
+| `platforms.<slug>.archive_item` | with `internet-archive` | Internet Archive item that holds `<game name>.zip` files, such as a No-Intro set. |
+| `network.proxy` | no | Proxy URL for every request. Schemes: `http`, `https`, `socks5`, `socks5h`. |
 | `hooks.after_import` | no | Commands to run after `import` moved at least one file. Each is an argument list, run without a shell. Default none. |
 
 Codes are upper case.
@@ -53,6 +63,13 @@ SMB or NFS is unverified, so prefer the scheduled rescan for a share.
 
 Each platform wants one release per game (igir `--single`): the preferred region among the
 listed regions and languages.
+
+Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
+wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
+password on a terminal. It never prints the password, and shows proxy URLs as `scheme://***@host`.
+
+Crawling a site requires the site operator's permission; see [sources.md](sources.md) before you
+list a source.
 
 ## Data directory
 
@@ -69,7 +86,8 @@ The directory is created on first use.
 romledger config
 ```
 
-It prints the resolved config file, data directory, library paths, and platforms. If a path
+It prints the resolved config file, data directory, library paths, platforms with their sources, and
+the proxy with credentials hidden. If a path
 is not a directory, mount the share and run it again.
 
 ## dats update
@@ -116,6 +134,30 @@ romledger missing PLATFORM [--links]
 
 Prints one missing game per line. `--links` appends a tab and a Vimm's Lair search URL for
 platforms Vimm's Lair carries.
+
+## fetch
+
+```sh
+romledger fetch PLATFORM [--limit N] [--dry-run] [--no-import] [--source NAME]
+```
+
+Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
+platform's `sources` in order and takes the first match. A download is written as `<name>.part`,
+resumed if it was interrupted, checked against the size the server announced (and the checksum,
+where the source lists one), then renamed. Then it runs `import`, unless `--no-import`.
+
+Output per game is `fetched <game> (<source>)`, `not found <game>`, or `failed <game>: <reason>`,
+then a summary line. A failed game does not stop the others.
+
+- `--limit N`: stop after N games.
+- `--dry-run`: look games up and print `would fetch <game> (<source>)`; download and import nothing.
+  CoolROM is asked for section pages only.
+- `--source NAME`: use only that one configured source.
+
+Run `scan` first. Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
+robots.txt asks), Internet Archive at least 1 second. A source whose robots.txt disallows a URL is
+skipped for the run. Exit status is 0, 1 if any game failed or a site's layout changed (or an
+`after_import` hook failed), or 2 for errors.
 
 ## import
 

@@ -1,4 +1,5 @@
 import argparse
+import functools
 import os
 import re
 import sys
@@ -11,6 +12,7 @@ from romledger import (
     __version__,
     config,
     dats,
+    fetch,
     http,
     igir,
     importer,
@@ -23,7 +25,6 @@ VIMM_URL = "https://vimm.net/vault/?p=list&system={system}&q={query}"
 TAGS = re.compile(r"\s*\([^)]*\)")
 MIN_QUERY = 3
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
-SCAN_HINT = "run: romledger scan"
 
 
 @dataclass(frozen=True)
@@ -57,10 +58,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="show what would happen; move nothing"
     )
     commands.add_parser("status", help="show have/missing counts per platform")
+    fetch_parser = commands.add_parser(
+        "fetch", help="download missing games from configured sources"
+    )
+    fetch_parser.add_argument("platform", metavar="PLATFORM")
+    fetch_parser.add_argument(
+        "--limit", type=positive_int, metavar="N", help="fetch at most N games"
+    )
+    fetch_parser.add_argument(
+        "--dry-run", action="store_true", help="show matches; download nothing"
+    )
+    fetch_parser.add_argument(
+        "--no-import", action="store_true", help="leave the downloads in the inbox"
+    )
+    fetch_parser.add_argument("--source", metavar="NAME", help="use only this configured source")
     missing = commands.add_parser("missing", help="list the games a platform is missing")
     missing.add_argument("platform", metavar="PLATFORM")
     missing.add_argument("--links", action="store_true", help="append a Vimm's Lair search URL")
     return parser
+
+
+def positive_int(text: str) -> int:
+    if not text.isdigit() or int(text) < 1:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a positive integer")
+    return int(text)
 
 
 def load_context(config_arg: str | None) -> Context:
@@ -93,6 +114,12 @@ def show_config(args: argparse.Namespace) -> int:
         print(f"{slug}: {platform.dat}")
         print(f"  regions: {', '.join(platform.regions)}")
         print(f"  languages: {', '.join(platform.languages)}")
+        if platform.sources:
+            print(f"  sources: {', '.join(platform.sources)}")
+        if platform.archive_item:
+            print(f"  archive_item: {platform.archive_item}")
+    if context.config.network.proxy:
+        print(f"proxy:   {http.redact(context.config.network.proxy)}")
     for argv in context.config.hooks.after_import:
         print(f"hook:    after_import {' '.join(argv)}")
     return 0
@@ -102,7 +129,7 @@ def update_dats(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     slugs = selected(context, args.platforms)
     wanted = {slug: context.config.platforms[slug].dat for slug in slugs}
-    with http.client() as client:
+    with http.client(context.config.network.proxy) as client:
         results = dats.update(context.data_dir, wanted, client)
     for slug, result in results.items():
         print(f"{slug} {result.version} ({'updated' if result.changed else 'unchanged'})")
@@ -121,9 +148,12 @@ def scan_platforms(args: argparse.Namespace) -> int:
 
 
 def import_games(args: argparse.Namespace) -> int:
-    context = load_context(args.config)
-    result = importer.import_inboxes(context.config, context.data_dir, args.dry_run)
-    for line in import_lines(result, dry_run=args.dry_run):
+    return run_import(load_context(args.config), args.dry_run)
+
+
+def run_import(context: Context, dry_run: bool) -> int:
+    result = importer.import_inboxes(context.config, context.data_dir, dry_run)
+    for line in import_lines(result, dry_run=dry_run):
         print(line)
     for failure in result.hook_failures:
         print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
@@ -142,6 +172,30 @@ def import_lines(result: importer.ImportResult, *, dry_run: bool) -> list[str]:
     return lines or ["inbox is empty"]
 
 
+def fetch_games(args: argparse.Namespace) -> int:
+    context = load_context(args.config)
+    (slug,) = selected(context, [args.platform])
+    if not context.config.platforms[slug].sources:
+        raise config.ConfigError(f"{slug} has no sources configured; set platforms.{slug}.sources")
+    with http.client(context.config.network.proxy) as client:
+        throttle = http.Throttle()
+        result = fetch.fetch_platform(
+            context.config,
+            slug,
+            context.data_dir,
+            args.limit,
+            args.dry_run,
+            functools.partial(fetch.build_sources, client=client, throttle=throttle),
+            client,
+            throttle,
+            args.source,
+        )
+    status = 1 if result.failed else 0
+    if result.fetched and not args.dry_run and not args.no_import:
+        status = max(status, run_import(context, dry_run=False))
+    return status
+
+
 def show_status(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     with state.State(context.data_dir / "state.db") as database:
@@ -150,7 +204,7 @@ def show_status(args: argparse.Namespace) -> int:
     for line in format_table(("platform", *STATUS_COLUMNS), rows):
         print(line)
     if any(slug not in counts for slug in context.config.platforms):
-        print(SCAN_HINT)
+        print(scan.SCAN_HINT)
     return 0
 
 
@@ -177,10 +231,7 @@ def format_table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[s
 def show_missing(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     (slug,) = selected(context, [args.platform])
-    with state.State(context.data_dir / "state.db") as database:
-        if database.scanned_at(slug) is None:
-            raise config.ConfigError(f"{slug} has not been scanned. {SCAN_HINT}")
-        games = database.missing(slug)
+    games = scan.missing_games(context.data_dir, slug)
     vimm = context.platforms[slug].vimm if slug in context.platforms else None
     for game in games:
         link = vimm_link(vimm, game) if args.links and vimm else None
@@ -200,6 +251,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "dats update": update_dats,
     "scan": scan_platforms,
     "import": import_games,
+    "fetch": fetch_games,
     "status": show_status,
     "missing": show_missing,
 }

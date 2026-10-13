@@ -4,8 +4,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from romledger import registry
+from romledger import http, registry
 
 CONFIG_ENV = "ROMLEDGER_CONFIG"
 DATA_ENV = "ROMLEDGER_DATA"
@@ -19,6 +20,8 @@ LANGUAGES = [
     *("DA", "DE", "EL", "EN", "ES", "FI", "FR", "IT"),
     *("JA", "KO", "NL", "NO", "PT", "RU", "SV", "ZH"),
 ]
+
+SOURCES = ("coolrom", "internet-archive")
 
 EXAMPLE = """\
 [library]
@@ -44,6 +47,9 @@ class Platform:
     dat: str
     regions: tuple[str, ...] = ("USA", "WORLD")
     languages: tuple[str, ...] = ("EN",)
+    sources: tuple[str, ...] = ()
+    archive_item: str | None = None
+    coolrom: str | None = None
 
 
 @dataclass(frozen=True)
@@ -52,10 +58,16 @@ class Hooks:
 
 
 @dataclass(frozen=True)
+class Network:
+    proxy: str | None = None
+
+
+@dataclass(frozen=True)
 class Config:
     library: Library
     platforms: dict[str, Platform]
     hooks: Hooks = Hooks()
+    network: Network = Network()
 
 
 def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
@@ -98,10 +110,11 @@ def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config
         raise ConfigError(
             f"{path}: cannot read the file ({error}). Fix its permissions."
         ) from error
-    _reject_unknown(path, "", data, {"library", "platforms", "hooks"})
+    _reject_unknown(path, "", data, {"library", "platforms", "hooks", "network"})
     library = _table(path, data, "library", required=True)
     platforms = _table(path, data, "platforms", required=False)
     hooks = _table(path, data, "hooks", required=False)
+    network = _table(path, data, "network", required=False)
     return Config(
         library=_parse_library(path, library),
         platforms={
@@ -109,6 +122,7 @@ def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config
             for slug, raw in platforms.items()
         },
         hooks=_parse_hooks(path, hooks),
+        network=_parse_network(path, network),
     )
 
 
@@ -147,19 +161,82 @@ def _parse_hooks(path: Path, table: dict[str, Any]) -> Hooks:
     return Hooks(after_import=tuple(tuple(argv) for argv in commands))
 
 
+def _parse_network(path: Path, table: dict[str, Any]) -> Network:
+    _reject_unknown(path, "network.", table, {"proxy"})
+    if "proxy" not in table:
+        return Network()
+    proxy = _string(path, table, "network.proxy", "proxy")
+    _check_proxy(path, proxy)
+    return Network(proxy=proxy)
+
+
+def _check_proxy(path: Path, proxy: str) -> None:
+    try:
+        parts = urlsplit(proxy)
+        _ = parts.port
+    except ValueError as error:
+        raise ConfigError(f"{path}: network.proxy is not a valid URL ({error}).") from error
+    if parts.scheme not in http.PROXY_SCHEMES or not parts.hostname:
+        raise ConfigError(
+            f"{path}: network.proxy {http.redact(proxy)!r} must be <scheme>://[user@]host[:port] "
+            f"with scheme one of: {', '.join(http.PROXY_SCHEMES)}."
+        )
+
+
 def _parse_platform(
     path: Path, slug: str, raw: object, platforms_registry: Mapping[str, registry.Entry]
 ) -> Platform:
     key = f"platforms.{slug}"
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: {key} must be a table. Write it as [{key}].")
-    _reject_unknown(path, f"{key}.", raw, {"dat", "regions", "languages"})
+    _reject_unknown(
+        path, f"{key}.", raw, {"dat", "regions", "languages", "sources", "archive_item"}
+    )
     defaults = Platform(dat="")
+    sources = _sources(path, raw, key)
     return Platform(
         dat=_dat(path, slug, raw, platforms_registry),
         regions=_codes(path, raw, f"{key}.regions", "regions", defaults.regions, REGIONS),
         languages=_codes(path, raw, f"{key}.languages", "languages", defaults.languages, LANGUAGES),
+        sources=sources,
+        archive_item=_archive_item(path, raw, key, sources),
+        coolrom=_coolrom_code(path, slug, key, sources, platforms_registry),
     )
+
+
+def _sources(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:
+    names = _strings(path, raw, f"{key}.sources", "sources", default=())
+    for name in names:
+        if name not in SOURCES:
+            raise ConfigError(
+                f"{path}: {key}.sources has unknown source {name!r}. Allowed: {', '.join(SOURCES)}."
+            )
+    return tuple(dict.fromkeys(names))
+
+
+def _archive_item(
+    path: Path, raw: dict[str, Any], key: str, sources: tuple[str, ...]
+) -> str | None:
+    if "archive_item" in raw or "internet-archive" in sources:
+        return _string(path, raw, f"{key}.archive_item", "archive_item")
+    return None
+
+
+def _coolrom_code(
+    path: Path,
+    slug: str,
+    key: str,
+    sources: tuple[str, ...],
+    platforms_registry: Mapping[str, registry.Entry],
+) -> str | None:
+    entry = platforms_registry.get(slug)
+    code = entry.coolrom if entry else None
+    if "coolrom" in sources and code is None:
+        raise ConfigError(
+            f"{path}: {key}.sources lists coolrom but CoolROM has no system for {slug!r}. "
+            "Remove coolrom from the list."
+        )
+    return code
 
 
 def _dat(

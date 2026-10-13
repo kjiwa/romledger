@@ -104,3 +104,87 @@ command by hand. Hooks run only when a file moved, so re-running `import` does n
 
 Cause: a relative data directory depends on the working directory, so `scan` and `status`
 would disagree. Fix: set it to a full path.
+
+## `<platform> has no sources configured; set platforms.<platform>.sources`
+
+Cause: `fetch` ran for a platform with no `sources`. Fix: add `sources = ["coolrom"]` and/or
+`["internet-archive"]` to `[platforms.<platform>]`; see [sources.md](sources.md).
+
+## `<platform> does not list source 'X'. Configured sources: ...`
+
+Cause: `--source X` names a source the platform does not use. Fix: use one of the listed names, or
+add X to `platforms.<platform>.sources`.
+
+## `platforms.X.sources has unknown source 'Y'`
+
+Cause: typo or an unsupported source. Fix: use `coolrom` or `internet-archive`.
+
+## `missing platforms.X.archive_item`
+
+Cause: `internet-archive` is listed but no item is named. Fix: set `archive_item` to the Internet
+Archive item that holds the platform's `<game name>.zip` files.
+
+## `platforms.X.sources lists coolrom but CoolROM has no system for 'X'`
+
+Cause: CoolROM does not carry the platform (no Nintendo systems), or a custom platform has no
+CoolROM code. Fix: remove `coolrom` from the list.
+
+## `network.proxy ... must be <scheme>://[user@]host[:port]`
+
+Cause: the proxy URL has an unsupported scheme or no host. Fix: use `http`, `https`, `socks5`, or
+`socks5h`. Credentials are hidden in the message.
+
+## `network.proxy is not a valid URL`
+
+Cause: the proxy URL does not parse, usually a non-numeric port. Fix: correct it.
+
+## `unknown key network.X`
+
+Cause: `[network]` supports only `proxy`. Fix: remove the key.
+
+## `--limit: 'X' is not a positive integer`
+
+Cause: `--limit` needs a whole number of at least 1. Fix: pass one, or omit the option.
+
+## `failed <game>: <reason>`
+
+Cause: that game could not be downloaded; `fetch` went on to the next game and exits 1. Fix: read
+the reason, then run `fetch` again; interrupted downloads resume. Reasons:
+
+- `<url>: HTTP N`: the site refused or lost the file. Retry later, or download by hand.
+- `downloaded N bytes, expected M; removed it`: the transfer was cut short. Retry.
+- `md5 does not match the source listing; removed it`: the file was corrupt in transit or changed
+  upstream. Retry; if it repeats, download by hand.
+- `partial file no longer valid; removed it, run fetch again` and `server resumed at the wrong
+  offset; removed the partial file`: the server changed the file between attempts. Run `fetch`
+  again.
+- `refusing unsafe file name '...'`: the name contains a path separator. Download that game by
+  hand.
+- A bare exception name such as `ReadTimeout`: a network problem. Check the connection and proxy.
+
+## `<url>: <what>. The site layout may have changed; ...`
+
+Cause: a page lacks something romledger expects (game rows, a download link, a file list), so the
+site has changed or is serving an error page. `fetch` stops using that source for the run and
+exits 1. Fix: download by hand, and update romledger or report it.
+
+## `<url>: not fetched, <host>/robots.txt disallows it for user agent romledger`
+
+Cause: the site's robots.txt forbids that URL, or could not be read. `fetch` skips the source for
+the run and does not count it as a failure. Fix: honor it, and download by hand.
+
+## `warning: ambiguous: <game> matches N CoolROM rows; skipped`
+
+Cause: several CoolROM rows fit the game and none is the DAT game's region. Fix: download that
+game by hand.
+
+## `warning: skipping <source>: ...`
+
+Cause: the source was blocked or changed (the message after the colon says which; see the entries
+above). The rest of the games use the remaining sources.
+
+## `Proxy password for <user>@<host>:`
+
+Not an error: the proxy URL has a user name and no password, and `fetch` or `dats update` is
+running on a terminal. Type the password; it is not shown. Without a terminal, put the password in
+the URL or in `HTTPS_PROXY`.
