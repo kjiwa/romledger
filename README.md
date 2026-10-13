@@ -13,6 +13,7 @@ Works today:
 - List missing games, with Vimm's Lair search links (`romledger missing nes --links`)
 - Import from the inboxes into a RomM layout (`romledger import`)
 - Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
+- Check that the supported sites and the igir pin still match (`romledger canary`; runs weekly in CI)
 
 Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
 

@@ -38,11 +38,11 @@ class InternetArchiveSource:
     def _listing(self) -> dict[str, dict[str, Any]]:
         if self._files is None:
             url = f"{BASE_URL}/metadata/{self._item}"
-            self._files = _index(self._site.get(url), url, self._item)
+            self._files = index(self._site.get(url), url, self._item)
         return self._files
 
 
-def _index(response: httpx.Response, url: str, item: str) -> dict[str, dict[str, Any]]:
+def index(response: httpx.Response, url: str, item: str) -> dict[str, dict[str, Any]]:
     try:
         files = response.json().get("files")
     except (ValueError, AttributeError) as error:

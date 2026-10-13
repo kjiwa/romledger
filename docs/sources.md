@@ -43,3 +43,32 @@ Manual. Vimm's game pages sit behind a bot challenge, so romledger never fetches
 `romledger missing PLATFORM --links` prints a search link per game. Download in your browser into
 an inbox, then run `romledger import`. Partial browser downloads are skipped until finished.
 For GameCube, pick the default ISO; the other formats do not match the Redump DAT.
+
+## Drift checks
+
+`romledger canary` makes about 50 requests to detect site changes before a download fails. It needs
+no config file and follows the same robots.txt and spacing rules as `fetch`. The weekly
+`canary` workflow runs it; run it by hand with `romledger canary` or `romledger canary --json`.
+
+It checks that:
+
+- CoolROM's `/roms/` lists every `coolrom` code in the registry, one section page parses, and one
+  `dlpop.php` page still holds a signed link. The link itself is never requested.
+- Vimm's Lair `/vault/` lists every `vimm` code in the registry, and one list page has game rows.
+  Game pages are never requested.
+- The Internet Archive's metadata for `No-Intro_NES` lists files with checksums.
+- Every DAT named in `src/romledger/platforms.toml` exists in libretro-database.
+- The latest igir release matches `IGIR_VERSION`.
+
+A finding means a site, the registry, or a pin needs a change. Each has a stable key such as
+`vimm:new-platform:Amiga`, `coolrom:contract:section`, `dat:missing:nes`, or `igir:update:v5.8.0`.
+The command exits 1 when there are findings. The workflow opens one issue titled `canary: <key>`
+per finding, leaves an open one alone, and closes it with a comment once the finding is gone.
+
+A note means a check could not conclude: a network error, HTTP 403, 429, or 5xx, a bot challenge
+page, or a robots.txt refusal. Notes are not findings, open no issue, and leave the exit status at
+0. The rest of that site's checks are skipped; the next run tries again.
+
+To support a platform a site lists, add its code to that platform's row in
+`src/romledger/platforms.toml`, or add a new row with `dat`, `vimm`, and `coolrom` keys. To decline
+it, add the code to the `[ignore]` table in the same file.

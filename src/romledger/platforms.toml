@@ -1,5 +1,10 @@
 # One table per RomM platform slug (verified with igir's {romm} token on 2026-10-13).
 # dat: <set>/<name> under libretro-database metadat. vimm, coolrom: site system codes.
+# [ignore] lists site systems that are deliberately unsupported (no console DAT is mapped).
+
+[ignore]
+vimm = ["WiiWare", "X360-D"]
+coolrom = ["c64", "cps1", "cps2", "mame", "model2", "namcosystem22", "neogeo", "neogeocd"]
 
 [atari2600]
 dat = "no-intro/Atari - 2600"
