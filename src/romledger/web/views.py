@@ -73,6 +73,11 @@ def platform_views(context: Context, database: state.State) -> list[PlatformView
     ]
 
 
+def vimm_code(context: Context, slug: str) -> str | None:
+    registered = context.platforms.get(slug)
+    return registered.vimm if registered else None
+
+
 def platform_view(context: Context, database: state.State, slug: str) -> PlatformView:
     return next(view for view in platform_views(context, database) if view.slug == slug)
 
@@ -87,7 +92,7 @@ def games_page(
     limit: int = PAGE_SIZE,
 ) -> Page:
     items, total = database.entries(slug, states, query, limit, offset)
-    vimm = context.platforms[slug].vimm if slug in context.platforms else None
+    vimm = vimm_code(context, slug)
     return Page([_game(item, vimm) for item in items], total, offset, limit)
 
 
