@@ -180,6 +180,10 @@ Files every inbox game that matches a DAT of a configured platform into
 Import applies no region or language filter. Then it rescans the platforms that received files
 and runs `hooks.after_import`.
 
+A zip that holds a ROM plus other files (a readme) is filed whole as `<DAT game name>.zip`: the
+extra files stay inside, and the match is on the ROM's hash. An inbox that igir empties is
+recreated.
+
 Nothing is ever deleted. Files that are not moved are relocated inside their inbox, keeping
 their relative path:
 
@@ -211,8 +215,8 @@ Pages and files are served from the local machine only; nothing
 loads from a CDN.
 
 - Overview: progress per platform.
-- Platform: missing, inbox or have games, a search box, and Vimm's Lair and Internet Archive
-  search links for missing games.
+- Platform: missing, inbox or have games, a search box, and Vimm's Lair search links for missing
+  games.
 - Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
   there, and the counts set aside by `import`. Press Import to file them.
 - Activity: scans and imports started from the dashboard, with their output. One runs at a time.
@@ -237,9 +241,9 @@ Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors ar
 | Request | Meaning |
 | --- | --- |
 | `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom` and `archive_item`: the platform's code on each site, or null). |
-| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing games with `links.vimm` and `links.archive`. |
+| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing games with `links.vimm`. |
 | `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
-| `GET /api/lookup?name=<game>&platform=<slug>` | Match by name: exact, else by title ignoring tags (`exact` is false); `matches` is empty when several games fit. |
+| `GET /api/lookup?name=<game>&platform=<slug>&regions=<names>` | Match by name: exact, else by title ignoring tags (`exact` is false). `regions` is an optional comma list of No-Intro region names (`USA,Europe`) that narrows the candidates, as do extra tags in the name. `matches` lists every game that still fits. `name` is at most 300 characters. |
 | `GET /api/jobs/current` | The running scan or import, or null. |
 | `POST /api/scan`, `POST /api/import` | Start a job; 202, or 409 while another runs. |
 

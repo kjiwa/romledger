@@ -101,7 +101,7 @@ def _argv(
     excludes: Sequence[str],
     cache_path: Path,
 ) -> list[str]:
-    argv = [*command(), verb]
+    argv = [*command(), verb, "--allow-excess-sets"]
     for dat in dats:
         argv += ["--dat", str(dat)]
     for directory in inputs:

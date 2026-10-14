@@ -51,8 +51,9 @@ on a page only to that address.
 | Not scanned | The platform has no scan yet. Run `romledger scan`. |
 | Not in any DAT | No DAT for a configured platform lists it. |
 
-A badge that says `(approximate)` was matched by title. Check the region and version before you
-rely on it. Platforms that are not in your config get no badges.
+A badge that says `(approximate)` was matched by title. On Vimm's Lair lists the row's region
+flags narrow the match; when several games still fit, the badge shows the best state among them.
+Check the region and version before you rely on it. Platforms that are not in your config get no badges.
 
 Vimm's Lair offers some GameCube games in extra formats (`ciso`, `nkit`, `rvz`). Only the
 default ISO matches a Redump DAT, so download that one.

@@ -80,7 +80,7 @@ def test_argv_and_parse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     rows = run_report(tmp_path, runner, igir.Filters(("USA", "WORLD"), ("EN",)))
     output = runner.argv[runner.argv.index("--report-output") + 1]
     assert runner.argv == [
-        *["igir", "report", "--dat", "/data/a.dat", "--dat", "/data/b.dat"],
+        *["igir", "report", "--allow-excess-sets", "--dat", "/data/a.dat", "--dat", "/data/b.dat"],
         *["--input", "/in/a", "--input", "/in/b"],
         *excludes_argv(),
         *["--cache-path", str(tmp_path / "cache" / "igir.cache")],
@@ -118,7 +118,7 @@ def test_move_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         runner,
     )
     assert runner.argv == [
-        *["igir", "move", "--dat", "/data/a.dat", "--input", "/in/a"],
+        *["igir", "move", "--allow-excess-sets", "--dat", "/data/a.dat", "--input", "/in/a"],
         *(arg for junk in igir.JUNK_EXCLUDES for arg in ("--input-exclude", f"/in/a/{junk}")),
         *["--input-exclude", "/in/a/unmatched/**"],
         *["--cache-path", str(cache), "--output", "/roms/{romm}"],

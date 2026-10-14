@@ -1,3 +1,5 @@
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from romledger import state, titles
@@ -9,6 +11,7 @@ UNWANTED = "unwanted"
 UNSCANNED = "unscanned"
 UNKNOWN = "unknown"
 WANTED = (HAVE, INBOX, MISSING)
+TAG = re.compile(r"\(([^()]*)\)")
 
 
 @dataclass(frozen=True)
@@ -26,20 +29,38 @@ def by_hash(database: state.State, sha1: str) -> list[Match]:
     return [_match(item, exact=True) for item in found]
 
 
-def by_name(database: state.State, platform: str, name: str) -> Match | None:
+def by_name(
+    database: state.State, platform: str, name: str, regions: Sequence[str] = ()
+) -> list[Match]:
     exact = database.locate_game(platform, name)
     if exact:
-        return _match(exact[0], exact=True)
+        return [_match(exact[0], exact=True)]
     normalized = titles.normalize(name)
     candidates = database.locate_title(platform, normalized) if normalized else []
     if not candidates:
-        return Match(platform, name, UNKNOWN, False)
-    pool = _narrow(candidates, titles.region_of(name))
-    return _match(pool[0], exact=False) if len(pool) == 1 else None
+        return [Match(platform, name, UNKNOWN, False)]
+    wanted_regions: set[str | None] = {titles.region_name(region) for region in regions} or {
+        titles.region_of(name)
+    }
+    pool = _narrow(_with_tags(candidates, _tokens(name)), wanted_regions)
+    return [_match(item, exact=False) for item in pool]
 
 
-def _narrow(candidates: list[state.Located], region: str | None) -> list[state.Located]:
-    pool = [item for item in candidates if item.region == region] or candidates
+def _tokens(game: str) -> set[str]:
+    return {
+        token.strip().lower()
+        for tag in TAG.findall(game)
+        for token in tag.split(",")
+        if token.strip()
+    }
+
+
+def _with_tags(candidates: list[state.Located], tokens: set[str]) -> list[state.Located]:
+    return [item for item in candidates if tokens <= _tokens(item.game)] or candidates
+
+
+def _narrow(candidates: list[state.Located], regions: set[str | None]) -> list[state.Located]:
+    pool = [item for item in candidates if item.region in regions] or candidates
     wanted = [item for item in pool if item.state in WANTED]
     return wanted if len(pool) > 1 and len(wanted) == 1 else pool
 

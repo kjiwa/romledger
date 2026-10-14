@@ -127,12 +127,28 @@ def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config
 
 
 def check_library(config: Config) -> None:
-    for directory in (config.library.roms, *config.library.inboxes):
-        if not directory.is_dir():
-            raise ConfigError(
-                f"{directory}: not a directory. Is the drive or share mounted? "
-                "Mount it, or fix the path in the config file."
-            )
+    _require_directory(config.library.roms)
+    for inbox in config.library.inboxes:
+        if not inbox.is_dir() and inbox.parent.is_dir():
+            _create_directory(inbox)
+        _require_directory(inbox)
+
+
+def _create_directory(directory: Path) -> None:
+    try:
+        directory.mkdir()
+    except OSError as error:
+        raise ConfigError(
+            f"{directory}: cannot create: {error.strerror}. Check its permissions."
+        ) from error
+
+
+def _require_directory(directory: Path) -> None:
+    if not directory.is_dir():
+        raise ConfigError(
+            f"{directory}: not a directory. Is the drive or share mounted? "
+            "Mount it, or fix the path in the config file."
+        )
 
 
 def _parse_library(path: Path, table: dict[str, Any]) -> Library:

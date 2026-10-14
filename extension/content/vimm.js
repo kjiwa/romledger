@@ -13,7 +13,7 @@ page.run(async () => {
       return { ok: true, match: first };
     }
     const byName = await page.ask({ type: "lookup-name", name: disc.name, platform: slug });
-    return byName.ok ? { ok: true, match: byName.data.matches[0] || first } : byName;
+    return byName.ok ? { ok: true, match: romledger.best(byName.data.matches, first) } : byName;
   }
 
   async function annotateGame() {
@@ -61,8 +61,13 @@ page.run(async () => {
       return;
     }
     await page.forEachLimited(links, async (link) => {
-      const reply = await page.ask({ type: "lookup-name", name: link.textContent.trim(), platform: slug });
-      const node = reply.ok ? page.matchBadge(reply.data.matches[0] || { state: "unknown" }) : page.failure(reply);
+      const reply = await page.ask({
+        type: "lookup-name",
+        name: link.textContent.trim(),
+        platform: slug,
+        regions: romledger.regionsOf(link.closest("tr")),
+      });
+      const node = reply.ok ? page.matchBadge(romledger.best(reply.data.matches)) : page.failure(reply);
       link.after(" ", node);
     });
   }

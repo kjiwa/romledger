@@ -1,3 +1,4 @@
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -28,6 +29,8 @@ class Env:
         path.write_text('clrmamepro (\n\tversion "1"\n)\n')
         self.reports: list[list[Row]] = []
         self.moves: list[tuple[list[Path], str, Sequence[str]]] = []
+        self.deletes_emptied_inbox = False
+        self.move_error: Exception | None = None
         self.hooks: list[Sequence[str]] = []
         self.hook_status = 0
 
@@ -53,6 +56,10 @@ class Env:
         excludes: Sequence[str],
     ) -> None:
         self.moves.append((dat_files, template, excludes))
+        if self.deletes_emptied_inbox:
+            shutil.rmtree(self.inbox)
+        if self.move_error:
+            raise self.move_error
 
     def hook(self, argv: Sequence[str]) -> int:
         self.hooks.append(argv)
@@ -236,3 +243,21 @@ def test_hook_failures_are_recorded(tmp_path: Path, status: int, expected: str) 
 def test_run_hook_returns_status() -> None:
     assert importer.run_hook(["true"]) == 0
     assert importer.run_hook(["false"]) == 1
+
+
+def test_inbox_is_restored_when_igir_fails(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.deletes_emptied_inbox = True
+    env.move_error = igir.ToolError("boom")
+    env.reports = [[row("FOUND", "A", "/gone/A")]]
+    with pytest.raises(igir.ToolError):
+        env.run()
+    assert env.inbox.is_dir()
+
+
+def test_inbox_survives_igir_deleting_it(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.deletes_emptied_inbox = True
+    env.reports = [[row("FOUND", "A", "/gone/A")], []]
+    env.run()
+    assert env.inbox.is_dir()

@@ -10,7 +10,14 @@ file from the example in the message.
 ## `not a directory. Is the drive or share mounted?`
 
 Cause: `library.roms` or an inbox does not exist, usually because the drive or share is not mounted.
-Fix: mount it, or correct the path in the config file.
+Fix: mount it, or correct the path in the config file. A missing inbox whose parent directory
+exists is created, so this error for an inbox means the parent is missing too.
+
+## A library zip contains files besides the ROM
+
+Cause: a download zip held a readme or similar. romledger tells igir to allow excess files, so
+the zip is renamed to the DAT game name and filed whole; the ROM inside still matches the DAT.
+Fix: none needed. To drop the extras, unzip it and re-import the ROM.
 
 ## `unknown platform 'X'. Use one of: ...; or set dat.`
 

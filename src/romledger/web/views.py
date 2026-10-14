@@ -39,7 +39,6 @@ class Game:
     name: str
     state: str
     vimm: str | None
-    archive: str | None
 
 
 @dataclass(frozen=True)
@@ -98,13 +97,8 @@ def games_page(
 
 def _game(item: state.Item, vimm: str | None) -> Game:
     if item.state != "missing":
-        return Game(item.game, item.state, None, None)
-    return Game(
-        item.game,
-        item.state,
-        links.vimm_search(vimm, item.game) if vimm else None,
-        links.archive_search(item.game),
-    )
+        return Game(item.game, item.state, None)
+    return Game(item.game, item.state, links.vimm_search(vimm, item.game) if vimm else None)
 
 
 def page_url(path: str, params: dict[str, str | int], offset: int) -> str:

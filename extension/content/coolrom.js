@@ -5,7 +5,7 @@ page.run(async () => {
 
   async function lookup(name, slug) {
     const reply = await page.ask({ type: "lookup-name", name, platform: slug });
-    return reply.ok ? page.matchBadge(reply.data.matches[0] || { state: "unknown" }) : page.failure(reply);
+    return reply.ok ? page.matchBadge(romledger.best(reply.data.matches)) : page.failure(reply);
   }
 
   const system = romledger.coolromSystemFromPath(location.pathname);
