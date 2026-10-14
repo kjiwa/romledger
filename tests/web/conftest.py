@@ -20,7 +20,6 @@ def env(tmp_path: Path) -> Env:
         dat_files: Sequence[Path],
         inputs: Sequence[Path],
         cache: Path,
-        filters: igir.Filters | None = None,
         excludes: Sequence[str] = (),
     ) -> list[igir.ReportRow]:
         reports.append("report")

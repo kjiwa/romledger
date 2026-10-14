@@ -47,7 +47,7 @@ on a page only to that address.
 | In library | The library has the game. |
 | In inbox | The game is in an inbox and `import` has not filed it. |
 | Missing | The DAT lists the game, you want it, and you do not have it. |
-| Not wanted | The DAT lists it, but the platform's regions and languages exclude it. |
+| Not wanted | The DAT lists it, but the platform's regions, languages or `include` leave its title out. |
 | Not scanned | The platform has no scan yet. Run `romledger scan`. |
 | Not in any DAT | No DAT for a configured platform lists it. |
 

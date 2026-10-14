@@ -49,14 +49,11 @@ class Recorder:
         return subprocess.CompletedProcess(argv, self.returncode, self.stdout, self.stderr)
 
 
-def run_report(
-    tmp_path: Path, runner: Recorder, filters: igir.Filters | None = None
-) -> list[igir.ReportRow]:
+def run_report(tmp_path: Path, runner: Recorder) -> list[igir.ReportRow]:
     return igir.report(
         [Path("/data/a.dat"), Path("/data/b.dat")],
         [Path("/in/a"), Path("/in/b")],
         tmp_path / "cache" / "igir.cache",
-        filters,
         ["/in/a/unmatched/**"],
         runner,
     )
@@ -77,15 +74,13 @@ def excludes_argv() -> list[str]:
 def test_argv_and_parse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutil, "which", fake_which({"igir"}))
     runner = Recorder()
-    rows = run_report(tmp_path, runner, igir.Filters(("USA", "WORLD"), ("EN",)))
+    rows = run_report(tmp_path, runner)
     output = runner.argv[runner.argv.index("--report-output") + 1]
     assert runner.argv == [
         *["igir", "report", "--allow-excess-sets", "--dat", "/data/a.dat", "--dat", "/data/b.dat"],
         *["--input", "/in/a", "--input", "/in/b"],
         *excludes_argv(),
         *["--cache-path", str(tmp_path / "cache" / "igir.cache")],
-        *["--single", "--filter-region", "USA,WORLD", "--filter-language", "EN"],
-        *["--prefer-region", "USA,WORLD", "--prefer-language", "EN"],
         *["--report-output", output],
     ]
     assert rows == [
@@ -94,15 +89,6 @@ def test_argv_and_parse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
         igir.ReportRow("Nintendo", "MISSING", "Gamma (USA)", ""),
         igir.ReportRow("", "UNUSED", "", "/roms/nes/Mystery.nes"),
     ]
-
-
-def test_report_without_filters_omits_selection_flags(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(shutil, "which", fake_which({"igir"}))
-    runner = Recorder()
-    run_report(tmp_path, runner)
-    assert not {"--single", "--filter-region", "--prefer-region"} & set(runner.argv)
 
 
 def test_move_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -140,8 +126,10 @@ def test_move_failure_and_unrunnable(tmp_path: Path, monkeypatch: pytest.MonkeyP
 def test_inbox_excludes() -> None:
     assert igir.inbox_excludes([Path("/in/a"), Path("/in/b")]) == (
         "/in/a/unmatched/**",
+        "/in/a/unwanted/**",
         "/in/a/duplicates/**",
         "/in/b/unmatched/**",
+        "/in/b/unwanted/**",
         "/in/b/duplicates/**",
     )
 
@@ -167,7 +155,7 @@ def test_missing_report_file_is_an_error(tmp_path: Path, monkeypatch: pytest.Mon
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     with pytest.raises(igir.ToolError, match="without writing a report"):
-        igir.report([Path("a.dat")], [], tmp_path / "c", None, (), quiet)
+        igir.report([Path("a.dat")], [], tmp_path / "c", (), quiet)
 
 
 def test_report_with_unexpected_columns_is_an_error(
@@ -180,7 +168,7 @@ def test_report_with_unexpected_columns_is_an_error(
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     with pytest.raises(igir.ToolError, match="lacks columns"):
-        igir.report([Path("a.dat")], [], tmp_path / "c", None, (), odd)
+        igir.report([Path("a.dat")], [], tmp_path / "c", (), odd)
 
 
 def test_unrunnable_tool_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -190,4 +178,4 @@ def test_unrunnable_tool_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyP
         raise PermissionError("denied")
 
     with pytest.raises(igir.ToolError, match="cannot run igir"):
-        igir.report([Path("a.dat")], [], tmp_path / "c", None, (), broken)
+        igir.report([Path("a.dat")], [], tmp_path / "c", (), broken)

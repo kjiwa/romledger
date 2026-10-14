@@ -1,17 +1,28 @@
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
+from xml.etree import ElementTree
 
 import pytest
 
 from romledger import config, dats, igir, importer, scan
 
 DAT_NAME = "Nintendo - Nintendo Entertainment System"
+GAMES = ["Alpha (USA)", "Alpha (USA) (Rev 1)", "Beta (USA) (Unl)", "Gamma (Japan)", "Delta (World)"]
+DAT = f'clrmamepro (\n\tname "{DAT_NAME}"\n\tversion "1"\n)\n' + "".join(
+    f'game (\n\tname "{name}"\n\trom ( name "{name}.nes" size 1 sha1 {str(i) * 40} )\n)\n'
+    for i, name in enumerate(GAMES)
+)
 Row = igir.ReportRow
 
 
 def row(status: str, game: str = "", path: Path | str = "") -> Row:
     return Row(DAT_NAME if game else "", status, game, str(path))
+
+
+@pytest.fixture(autouse=True)
+def no_rescan(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scan, "scan_platform", lambda *args: None)
 
 
 class Env:
@@ -26,9 +37,12 @@ class Env:
         )
         path = dats.dat_path(self.data, f"no-intro/{DAT_NAME}")
         path.parent.mkdir(parents=True)
-        path.write_text('clrmamepro (\n\tversion "1"\n)\n')
+        path.write_text(DAT)
+        self.full_dat = path
         self.reports: list[list[Row]] = []
-        self.moves: list[tuple[list[Path], str, Sequence[str]]] = []
+        self.report_dats: list[list[Path]] = []
+        self.subsets: list[str] = []
+        self.moves: list[tuple[str, Sequence[str]]] = []
         self.deletes_emptied_inbox = False
         self.move_error: Exception | None = None
         self.hooks: list[Sequence[str]] = []
@@ -39,12 +53,10 @@ class Env:
         dat_files: list[Path],
         inputs: Sequence[Path],
         cache: Path,
-        filters: igir.Filters | None,
         excludes: Sequence[str],
     ) -> list[Row]:
-        if filters is not None:
-            return []
-        assert excludes == (f"{self.inbox}/unmatched/**", f"{self.inbox}/duplicates/**")
+        assert excludes == igir.inbox_excludes([self.inbox])
+        self.report_dats.append(list(dat_files))
         return self.reports.pop(0)
 
     def move(
@@ -55,7 +67,8 @@ class Env:
         cache: Path,
         excludes: Sequence[str],
     ) -> None:
-        self.moves.append((dat_files, template, excludes))
+        self.subsets.extend(path.read_text() for path in dat_files)
+        self.moves.append((template, excludes))
         if self.deletes_emptied_inbox:
             shutil.rmtree(self.inbox)
         if self.move_error:
@@ -74,10 +87,14 @@ class Env:
 
 
 def make_files(env: Env) -> dict[str, Path]:
-    files = {"dup": env.inbox / "Alpha.nes", "mystery": env.inbox / "sub" / "Mystery.nes"}
-    files["dup"].write_text("a")
+    files = {
+        "dup": env.inbox / "Alpha.nes",
+        "mystery": env.inbox / "sub" / "Mystery.nes",
+        "japan": env.inbox / "Gamma.nes",
+    }
     files["mystery"].parent.mkdir()
-    files["mystery"].write_text("m")
+    for name, path in files.items():
+        path.write_text(name)
     return files
 
 
@@ -99,7 +116,7 @@ def test_empty_inbox(tmp_path: Path) -> None:
     env = Env(tmp_path, (("true",),))
     env.reports = [[row("MISSING", "A"), row("MISSING", "B")]]
     result = env.run()
-    assert result == importer.ImportResult({}, [], [], [])
+    assert result == importer.ImportResult({}, [], [], [], [])
     assert env.moves == [] and env.hooks == []
 
 
@@ -108,29 +125,62 @@ def test_classifies_and_relocates(tmp_path: Path) -> None:
     files = make_files(env)
     env.reports = [
         [
-            row("FOUND", "A", files["dup"]),
-            row("FOUND", "B", "/gone/B.nes"),
-            row("MISSING", "C"),
+            row("FOUND", "Alpha (USA)", files["dup"]),
+            row("FOUND", "Delta (World)", "/gone/D.nes"),
+            row("MISSING", "Alpha (USA) (Rev 1)"),
             row("UNUSED", path=files["mystery"]),
+            row("UNUSED", path=files["japan"]),
         ],
-        [row("FOUND", "A", files["dup"]), row("UNUSED", path=files["mystery"])],
+        [row("FOUND", "Alpha (USA)", files["dup"]), row("UNUSED", path=files["mystery"])],
+        [row("FOUND", "Gamma (Japan)", files["japan"]), row("UNUSED", path=files["mystery"])],
     ]
     result = env.run()
     assert result.moved == {"nes": 1}
     assert result.duplicates == [env.inbox / "duplicates" / "Alpha.nes"]
+    assert result.unwanted == [env.inbox / "unwanted" / "Gamma.nes"]
     assert result.unmatched == [env.inbox / "unmatched" / "sub" / "Mystery.nes"]
-    assert (env.inbox / "duplicates" / "Alpha.nes").read_text() == "a"
-    assert (env.inbox / "unmatched" / "sub" / "Mystery.nes").read_text() == "m"
-    assert not files["dup"].exists() and not files["mystery"].exists()
-    assert env.moves == [
-        (
-            [dats.dat_path(env.data, f"no-intro/{DAT_NAME}")],
-            f"{env.roms}/{{romm}}",
-            (f"{env.inbox}/unmatched/**", f"{env.inbox}/duplicates/**"),
-        )
-    ]
+    assert (env.inbox / "duplicates" / "Alpha.nes").read_text() == "dup"
+    assert (env.inbox / "unwanted" / "Gamma.nes").read_text() == "japan"
+    assert (env.inbox / "unmatched" / "sub" / "Mystery.nes").read_text() == "mystery"
+    assert [path.exists() for path in files.values()] == [False] * 3
+    assert env.moves == [(f"{env.roms}/{{romm}}", igir.inbox_excludes([env.inbox]))]
     assert env.hooks == [("touch", "x")]
     assert result.hook_failures == []
+
+
+def test_moves_only_wanted_groups_and_splits_leftovers_by_the_full_dat(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.reports = [[row("UNUSED", path="/elsewhere/x")], [], [row("UNUSED", path="/elsewhere/x")]]
+    env.run()
+    assert len(env.subsets) == 1
+    subset = ElementTree.fromstring(env.subsets[0])  # noqa: S314
+    assert subset.findtext("header/name") == DAT_NAME
+    assert [game.get("name") for game in subset.findall("game")] == [
+        "Alpha (USA)",
+        "Alpha (USA) (Rev 1)",
+        "Delta (World)",
+    ]
+    assert env.report_dats[0] == env.report_dats[1] != [env.full_dat]
+    assert env.report_dats[2] == [env.full_dat]
+
+
+def test_subset_is_built_from_include(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.config = config.Config(
+        env.config.library,
+        {"nes": config.Platform(f"no-intro/{DAT_NAME}", include=("unlicensed",))},
+    )
+    env.reports = [[row("FOUND", "A", "/gone/A")], []]
+    env.run()
+    names = [game.get("name") for game in ElementTree.fromstring(env.subsets[0]).findall("game")]  # noqa: S314
+    assert "Beta (USA) (Unl)" in names
+
+
+def test_leftover_report_is_skipped_when_every_file_matched(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.reports = [[row("FOUND", "Alpha (USA)", "/gone/A")], []]
+    env.run()
+    assert len(env.report_dats) == 2
 
 
 def test_rescans_only_moved_platforms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -141,7 +191,7 @@ def test_rescans_only_moved_platforms(tmp_path: Path, monkeypatch: pytest.Monkey
     env.run()
     assert rescanned == ["nes"]
     rescanned.clear()
-    env.reports = [[row("UNUSED", path="/elsewhere/x")], [row("UNUSED", path="/elsewhere/x")]]
+    env.reports = [[row("UNUSED", path="/elsewhere/x")], [], [row("UNUSED", path="/elsewhere/x")]]
     env.run()
     assert rescanned == []
 
@@ -151,16 +201,14 @@ def test_second_dat_name_is_ignored(tmp_path: Path) -> None:
     other = Row("Other - System", "FOUND", "Z", "/gone/Z")
     env.reports = [
         [other, row("UNUSED", path="/elsewhere/x")],
+        [],
         [row("UNUSED", path="/elsewhere/x")],
     ]
     assert env.run().moved == {}
 
 
-def test_moved_counts_files_that_left_the_inbox(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_moved_counts_files_that_left_the_inbox(tmp_path: Path) -> None:
     env = Env(tmp_path)
-    monkeypatch.setattr(scan, "scan_platform", lambda *args: None)
     stays = env.inbox / "A copy.nes"
     stays.write_text("a")
     env.reports = [
@@ -181,10 +229,7 @@ def test_path_outside_inbox_is_left_alone(
     outside = tmp_path / "elsewhere" / "x.nes"
     outside.parent.mkdir()
     outside.write_text("x")
-    env.reports = [
-        [row("UNUSED", path=outside)],
-        [row("UNUSED", path=outside)],
-    ]
+    env.reports = [[row("UNUSED", path=outside)], [], [row("UNUSED", path=outside)]]
     result = env.run()
     assert result.unmatched == []
     assert outside.read_text() == "x"
@@ -199,7 +244,7 @@ def test_collision_gets_numeric_suffix(tmp_path: Path) -> None:
     (env.inbox / "unmatched" / "Mystery.1.nes").write_text("old1")
     new = env.inbox / "Mystery.nes"
     new.write_text("new")
-    env.reports = [[row("UNUSED", path=new)], [row("UNUSED", path=new)]]
+    env.reports = [[row("UNUSED", path=new)], [], [row("UNUSED", path=new)]]
     result = env.run()
     assert result.unmatched == [env.inbox / "unmatched" / "Mystery.2.nes"]
     assert taken.read_text() == "old"
@@ -210,20 +255,30 @@ def test_dry_run_touches_nothing(tmp_path: Path) -> None:
     env = Env(tmp_path, (("true",),))
     files = make_files(env)
     env.reports = [
-        [row("FOUND", "A", files["dup"]), row("UNUSED", path=files["mystery"])],
+        [
+            row("FOUND", "Alpha (USA)", files["dup"]),
+            row("UNUSED", path=files["mystery"]),
+            row("UNUSED", path=files["japan"]),
+        ],
+        [
+            row("FOUND", "Alpha (USA)", files["dup"]),
+            row("FOUND", "Gamma (Japan)", files["japan"]),
+            row("UNUSED", path=files["mystery"]),
+        ],
     ]
     result = env.run(dry_run=True)
     assert result.moved == {"nes": 1}
+    assert result.unwanted == [files["japan"]]
     assert result.unmatched == [files["mystery"]]
     assert result.duplicates == []
-    assert files["dup"].exists() and files["mystery"].exists()
-    assert not (env.inbox / "unmatched").exists()
+    assert all(path.exists() for path in files.values())
+    assert not (env.inbox / "unmatched").exists() and not (env.inbox / "unwanted").exists()
     assert env.moves == [] and env.hooks == []
 
 
 def test_hook_not_run_when_nothing_moved(tmp_path: Path) -> None:
     env = Env(tmp_path, (("true",),))
-    env.reports = [[row("UNUSED", path="/elsewhere/x")], [row("UNUSED", path="/elsewhere/x")]]
+    env.reports = [[row("UNUSED", path="/elsewhere/x")], [], [row("UNUSED", path="/elsewhere/x")]]
     env.run()
     assert env.hooks == []
 

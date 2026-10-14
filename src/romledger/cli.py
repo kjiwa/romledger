@@ -133,6 +133,8 @@ def show_config(args: argparse.Namespace) -> int:
         print(f"{slug}: {platform.dat}")
         print(f"  regions: {', '.join(platform.regions)}")
         print(f"  languages: {', '.join(platform.languages)}")
+        if platform.include:
+            print(f"  include: {', '.join(platform.include)}")
         if platform.sources:
             print(f"  sources: {', '.join(platform.sources)}")
         if platform.archive_item:

@@ -49,11 +49,15 @@ def test_report_statuses(tmp_path: Path) -> None:
         [dat],
         [library],
         tmp_path / "cache" / "igir.cache",
-        igir.Filters(("USA",), ("EN",)),
     )
 
     statuses = {(row.status, row.game) for row in rows if row.game}
-    assert statuses == {("FOUND", "Alpha (USA)"), ("FOUND", "Beta (USA)")}
+    assert statuses == {
+        ("FOUND", "Alpha (USA)"),
+        ("FOUND", "Beta (USA)"),
+        ("MISSING", "Alpha (Europe)"),
+        ("MISSING", "Gamma (Japan)"),
+    }
     unused = [row for row in rows if row.status == "UNUSED"]
     assert [Path(row.path).name for row in unused] == ["Mystery.nes"]
     assert all(isinstance(row, ReportRow) for row in rows)
@@ -82,6 +86,7 @@ def test_import_end_to_end(
     (inbox / "Alpha (USA).nes").write_bytes(GAMES["Alpha (USA)"])
     (inbox / "sub" / "Beta (USA).nes").write_bytes(GAMES["Beta (USA)"])
     (inbox / "Mystery.nes").write_bytes(b"?" * 500)
+    (inbox / "Gamma (Japan).nes").write_bytes(GAMES["Gamma (Japan)"])
     junk = {"._junk": b"j", ".DS_Store": b"d", "x.part": b"p"}
     for name, content in junk.items():
         (inbox / name).write_bytes(content)
@@ -95,11 +100,13 @@ def test_import_end_to_end(
     assert capsys.readouterr().out == (
         "moved nes 1\n"
         "duplicates 1 (moved to <inbox>/duplicates)\n"
+        "unwanted 1 (moved to <inbox>/unwanted)\n"
         "unmatched 1 (moved to <inbox>/unmatched)\n"
     )
     assert names(roms / "nes") == {"Alpha (USA).nes", "Beta (USA).nes"}
     assert names(inbox) == {
         "duplicates/Alpha (USA).nes",
+        "unwanted/Gamma (Japan).nes",
         "unmatched/Mystery.nes",
         *junk,
     }

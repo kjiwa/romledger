@@ -5,7 +5,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import NamedTuple
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 BASE_SCHEMA = """
 CREATE TABLE entries (
     platform TEXT NOT NULL,
@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS dat_index (
     sha1 TEXT,
     md5 TEXT,
     crc TEXT,
-    size INTEGER
+    size INTEGER,
+    rom TEXT
 );
 CREATE INDEX IF NOT EXISTS dat_index_sha1 ON dat_index (sha1);
 CREATE INDEX IF NOT EXISTS dat_index_game ON dat_index (platform, game);
@@ -47,13 +48,34 @@ CREATE TABLE IF NOT EXISTS dat_versions (
     mtime_ns INTEGER NOT NULL
 );
 """
-MIGRATIONS = {0: BASE_SCHEMA + INDEX_SCHEMA, 1: INDEX_SCHEMA}
+RESET_SCANS = """
+DROP TABLE IF EXISTS dat_index;
+DROP TABLE IF EXISTS dat_games;
+DROP TABLE IF EXISTS dat_versions;
+DELETE FROM entries;
+DELETE FROM unmatched;
+DELETE FROM scans;
+"""
+MIGRATIONS = {
+    0: BASE_SCHEMA + INDEX_SCHEMA,
+    1: RESET_SCANS + INDEX_SCHEMA,
+    2: RESET_SCANS + INDEX_SCHEMA,
+}
 
 
 class DatStamp(NamedTuple):
     version: str
     size: int
     mtime_ns: int
+
+
+class DatRom(NamedTuple):
+    sha1: str | None
+    md5: str | None
+    crc: str | None
+    size: int | None
+    game: str
+    name: str | None
 
 
 @dataclass(frozen=True)
@@ -90,7 +112,10 @@ class Located:
 LOCATE = """
 SELECT g.platform, g.game, g.region, e.state, s.platform IS NOT NULL
 FROM dat_games g
-LEFT JOIN entries e ON e.platform = g.platform AND e.game = g.game
+LEFT JOIN (
+    SELECT x.platform, x.game, d.norm, x.state
+    FROM entries x JOIN dat_games d ON d.platform = x.platform AND d.game = x.game
+) e ON e.platform = g.platform AND (e.game = g.game OR (g.norm != '' AND e.norm = g.norm))
 LEFT JOIN scans s ON s.platform = g.platform
 WHERE {where}
 ORDER BY g.platform, g.game
@@ -188,7 +213,7 @@ class State:
     def replace_index(
         self,
         platform: str,
-        roms: Iterable[tuple[str | None, str | None, str | None, int | None, str]],
+        roms: Iterable[DatRom],
         games: Iterable[IndexedGame],
         stamp: DatStamp,
     ) -> None:
@@ -196,8 +221,8 @@ class State:
             for table in ("dat_index", "dat_games"):
                 self._db.execute(f"DELETE FROM {table} WHERE platform = ?", (platform,))  # noqa: S608
             self._db.executemany(
-                "INSERT INTO dat_index (platform, sha1, md5, crc, size, game) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO dat_index (platform, sha1, md5, crc, size, game, rom) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [(platform, *rom) for rom in roms],
             )
             self._db.executemany(
@@ -207,6 +232,14 @@ class State:
             self._db.execute(
                 "INSERT OR REPLACE INTO dat_versions VALUES (?, ?, ?, ?)", (platform, *stamp)
             )
+
+    def dat_roms(self, platform: str) -> list[DatRom]:
+        rows = self._db.execute(
+            "SELECT sha1, md5, crc, size, game, rom FROM dat_index WHERE platform = ? "
+            "ORDER BY game, rowid",
+            (platform,),
+        )
+        return [DatRom(*row) for row in rows]
 
     def locate_sha1(self, sha1: str) -> list[Located]:
         where = "(g.platform, g.game) IN (SELECT platform, game FROM dat_index WHERE sha1 = ?)"

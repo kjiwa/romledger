@@ -1,11 +1,12 @@
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from romledger import DOCS_URL, dats, igir, scan
+from romledger import DOCS_URL, datindex, dats, igir, scan, state
 from romledger.config import Config, ConfigError
 
 NO_PLATFORMS = f"no platforms configured. Add a [platforms.<slug>] table; see {DOCS_URL}/setup.md."
@@ -19,6 +20,7 @@ PathTest = Callable[[Path], bool]
 class ImportResult:
     moved: dict[str, int]
     duplicates: list[Path]
+    unwanted: list[Path]
     unmatched: list[Path]
     hook_failures: list[str]
 
@@ -39,28 +41,44 @@ def import_inboxes(
     if not slugs:
         raise ConfigError(NO_PLATFORMS)
     scan.require_dats(config, slugs, data_dir)
-    dat_files = [dats.dat_path(data_dir, config.platforms[slug].dat) for slug in slugs]
+    with tempfile.TemporaryDirectory() as temp:
+        subsets = _write_subsets(config, data_dir, Path(temp))
+        return _import(config, data_dir, subsets, dry_run, igir_report, igir_move, hook)
+
+
+def _import(
+    config: Config,
+    data_dir: Path,
+    subsets: list[Path],
+    dry_run: bool,
+    igir_report: scan.IgirReport,
+    igir_move: IgirMove,
+    hook: RunHook,
+) -> ImportResult:
     inboxes = config.library.inboxes
     excludes = igir.inbox_excludes(inboxes)
     cache = scan.cache_path(data_dir)
-    before = igir_report(dat_files, inboxes, cache, None, excludes)
+    before = igir_report(subsets, inboxes, cache, excludes)
     if not any(row.status in (scan.FOUND, scan.UNUSED) for row in before):
-        return ImportResult({}, [], [], [])
+        return ImportResult({}, [], [], [], [])
+    wanted = set(_paths(before, scan.FOUND))
     if dry_run:
-        return ImportResult(
-            _moved(config, data_dir, before, lambda _: True), [], _paths(before, scan.UNUSED), []
-        )
+        unwanted, unmatched = _leftovers(config, data_dir, igir_report, before, wanted)
+        moved = _moved(config, data_dir, before, lambda _: True)
+        return ImportResult(moved, [], unwanted, unmatched, [])
     try:
-        igir_move(dat_files, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
+        igir_move(subsets, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
     finally:
         _restore_inboxes(inboxes)
-    after = igir_report(dat_files, inboxes, cache, None, excludes)
+    after = igir_report(subsets, inboxes, cache, excludes)
     moved = _moved(config, data_dir, before, lambda path: not path.exists())
     duplicates = _relocate(_paths(after, scan.FOUND), inboxes, igir.DUPLICATES_DIR)
-    unmatched = _relocate(_paths(after, scan.UNUSED), inboxes, igir.UNMATCHED_DIR)
+    unwanted, unmatched = _leftovers(config, data_dir, igir_report, before, wanted)
+    unwanted = _relocate(unwanted, inboxes, igir.UNWANTED_DIR)
+    unmatched = _relocate(unmatched, inboxes, igir.UNMATCHED_DIR)
     for slug in moved:
         scan.scan_platform(config, slug, data_dir, igir_report)
-    return ImportResult(moved, duplicates, unmatched, _run_hooks(config, moved, hook))
+    return ImportResult(moved, duplicates, unwanted, unmatched, _run_hooks(config, moved, hook))
 
 
 def import_lines(result: ImportResult, *, dry_run: bool) -> list[str]:
@@ -70,6 +88,8 @@ def import_lines(result: ImportResult, *, dry_run: bool) -> list[str]:
         lines.append(
             f"duplicates {len(result.duplicates)} ({moved_to} <inbox>/{igir.DUPLICATES_DIR})"
         )
+    if result.unwanted:
+        lines.append(f"unwanted {len(result.unwanted)} ({moved_to} <inbox>/{igir.UNWANTED_DIR})")
     if result.unmatched:
         lines.append(f"unmatched {len(result.unmatched)} ({moved_to} <inbox>/{igir.UNMATCHED_DIR})")
     return lines or ["inbox is empty"]
@@ -81,6 +101,35 @@ def print_result(result: ImportResult, *, dry_run: bool) -> int:
     for failure in result.hook_failures:
         print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
     return 1 if result.hook_failures else 0
+
+
+def _write_subsets(config: Config, data_dir: Path, directory: Path) -> list[Path]:
+    subsets = []
+    with state.State(data_dir / "state.db") as database:
+        for slug, platform in config.platforms.items():
+            dat = dats.dat_path(data_dir, platform.dat)
+            groups = scan.wanted_groups(database, slug, platform, dat)
+            wanted = {name for group in groups for name in group.members}
+            roms = [rom for rom in database.dat_roms(slug) if rom.game in wanted]
+            subsets.append(directory / f"{slug}.dat")
+            datindex.write_subset(subsets[-1], dats.name_of(dat), roms)
+    return subsets
+
+
+def _leftovers(
+    config: Config,
+    data_dir: Path,
+    igir_report: scan.IgirReport,
+    before: Sequence[igir.ReportRow],
+    wanted: set[Path],
+) -> tuple[list[Path], list[Path]]:
+    if not _paths(before, scan.UNUSED):
+        return [], []
+    full = [dats.dat_path(data_dir, platform.dat) for platform in config.platforms.values()]
+    inboxes = config.library.inboxes
+    rows = igir_report(full, inboxes, scan.cache_path(data_dir), igir.inbox_excludes(inboxes))
+    unwanted = [path for path in _paths(rows, scan.FOUND) if path not in wanted]
+    return unwanted, _paths(rows, scan.UNUSED)
 
 
 def _restore_inboxes(inboxes: Sequence[Path]) -> None:

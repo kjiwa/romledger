@@ -67,7 +67,7 @@ def test_reopen_persists(tmp_path: Path) -> None:
         assert database.missing("nes") == ["Beta (USA)", "Zed (USA)"]
 
 
-def test_version_one_database_migrates_without_losing_scans(tmp_path: Path) -> None:
+def test_version_one_database_migrates_but_must_be_rescanned(tmp_path: Path) -> None:
     path = tmp_path / "state.db"
     connection = sqlite3.connect(path)
     connection.executescript(state.BASE_SCHEMA + "PRAGMA user_version = 1;")
@@ -75,10 +75,12 @@ def test_version_one_database_migrates_without_losing_scans(tmp_path: Path) -> N
     connection.commit()
     connection.close()
     with State(path) as database:
-        assert database.scanned_at("nes") == "t"
+        assert database.scanned_at("nes") is None
         assert database.index_stamp("nes") is None
         assert database.locate_sha1("a" * 40) == []
-    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 2
+    assert (
+        sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == state.SCHEMA_VERSION
+    )
 
 
 def test_entries_filter_page_and_escape_wildcards(tmp_path: Path) -> None:
@@ -110,3 +112,49 @@ def test_state_is_usable_from_another_thread(tmp_path: Path) -> None:
         worker.start()
         worker.join()
     assert errors == []
+
+
+V2_SCHEMA = """
+CREATE TABLE dat_index (
+    platform TEXT NOT NULL, game TEXT NOT NULL,
+    sha1 TEXT, md5 TEXT, crc TEXT, size INTEGER
+);
+CREATE TABLE dat_games (
+    platform TEXT NOT NULL, game TEXT NOT NULL, norm TEXT NOT NULL, region TEXT,
+    PRIMARY KEY (platform, game)
+);
+CREATE TABLE dat_versions (
+    platform TEXT PRIMARY KEY, version TEXT NOT NULL, size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL
+);
+INSERT INTO dat_index VALUES ('nes', 'A (USA)', 'aa', NULL, NULL, 1);
+INSERT INTO dat_games VALUES ('nes', 'A (USA)', 'a', 'usa');
+INSERT INTO dat_versions VALUES ('nes', 'v', 1, 1);
+PRAGMA user_version = 2;
+"""
+
+
+def test_version_two_database_migrates_to_group_scans_and_rom_names(tmp_path: Path) -> None:
+    path = tmp_path / "state.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(state.BASE_SCHEMA + V2_SCHEMA)
+    connection.execute("INSERT INTO entries VALUES ('nes', 'A (USA)', 'have', '/a')")
+    connection.execute("INSERT INTO unmatched VALUES ('nes', '/u')")
+    connection.execute("INSERT INTO scans VALUES ('nes', 't', 'v')")
+    connection.commit()
+    connection.close()
+    with State(path) as database:
+        assert database.counts() == {}
+        assert database.scanned_at("nes") is None
+        assert database.index_stamp("nes") is None
+        assert database.dat_roms("nes") == []
+        database.replace_index(
+            "nes",
+            [state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes")],
+            [state.IndexedGame("A (USA)", "a", "usa")],
+            state.DatStamp("v", 1, 1),
+        )
+        assert database.dat_roms("nes") == [
+            state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes")
+        ]
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 3

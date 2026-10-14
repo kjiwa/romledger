@@ -63,6 +63,8 @@ def test_inbox_lists_files_and_hides_junk(env: Env) -> None:
     (env.inbox / "b.nes.part").write_bytes(b"")
     (env.inbox / "unmatched").mkdir()
     (env.inbox / "unmatched" / "x.bin").write_bytes(b"")
+    (env.inbox / "unwanted").mkdir()
+    (env.inbox / "unwanted" / "y.bin").write_bytes(b"")
     (env.inbox / "sub").mkdir()
     (env.inbox / "sub" / "c.nes").write_bytes(b"")
     page = env.client.get("/inbox")
@@ -72,6 +74,8 @@ def test_inbox_lists_files_and_hides_junk(env: Env) -> None:
     assert str(Path("sub") / "c.nes") in page.text
     assert ".DS_Store" not in page.text
     assert "x.bin" not in page.text
+    assert "y.bin" not in page.text
+    assert "<dt>Unwanted</dt><dd>1</dd>" in page.text
 
 
 def test_empty_inbox_and_upload_notice(env: Env) -> None:

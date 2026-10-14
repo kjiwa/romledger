@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from romledger import datindex, dats, igir, state
+from romledger import catalog, datindex, dats, igir, state
 from romledger.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
@@ -16,21 +16,30 @@ IgirReport = Callable[..., list[igir.ReportRow]]
 
 
 def classify(
-    library_rows: Sequence[igir.ReportRow], inbox_rows: Sequence[igir.ReportRow]
+    groups: Sequence[catalog.Group],
+    library_rows: Sequence[igir.ReportRow],
+    inbox_rows: Sequence[igir.ReportRow],
 ) -> tuple[list[state.Item], list[str]]:
-    items = {
-        row.game: state.Item(row.game, "have", row.path)
-        for row in library_rows
-        if row.status == FOUND
-    }
-    for row in inbox_rows:
-        if row.status == FOUND and row.game not in items:
-            items[row.game] = state.Item(row.game, "inbox", row.path)
-    for row in library_rows:
-        if row.status == MISSING and row.game not in items:
-            items[row.game] = state.Item(row.game, "missing", None)
+    library, inbox = _found(library_rows), _found(inbox_rows)
+    items = [_item(group, library, inbox) for group in groups]
     unmatched = [row.path for row in library_rows if row.status == UNUSED]
-    return list(items.values()), unmatched
+    return items, unmatched
+
+
+def _found(rows: Sequence[igir.ReportRow]) -> dict[str, str]:
+    found: dict[str, str] = {}
+    for row in rows:
+        if row.status == FOUND:
+            found.setdefault(row.game, row.path)
+    return found
+
+
+def _item(group: catalog.Group, library: dict[str, str], inbox: dict[str, str]) -> state.Item:
+    for kind, found in (("have", library), ("inbox", inbox)):
+        member = next((name for name in group.members if name in found), None)
+        if member is not None:
+            return state.Item(member, kind, found[member])
+    return state.Item(group.preferred, "missing", None)
 
 
 def cache_path(data_dir: Path) -> Path:
@@ -58,34 +67,28 @@ def scan_each(slugs: Sequence[str], scan_one: Callable[[str], None]) -> None:
     print(f"scanned {len(slugs)} platform(s)")
 
 
+def wanted_groups(
+    database: state.State, slug: str, platform: Platform, dat: Path
+) -> list[catalog.Group]:
+    datindex.ensure(database, slug, dat)
+    games = datindex.catalog_games(database.dat_roms(slug))
+    return catalog.wanted_groups(games, platform.regions, platform.languages, platform.include)
+
+
 def scan_platform(
     config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
 ) -> None:
     platform = config.platforms[slug]
     dat = dats.dat_path(data_dir, platform.dat)
+    with state.State(data_dir / "state.db") as database:
+        groups = wanted_groups(database, slug, platform, dat)
+    cache = cache_path(data_dir)
     excludes = igir.inbox_excludes(config.library.inboxes)
-    inbox_rows = _report(igir_report, dat, config.library.inboxes, platform, data_dir, excludes)
+    inbox_rows = igir_report([dat], config.library.inboxes, cache, excludes)
     library = config.library.roms / slug
-    if library.is_dir():
-        library_rows = _report(igir_report, dat, [library], platform, data_dir, ())
-    else:
-        # No library directory yet: everything the inbox lacks is missing.
-        library_rows = [row for row in inbox_rows if row.status == MISSING]
-    items, unmatched = classify(library_rows, inbox_rows)
+    library_rows = igir_report([dat], [library], cache, ()) if library.is_dir() else []
+    items, unmatched = classify(groups, library_rows, inbox_rows)
     with state.State(data_dir / "state.db") as database:
         database.replace_platform(
             slug, items, unmatched, dats.version_of(dat), datetime.now(UTC).isoformat()
         )
-        datindex.ensure(database, slug, dat)
-
-
-def _report(
-    igir_report: IgirReport,
-    dat: Path,
-    inputs: Sequence[Path],
-    platform: Platform,
-    data_dir: Path,
-    excludes: Sequence[str],
-) -> list[igir.ReportRow]:
-    filters = igir.Filters(platform.regions, platform.languages)
-    return igir_report([dat], inputs, cache_path(data_dir), filters, excludes)

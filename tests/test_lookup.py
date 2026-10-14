@@ -105,10 +105,18 @@ def test_name_without_candidates_is_unknown(tmp_path: Path) -> None:
         ]
 
 
+def test_any_member_of_a_had_group_reports_have(tmp_path: Path) -> None:
+    with build(tmp_path) as database:
+        assert lookup.by_name(database, "nes", "Alpha (Europe)") == [
+            lookup.Match("nes", "Alpha (Europe)", lookup.HAVE, True)
+        ]
+        assert lookup.by_hash(database, "b" * 40)[0].state == lookup.HAVE
+
+
 def test_title_match_is_approximate_and_prefers_the_region(tmp_path: Path) -> None:
     with build(tmp_path) as database:
         assert lookup.by_name(database, "nes", "alpha (europe) (rev a)") == [
-            lookup.Match("nes", "Alpha (Europe)", lookup.UNWANTED, False)
+            lookup.Match("nes", "Alpha (Europe)", lookup.HAVE, False)
         ]
         assert lookup.by_name(database, "nes", "Cat") == [
             lookup.Match("nes", "Cat (USA)", lookup.MISSING, False)
@@ -122,14 +130,15 @@ def test_region_without_a_candidate_falls_back_to_all(tmp_path: Path) -> None:
         ]
 
 
-def test_ambiguous_title_returns_every_candidate_unless_one_is_wanted(tmp_path: Path) -> None:
+def test_ambiguous_title_returns_every_candidate(tmp_path: Path) -> None:
     with build(tmp_path) as database:
         assert lookup.by_name(database, "nes", "Dog (USA) (Beta)") == [
             lookup.Match("nes", "Dog (USA)", lookup.UNWANTED, False),
             lookup.Match("nes", "Dog (USA) (Rev 1)", lookup.UNWANTED, False),
         ]
         assert lookup.by_name(database, "nes", "Mix (USA) (Beta)") == [
-            lookup.Match("nes", "Mix (USA)", lookup.MISSING, False)
+            lookup.Match("nes", "Mix (USA)", lookup.MISSING, False),
+            lookup.Match("nes", "Mix (USA) (Rev 1)", lookup.MISSING, False),
         ]
 
 
@@ -173,3 +182,23 @@ def test_title_with_no_ascii_never_fuzzy_matches(tmp_path: Path) -> None:
         assert lookup.by_name(database, "nes", "\u3042\u3044 (Japan)") == [
             lookup.Match("nes", "\u3042\u3044 (Japan)", lookup.UNKNOWN, False)
         ]
+
+
+def test_titles_without_ascii_keep_their_own_state(tmp_path: Path) -> None:
+    with build(tmp_path) as database:
+        database.replace_index(
+            "nes",
+            [],
+            [
+                state.IndexedGame("\u30b2\u30fc\u30e0 (Japan)", "", "japan"),
+                state.IndexedGame("\u30c9\u30e9\u30b4\u30f3 (Japan)", "", "japan"),
+            ],
+            state.DatStamp("1", 0, 0),
+        )
+        database.replace_platform(
+            "nes", [state.Item("\u30b2\u30fc\u30e0 (Japan)", "have", "/g")], [], "1", "t"
+        )
+        assert lookup.by_name(database, "nes", "\u30b2\u30fc\u30e0 (Japan)")[0].state == "have"
+        assert lookup.by_name(database, "nes", "\u30c9\u30e9\u30b4\u30f3 (Japan)")[0].state == (
+            lookup.UNWANTED
+        )
