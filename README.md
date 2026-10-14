@@ -67,5 +67,6 @@ romledger serve --open
 ```
 
 See [docs/setup.md](docs/setup.md) for all options,
+[docs/deploy.md](docs/deploy.md) to run it as a container,
 [docs/sources.md](docs/sources.md) for download sources and
 [docs/troubleshooting.md](docs/troubleshooting.md) for error messages.
