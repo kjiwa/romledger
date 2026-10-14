@@ -57,9 +57,10 @@ Codes are upper case.
   NZ POR RUS SPA SWE TAI UK UNK USA WORLD
 - Languages: DA DE EL EN ES FI FR IT JA KO NL NO PT RU SV ZH
 
-RomM's own filesystem watcher or scheduled rescan (`ENABLE_RESCAN_ON_FILESYSTEM_CHANGE`,
-`ENABLE_SCHEDULED_RESCAN`) normally makes a hook unnecessary. Whether inotify events arrive over
-SMB or NFS is unverified, so prefer the scheduled rescan for a share.
+If you run [RomM](https://docs.romm.app), its filesystem watcher or scheduled rescan
+(`ENABLE_RESCAN_ON_FILESYSTEM_CHANGE`, `ENABLE_SCHEDULED_RESCAN`) normally makes a
+`hooks.after_import` hook unnecessary. Whether inotify events arrive over SMB or NFS is
+unverified, so prefer the scheduled rescan if the library is on a network share.
 
 Each platform wants one release per game (igir `--single`): the preferred region among the
 listed regions and languages.
@@ -68,8 +69,7 @@ Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variable
 wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
 password on a terminal. It never prints the password, and shows proxy URLs as `scheme://***@host`.
 
-Crawling a site requires the site operator's permission; see [sources.md](sources.md) before you
-list a source.
+See [sources.md](sources.md) before you list a source.
 
 ## Data directory
 
@@ -87,8 +87,8 @@ romledger config
 ```
 
 It prints the resolved config file, data directory, library paths, platforms with their sources, and
-the proxy with credentials hidden. If a path
-is not a directory, mount the share and run it again.
+the proxy with credentials hidden. If a path is not a directory, mount the drive or share and
+run it again.
 
 ## dats update
 
@@ -151,7 +151,7 @@ platforms Vimm's Lair carries.
 romledger fetch PLATFORM [--limit N] [--dry-run] [--no-import] [--source NAME]
 ```
 
-Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
+Run `scan` first. Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
 platform's `sources` in order and takes the first match. A download is written as `<name>.part`,
 resumed if it was interrupted, checked against the size the server announced (and the checksum,
 where the source lists one), then renamed. Then it runs `import`, unless `--no-import`.
@@ -164,7 +164,7 @@ then a summary line. A failed game does not stop the others.
   CoolROM is asked for section pages only.
 - `--source NAME`: use only that one configured source.
 
-Run `scan` first. Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
+Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
 robots.txt asks), Internet Archive at least 1 second. A source whose robots.txt disallows a URL is
 skipped for the run. Exit status is 0, 1 if any game failed or a site's layout changed (or an
 `after_import` hook failed), or 2 for errors.
@@ -188,8 +188,10 @@ their relative path:
 
 A name collision there gets `.1`, `.2`, ... before the extension. Output lists
 `moved <slug> <n>`, `duplicates <n>`, and `unmatched <n>`; an inbox with nothing to do prints
-`inbox is empty`. `--dry-run` prints what would be filed (it cannot tell duplicates from new games, so its counts include games the library already has) and the unmatched files, and changes
-nothing; duplicates are only known after filing, so it does not list them.
+`inbox is empty`.
+
+`--dry-run` changes nothing. It prints what would be filed and the unmatched files. It cannot tell
+duplicates from new games, so its counts include games the library already has.
 
 Exit status is 0, 1 if an `after_import` hook failed (everything else still completed), or 2 for
 errors.
@@ -197,16 +199,14 @@ errors.
 Manual downloads from Vimm's Lair: download in a browser into an inbox, then run
 `romledger import`. Partial downloads are skipped until the browser renames them.
 
-Disc images: igir can read CHD; matching Redump CHDs is unverified.
-
 ## serve
 
 ```sh
 romledger serve [--host 127.0.0.1] [--port 8730] [--open]
 ```
 
-Runs the dashboard and JSON API, and prints a link ending in `?token=...`. Open the link once; the
-browser keeps a session cookie. Pages and files are served from the local machine only; nothing
+Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the link in your
+browser; otherwise copy it from the terminal. Open it once; the browser keeps a session cookie. Pages and files are served from the local machine only; nothing
 loads from a CDN.
 
 - Overview: progress per platform.
@@ -216,7 +216,7 @@ loads from a CDN.
   there, and the counts set aside by `import`. Press Import to file them.
 - Activity: scans and imports started from the dashboard, with their output. One runs at a time.
 
-The service reads the config file on every request, so edits and a remounted share take effect
+The service reads the config file on every request, so edits and a remounted library take effect
 without a restart. Scan and import need the DATs (`romledger dats update`) and igir, as on the
 command line.
 

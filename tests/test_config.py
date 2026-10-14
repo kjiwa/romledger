@@ -189,7 +189,7 @@ def test_check_library_ok(tmp_path: Path) -> None:
 
 def test_check_library_missing_roms(tmp_path: Path) -> None:
     loaded = load(write(tmp_path, valid_text(tmp_path)))
-    with pytest.raises(config.ConfigError, match=r"not a directory.*NAS share mounted"):
+    with pytest.raises(config.ConfigError, match=r"not a directory.*drive or share mounted"):
         config.check_library(loaded)
 
 
