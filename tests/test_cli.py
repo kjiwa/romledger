@@ -508,7 +508,7 @@ def test_fetch_end_to_end(
     assert capsys.readouterr().out.splitlines() == [
         "fetched A (USA) (internet-archive)",
         "not found B (USA)",
-        "fetched 1, not found 1, failed 0",
+        "fetched 1, not found 1, failed 0, skipped 0",
     ]
 
 

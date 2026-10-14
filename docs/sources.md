@@ -10,7 +10,8 @@ as a browser. If a site refuses it, `fetch` reports the error and stops using th
 
 Downloads from every source land in the first inbox, and `import` verifies them against the DAT by
 content. The DAT check is the integrity gate; a wrong or corrupt file is filed under
-`<inbox>/unmatched/`.
+`<inbox>/unmatched/`, and a valid dump of another release under `<inbox>/unwanted/`. `fetch` does
+not download a file again while the earlier copy sits in either folder.
 
 ## CoolROM
 
@@ -22,6 +23,8 @@ systems; listing `coolrom` for a platform it does not carry is an error.
   unique row is used; an ambiguous title is skipped with a warning, and you download it by hand.
 - It follows `robots.txt`, which asks for a 10 second crawl delay, and keeps at least that gap
   between requests. Large platforms take a while by design.
+- CoolROM lists one file per title, so it may be another region's dump or one the DAT does not
+  list; either way `import` sets it aside and `fetch` skips that title next time.
 - CoolROM publishes no hashes. A download link expires about 10 minutes after the page that
   holds it, so romledger asks for the link immediately before each download.
 - Crawl it only with the site's permission; see the top of this page.

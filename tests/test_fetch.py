@@ -106,7 +106,7 @@ def test_fetches_every_missing_game(
         "fetched Alpha (USA) (coolrom)",
         "fetched Beta (USA) (coolrom)",
         "fetched Gamma (USA) (coolrom)",
-        "fetched 3, not found 0, failed 0",
+        "fetched 3, not found 0, failed 0, skipped 0",
     ]
 
 
@@ -147,6 +147,58 @@ def test_the_next_source_is_tried(inbox: Path, data_dir: Path) -> None:
     result = run(inbox, data_dir, [first, second])
     assert result.fetched == GAMES
     assert result.failed == []
+
+
+def seed_set_aside(inbox: Path, directory: str = "unwanted") -> Path:
+    path = inbox / directory / "Alpha (USA).zip"
+    path.parent.mkdir()
+    path.write_bytes(BODY)
+    return path
+
+
+def test_a_set_aside_download_is_skipped_not_fetched_again(
+    inbox: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    set_aside = seed_set_aside(inbox)
+    network = Network()
+    source = FakeSource("coolrom", {"Alpha (USA)": found("Alpha (USA)")})
+    result = run(inbox, data_dir, [source], network)
+    assert result.skipped == ["Alpha (USA)"]
+    assert result.not_found == ["Beta (USA)", "Gamma (USA)"]
+    assert network.requests == []
+    assert not (inbox / "Alpha (USA).zip").exists()
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == f"skipped Alpha (USA): {set_aside} was set aside by an earlier import"
+    assert out[-1] == "fetched 0, not found 2, failed 0, skipped 1"
+
+
+@pytest.mark.parametrize("directory", ["unmatched", "duplicates"])
+def test_every_rejected_directory_counts_as_set_aside(
+    inbox: Path, data_dir: Path, directory: str
+) -> None:
+    seed_set_aside(inbox, directory)
+    source = FakeSource("coolrom", {"Alpha (USA)": found("Alpha (USA)")})
+    assert run(inbox, data_dir, [source]).skipped == ["Alpha (USA)"]
+
+
+def test_a_set_aside_download_does_not_stop_the_next_source(inbox: Path, data_dir: Path) -> None:
+    seed_set_aside(inbox)
+    first = FakeSource("coolrom", {"Alpha (USA)": found("Alpha (USA)")})
+    second = FakeSource(
+        "internet-archive",
+        {"Alpha (USA)": Candidate("Alpha (USA)", lambda: "https://ia.example/a", "Alpha.zip")},
+    )
+    result = run(inbox, data_dir, [first, second])
+    assert result.fetched == ["Alpha (USA)"]
+    assert result.skipped == []
+
+
+def test_a_dry_run_reports_a_set_aside_download_as_skipped(inbox: Path, data_dir: Path) -> None:
+    seed_set_aside(inbox)
+    source = FakeSource("coolrom", {"Alpha (USA)": found("Alpha (USA)")})
+    result = run(inbox, data_dir, [source], dry_run=True)
+    assert result.skipped == ["Alpha (USA)"]
+    assert result.fetched == []
 
 
 def test_a_failure_survives_a_later_miss(inbox: Path, data_dir: Path) -> None:
@@ -208,7 +260,7 @@ def test_dry_run_downloads_nothing(
     assert list(inbox.iterdir()) == []
     out = capsys.readouterr().out.splitlines()
     assert out[0] == "would fetch Alpha (USA) (coolrom)"
-    assert out[-1] == "would fetch 1, not found 2, failed 0"
+    assert out[-1] == "would fetch 1, not found 2, failed 0, skipped 0"
 
 
 def test_dry_run_with_coolrom_requests_only_section_pages(

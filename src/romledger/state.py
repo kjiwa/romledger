@@ -5,7 +5,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import NamedTuple
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BASE_SCHEMA = """
 CREATE TABLE entries (
     platform TEXT NOT NULL,
@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS dat_index (
     md5 TEXT,
     crc TEXT,
     size INTEGER,
-    rom TEXT
+    rom TEXT,
+    block INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS dat_index_sha1 ON dat_index (sha1);
 CREATE INDEX IF NOT EXISTS dat_index_game ON dat_index (platform, game);
@@ -56,10 +57,15 @@ DELETE FROM entries;
 DELETE FROM unmatched;
 DELETE FROM scans;
 """
+REBUILD_INDEX = """
+DROP TABLE IF EXISTS dat_index;
+DROP TABLE IF EXISTS dat_versions;
+"""
 MIGRATIONS = {
     0: BASE_SCHEMA + INDEX_SCHEMA,
     1: RESET_SCANS + INDEX_SCHEMA,
     2: RESET_SCANS + INDEX_SCHEMA,
+    3: REBUILD_INDEX + INDEX_SCHEMA,
 }
 
 
@@ -76,6 +82,7 @@ class DatRom(NamedTuple):
     size: int | None
     game: str
     name: str | None
+    block: int
 
 
 @dataclass(frozen=True)
@@ -221,8 +228,8 @@ class State:
             for table in ("dat_index", "dat_games"):
                 self._db.execute(f"DELETE FROM {table} WHERE platform = ?", (platform,))  # noqa: S608
             self._db.executemany(
-                "INSERT INTO dat_index (platform, sha1, md5, crc, size, game, rom) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO dat_index (platform, sha1, md5, crc, size, game, rom, block) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [(platform, *rom) for rom in roms],
             )
             self._db.executemany(
@@ -235,8 +242,8 @@ class State:
 
     def dat_roms(self, platform: str) -> list[DatRom]:
         rows = self._db.execute(
-            "SELECT sha1, md5, crc, size, game, rom FROM dat_index WHERE platform = ? "
-            "ORDER BY game, rowid",
+            "SELECT sha1, md5, crc, size, game, rom, block FROM dat_index WHERE platform = ? "
+            "ORDER BY game, block, rowid",
             (platform,),
         )
         return [DatRom(*row) for row in rows]

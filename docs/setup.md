@@ -206,8 +206,10 @@ platform's `sources` in order and takes the first match. A download is written a
 resumed if it was interrupted, checked against the size the server announced (and the checksum,
 where the source lists one), then renamed. Then it runs `import`, unless `--no-import`.
 
-Output per game is `fetched <game> (<source>)`, `not found <game>`, or `failed <game>: <reason>`,
-then a summary line. A failed game does not stop the others.
+Output per game is `fetched <game> (<source>)`, `not found <game>`, `skipped <game>: <path> ...` or
+`failed <game>: <reason>`, then a summary line. A failed game does not stop the others. A game is
+skipped when the file a source would send already sits in `<inbox>/unmatched/`, `unwanted/` or
+`duplicates/` from an earlier import; delete that file to try again.
 
 - `--limit N`: stop after N games.
 - `--dry-run`: look games up and print `would fetch <game> (<source>)`; download and import nothing.

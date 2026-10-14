@@ -152,3 +152,34 @@ def test_import_extracts_a_zip_with_an_extra_file_and_keeps_the_inbox(
     assert capsys.readouterr().out == "inbox is empty\n"
     assert cli.main(["--config", str(path), "status"]) == 0
     assert capsys.readouterr().out.splitlines()[1].split()[:3] == ["nes", "2", "1"]
+
+
+@needs_igir
+def test_import_files_a_game_whose_name_repeats_in_another_dat_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    primary, alternate = b"P" * 1000, b"Q" * 1000
+    data = tmp_path / "data"
+    monkeypatch.setenv(config.DATA_ENV, str(data))
+    dat = data / "dats" / "no-intro" / f"{NES}.dat"
+    dat.parent.mkdir(parents=True)
+    blocks = "".join(
+        f'game (\n\tname "Delta (USA)"\n\trom ( name "{name}" size {len(content)} '
+        f"crc {zlib.crc32(content):08x} )\n)\n"
+        for name, content in (("Delta (USA).nes", primary), ("Delta (USA) (Alt).nes", alternate))
+    )
+    dat.write_text(f'clrmamepro (\n\tname "{NES}"\n\tversion "2026.10.01"\n)\n{blocks}')
+    roms, inbox = tmp_path / "roms", tmp_path / "inbox"
+    roms.mkdir()
+    inbox.mkdir()
+    (inbox / "Delta (USA).nes").write_bytes(alternate)
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
+        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
+    )
+
+    assert cli.main(["--config", str(path), "import"]) == 0
+    assert capsys.readouterr().out == "moved nes 1\n"
+    assert names(roms / "nes") == {"Delta (USA) (Alt).nes"}
+    assert names(inbox) == set()

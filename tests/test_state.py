@@ -150,11 +150,41 @@ def test_version_two_database_migrates_to_group_scans_and_rom_names(tmp_path: Pa
         assert database.dat_roms("nes") == []
         database.replace_index(
             "nes",
-            [state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes")],
+            [state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes", 0)],
             [state.IndexedGame("A (USA)", "a", "usa")],
             state.DatStamp("v", 1, 1),
         )
         assert database.dat_roms("nes") == [
-            state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes")
+            state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes", 0)
         ]
-    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 3
+    assert (
+        sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == state.SCHEMA_VERSION
+    )
+
+
+V3_SCHEMA = """
+CREATE TABLE dat_versions (
+    platform TEXT PRIMARY KEY, version TEXT NOT NULL, size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL
+);
+INSERT INTO dat_versions VALUES ('nes', 'v', 1, 1);
+CREATE TABLE dat_index (
+    platform TEXT NOT NULL, game TEXT NOT NULL,
+    sha1 TEXT, md5 TEXT, crc TEXT, size INTEGER, rom TEXT
+);
+INSERT INTO dat_index VALUES ('nes', 'A (USA)', 'aa', NULL, NULL, 1, 'a.nes');
+PRAGMA user_version = 3;
+"""
+
+
+def test_version_three_database_rebuilds_the_index_and_keeps_scans(tmp_path: Path) -> None:
+    path = tmp_path / "state.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(state.BASE_SCHEMA + V3_SCHEMA)
+    connection.execute("INSERT INTO scans VALUES ('nes', 't', 'v')")
+    connection.commit()
+    connection.close()
+    with State(path) as database:
+        assert database.scanned_at("nes") == "t"
+        assert database.index_stamp("nes") is None
+        assert database.dat_roms("nes") == []

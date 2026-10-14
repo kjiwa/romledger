@@ -36,12 +36,28 @@ game (
 def test_parse_reads_hashes_sizes_and_games() -> None:
     roms = list(datindex.parse(DAT.splitlines()))
     assert roms == [
-        state.DatRom(SHA.lower(), "b" * 32, "0000abcd", 1024, "Alpha (USA)", "Alpha (USA).nes"),
+        state.DatRom(SHA.lower(), "b" * 32, "0000abcd", 1024, "Alpha (USA)", "Alpha (USA).nes", 0),
         state.DatRom(
-            None, None, "11111111", 12, "Beta (Europe) (En,Fr)", 'weird "quoted" size 9 (x).nes'
+            None, None, "11111111", 12, "Beta (Europe) (En,Fr)", 'weird "quoted" size 9 (x).nes', 1
         ),
-        state.DatRom("c" * 40, None, None, None, "Beta (Europe) (En,Fr)", "b2.nes"),
-        state.DatRom(None, None, None, None, "Bare (Japan)", None),
+        state.DatRom("c" * 40, None, None, None, "Beta (Europe) (En,Fr)", "b2.nes", 1),
+        state.DatRom(None, None, None, None, "Bare (Japan)", None, 2),
+    ]
+
+
+def test_parse_gives_same_named_games_separate_blocks() -> None:
+    lines = [
+        *("game (", '\tname "A (USA)"', '\trom ( name "A (USA).a26" size 1 crc 00000001 )', ")"),
+        *(
+            "game (",
+            '\tname "A (USA)"',
+            '\trom ( name "A (USA) (Alt).a26" size 1 crc 00000002 )',
+            ")",
+        ),
+    ]
+    assert [(rom.name, rom.block) for rom in datindex.parse(lines)] == [
+        ("A (USA).a26", 0),
+        ("A (USA) (Alt).a26", 1),
     ]
 
 
@@ -111,8 +127,8 @@ def test_ensure_stores_rom_names_for_the_catalog(tmp_path: Path) -> None:
 
 def test_write_subset_keeps_the_header_name_and_chosen_games(tmp_path: Path) -> None:
     roms = [
-        state.DatRom(SHA, "b" * 32, "0000abcd", 1024, "Alpha & <Co> (USA)", 'A "1".nes'),
-        state.DatRom(None, None, None, None, "Bare (USA)", None),
+        state.DatRom(SHA, "b" * 32, "0000abcd", 1024, "Alpha & <Co> (USA)", 'A "1".nes', 0),
+        state.DatRom(None, None, None, None, "Bare (USA)", None, 1),
     ]
     path = tmp_path / "subset.dat"
     datindex.write_subset(path, "Nintendo - NES", roms)
@@ -124,6 +140,20 @@ def test_write_subset_keeps_the_header_name_and_chosen_games(tmp_path: Path) -> 
         {"name": 'A "1".nes', "size": "1024", "crc": "0000abcd", "md5": "b" * 32, "sha1": SHA}
     ]
     assert games["Bare (USA)"] == []
+
+
+def test_write_subset_keeps_same_named_blocks_as_separate_games(tmp_path: Path) -> None:
+    roms = [
+        state.DatRom(None, None, "00000001", 1, "A (USA)", "A (USA).a26", 0),
+        state.DatRom(None, None, "00000002", 1, "A (USA)", "A (USA) (Alt).a26", 1),
+    ]
+    path = tmp_path / "subset.dat"
+    datindex.write_subset(path, "Atari - 2600", roms)
+    root = ElementTree.parse(path).getroot()  # noqa: S314
+    assert [[rom.get("name") for rom in game.findall("rom")] for game in root.findall("game")] == [
+        ["A (USA).a26"],
+        ["A (USA) (Alt).a26"],
+    ]
 
 
 def test_subset_header_name_round_trips_with_an_ampersand(tmp_path: Path) -> None:
