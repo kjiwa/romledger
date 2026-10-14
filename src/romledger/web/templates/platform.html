@@ -49,9 +49,10 @@
   <li class="game">
     <span class="game-name">{{ game.name }}</span>
     <span class="badge badge-{{ game.state }}">{{ game.state }}</span>
-    {% if game.vimm %}
+    {% if game.vimm or game.emuland %}
     <span class="game-links">
-      <a href="{{ game.vimm }}" target="_blank" rel="noopener noreferrer">Vimm's Lair{{ icon("external") }}<span class="sr-only"> (opens in a new tab)</span></a>
+      {% if game.vimm %}<a href="{{ game.vimm }}" target="_blank" rel="noopener noreferrer">Vimm's Lair{{ icon("external") }}<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
+      {% if game.emuland %}<a href="{{ game.emuland }}" target="_blank" rel="noopener noreferrer">emu-land{{ icon("external") }}<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
     </span>
     {% endif %}
   </li>

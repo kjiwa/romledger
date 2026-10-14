@@ -19,7 +19,13 @@ def test_platforms_before_and_after_a_scan(env: Env) -> None:
     after = env.client.get("/api/platforms").json()[0]
     assert (after["have"], after["inbox"], after["missing"], after["wanted"]) == (1, 1, 1, 3)
     assert after["percent"] == 33
-    assert after["sites"] == {"vimm": "NES", "coolrom": None, "archive_item": None}
+    assert after["sites"] == {
+        "vimm": "NES",
+        "coolrom": None,
+        "consoleroms": "nes",
+        "emuland": "consoles/dendy",
+        "archive_item": None,
+    }
 
 
 def test_platform_sites_report_configured_codes(env: Env) -> None:
@@ -29,7 +35,13 @@ def test_platform_sites_report_configured_codes(env: Env) -> None:
     )
     env.context.platforms.pop("nes")
     sites = env.client.get("/api/platforms").json()[0]["sites"]
-    assert sites == {"vimm": None, "coolrom": "NES", "archive_item": "item-1"}
+    assert sites == {
+        "vimm": None,
+        "coolrom": "NES",
+        "consoleroms": None,
+        "emuland": None,
+        "archive_item": "item-1",
+    }
 
 
 def test_missing_lists_games_with_links(env: Env) -> None:
@@ -37,7 +49,10 @@ def test_missing_lists_games_with_links(env: Env) -> None:
     body = env.client.get("/api/platforms/nes/missing").json()
     assert body["total"] == 1
     assert body["games"][0]["game"] == "Beta (USA)"
-    assert body["games"][0]["links"] == {"vimm": "https://vimm.net/vault/?p=list&system=NES&q=Beta"}
+    assert body["games"][0]["links"] == {
+        "vimm": "https://vimm.net/vault/?p=list&system=NES&q=Beta",
+        "emuland": "https://www.emu-land.net/en/search_games?q=Beta",
+    }
     assert env.client.get("/api/platforms/nes/missing?q=zzz").json()["games"] == []
     assert env.client.get("/api/platforms/nes/missing?limit=0").status_code == 422
 

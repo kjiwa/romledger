@@ -7,7 +7,7 @@ import httpx
 
 from romledger import http, igir, scan
 from romledger.config import Config, ConfigError, Platform
-from romledger.sources import coolrom, internet_archive
+from romledger.sources import consoleroms, coolrom, internet_archive
 from romledger.sources.base import Source, fetch_to
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
@@ -34,6 +34,9 @@ def build_sources(
     platform: Platform, names: Sequence[str], client: httpx.Client, throttle: http.Throttle
 ) -> list[Source]:
     builders: dict[str, Callable[[], Source]] = {
+        consoleroms.NAME: lambda: consoleroms.ConsoleromsSource(
+            platform.consoleroms or "", client, throttle
+        ),
         coolrom.NAME: lambda: coolrom.CoolromSource(platform.coolrom or "", client, throttle),
         internet_archive.NAME: lambda: internet_archive.InternetArchiveSource(
             platform.archive_item or "", client, throttle

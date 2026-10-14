@@ -46,7 +46,10 @@ def missing(
         "total": page.total,
         "offset": offset,
         "limit": limit,
-        "games": [{"game": game.name, "links": {"vimm": game.vimm}} for game in page.games],
+        "games": [
+            {"game": game.name, "links": {"vimm": game.vimm, "emuland": game.emuland}}
+            for game in page.games
+        ],
     }
 
 
@@ -101,8 +104,10 @@ def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
         "unmatched": counts.unmatched if counts else None,
         "percent": view.percent,
         "sites": {
-            "vimm": views.vimm_code(context, view.slug),
+            "vimm": views.site_code(context, view.slug, "vimm"),
             "coolrom": configured.coolrom,
+            "consoleroms": views.site_code(context, view.slug, "consoleroms"),
+            "emuland": views.site_code(context, view.slug, "emuland"),
             "archive_item": configured.archive_item,
         },
     }

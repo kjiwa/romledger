@@ -92,6 +92,31 @@ const romledger = (() => {
     return name.replaceAll("_", " ");
   }
 
+  function consoleromsSystemFromPath(path) {
+    const found = /^\/roms\/([^/]+)/.exec(path);
+    return found ? found[1] : null;
+  }
+
+  function consoleromsGameSlug(path) {
+    const found = /^\/roms\/[^/]+\/([^/]+)$/.exec(path);
+    return found && found[1] !== "page" ? found[1] : null;
+  }
+
+  const EMULAND_GROUPS = "consoles|portable|computers|arcade";
+  const EMULAND_SYSTEM = new RegExp(`^(?:/en)?/(${EMULAND_GROUPS})/([^/]+)`);
+  const EMULAND_GAME = new RegExp(`^(?:/en)?/(?:${EMULAND_GROUPS})/[^/]+/(?:roms|games|iso)/([^/]+)$`);
+  const EMULAND_INDEX_PAGES = /^(?:[a-z]|0-9|a-z|best|homebrew|misc|top)$/;
+
+  function emulandSystemFromPath(path) {
+    const found = EMULAND_SYSTEM.exec(path);
+    return found ? `${found[1]}/${found[2]}` : null;
+  }
+
+  function emulandGameSlug(path) {
+    const found = EMULAND_GAME.exec(path);
+    return found && !EMULAND_INDEX_PAGES.test(found[1]) ? found[1] : null;
+  }
+
   function archiveItemFromPath(path) {
     const found = /^\/details\/([^/?#]+)/.exec(path);
     return found ? decodeURIComponent(found[1]) : null;
@@ -149,6 +174,10 @@ const romledger = (() => {
     vimmSystemFromTitle,
     coolromSystemFromPath,
     coolromNameFromPath,
+    consoleromsSystemFromPath,
+    consoleromsGameSlug,
+    emulandSystemFromPath,
+    emulandGameSlug,
     archiveItemFromPath,
     slugFor,
     progress,

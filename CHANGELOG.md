@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- `fetch` can download from ConsoleRoms. List `consoleroms` in a platform's `sources`; it carries
+  about thirty platforms, Nintendo systems included.
+- `missing --links` appends an emu-land search URL after the Vimm's Lair one, and the dashboard and
+  `/api/platforms` carry it too (`links.emuland`, `sites.emuland`, `sites.consoleroms`). emu-land
+  downloads are manual.
+- `missing --links` prints tab-separated columns (game, Vimm's Lair, emu-land), with an empty cell
+  where a site has no link. Column 2 is still Vimm's Lair.
+- The extension marks games on ConsoleRoms and emu-land.
+- `platforms.toml` gains ConsoleRoms and emu-land codes.
+
 ## 0.3.2
 
 - `import` files a game whose name the DAT repeats in separate blocks, such as `(USA)` and its

@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import os
 import webbrowser
@@ -9,7 +10,19 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
-from romledger import __version__, canary, cli, config, dats, fetch, http, importer, scan, state
+from romledger import (
+    __version__,
+    canary,
+    cli,
+    config,
+    dats,
+    fetch,
+    http,
+    importer,
+    registry,
+    scan,
+    state,
+)
 from romledger.context import Context
 from romledger.web import app as web_app
 
@@ -140,11 +153,29 @@ def test_missing_links(tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFix
     assert run(make_config(tmp_path), "missing", "nes", "--links") == 0
     assert capsys.readouterr().out.splitlines() == [
         "R (USA)",
-        "Super Mario Bros. (USA)\thttps://vimm.net/vault/?p=list&system=NES&q=Super+Mario+Bros.",
+        "Super Mario Bros. (USA)\thttps://vimm.net/vault/?p=list&system=NES&q=Super+Mario+Bros."
+        "\thttps://www.emu-land.net/en/search_games?q=Super+Mario+Bros.",
     ]
 
 
-def test_missing_links_without_vimm_code(
+def test_missing_links_leaves_an_empty_cell_for_a_site_without_a_code(
+    tmp_path: Path,
+    data_dir: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = registry.load()
+    real["nes"] = dataclasses.replace(real["nes"], vimm=None)
+    monkeypatch.setattr(registry, "load", lambda: real)
+    seed(data_dir, "nes", [state.Item("Contra (USA)", "missing", None)])
+    assert run(make_config(tmp_path), "missing", "nes", "--links") == 0
+    assert (
+        capsys.readouterr().out
+        == "Contra (USA)\t\thttps://www.emu-land.net/en/search_games?q=Contra\n"
+    )
+
+
+def test_missing_links_without_site_codes(
     tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = make_config(tmp_path)

@@ -16,6 +16,8 @@ def test_load_entries() -> None:
     assert nes.dat == "no-intro/Nintendo - Nintendo Entertainment System"
     assert nes.vimm == "NES"
     assert nes.coolrom is None
+    assert nes.consoleroms == "nes"
+    assert nes.emuland == "consoles/dendy"
 
 
 def test_every_dat_has_valid_set() -> None:
@@ -46,6 +48,7 @@ def test_ignored_codes() -> None:
     ignored = registry.ignored()
     assert ignored["vimm"] == {"WiiWare", "X360-D"}
     assert "mame" in ignored["coolrom"]
+    assert "famicom" in ignored["consoleroms"]
 
 
 def test_no_ignored_code_is_also_mapped() -> None:
@@ -53,11 +56,13 @@ def test_no_ignored_code_is_also_mapped() -> None:
     ignored = registry.ignored()
     assert not ignored["vimm"] & {entry.vimm for entry in entries}
     assert not ignored["coolrom"] & {entry.coolrom for entry in entries}
+    assert not ignored["consoleroms"] & {entry.consoleroms for entry in entries}
+    assert not ignored["emuland"] & {entry.emuland for entry in entries}
 
 
 def test_ignored_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(registry, "_parse", lambda: {})
-    assert registry.ignored() == {"vimm": frozenset(), "coolrom": frozenset()}
+    assert registry.ignored() == {site: frozenset() for site in registry.SITES}
 
 
 @pytest.mark.parametrize(
@@ -68,6 +73,8 @@ def test_ignored_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
         ({"vimm": "WiiWare"}, r"ignore\.vimm must be a list"),
         ({"vimm": [""]}, r"ignore\.vimm must be a list"),
         ({"coolrom": [1]}, r"ignore\.coolrom must be a list"),
+        ({"consoleroms": [1]}, r"ignore\.consoleroms must be a list"),
+        ({"emuland": "consoles/psx"}, r"ignore\.emuland must be a list"),
     ],
 )
 def test_invalid_ignore_table(monkeypatch: pytest.MonkeyPatch, table: object, message: str) -> None:

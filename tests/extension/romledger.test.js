@@ -45,8 +45,32 @@ test("site codes come from titles and paths", () => {
     "Saint Sword (Japan)",
   );
   assert.equal(romledger.coolromNameFromPath("/roms/genesis/1/100%_Fun.php"), "100% Fun");
+  assert.equal(romledger.consoleromsSystemFromPath("/roms/atari-7800"), "atari-7800");
+  assert.equal(romledger.consoleromsSystemFromPath("/roms/atari-7800/page/2"), "atari-7800");
+  assert.equal(romledger.consoleromsSystemFromPath("/tags/action"), null);
+  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/galaga"), "galaga");
+  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800"), null);
+  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/page"), null);
+  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/page/2"), null);
+  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/galaga/download"), null);
+  assert.equal(romledger.emulandSystemFromPath("/en/consoles/dendy/roms/x"), "consoles/dendy");
+  assert.equal(romledger.emulandSystemFromPath("/portable/gb"), "portable/gb");
+  assert.equal(romledger.emulandSystemFromPath("/en/news/today"), null);
+  assert.equal(romledger.emulandSystemFromPath("/en"), null);
   assert.equal(romledger.archiveItemFromPath("/details/No-Intro_NES"), "No-Intro_NES");
   assert.equal(romledger.archiveItemFromPath("/search"), null);
+});
+
+test("emulandGameSlug accepts game pages and skips index pages", () => {
+  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/roms/xevious"), "xevious");
+  assert.equal(romledger.emulandGameSlug("/computers/dos/games/doom"), "doom");
+  assert.equal(romledger.emulandGameSlug("/en/consoles/psx/iso/gran-turismo"), "gran-turismo");
+  for (const index of ["x", "0-9", "a-z", "best", "homebrew", "misc", "top"]) {
+    assert.equal(romledger.emulandGameSlug(`/en/consoles/dendy/roms/${index}`), null, index);
+  }
+  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/roms"), null);
+  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/news/xevious"), null);
+  assert.equal(romledger.emulandGameSlug("/en/news/dendy/roms/xevious"), null);
 });
 
 test("slugFor matches a site code case-insensitively", () => {

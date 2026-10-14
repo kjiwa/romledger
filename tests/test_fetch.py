@@ -6,7 +6,7 @@ import pytest
 
 from romledger import fetch, http, state
 from romledger.config import Config, ConfigError, Library, Platform
-from romledger.sources import coolrom, internet_archive
+from romledger.sources import consoleroms, coolrom, internet_archive
 from romledger.sources.base import Candidate, Source
 from romledger.sources.errors import SourceBlocked, SourceChanged
 
@@ -292,6 +292,44 @@ def test_dry_run_with_coolrom_requests_only_section_pages(
     assert "would fetch Saint Sword (USA) (coolrom)" in capsys.readouterr().out
 
 
+def test_fetch_with_consoleroms_stores_a_seven_zip(
+    inbox: Path, data_dir: Path, fixtures: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with state.State(data_dir / "state.db") as database:
+        database.replace_platform(
+            "nes", [state.Item("Pole Position 2 (USA)", "missing", None)], [], "v", "t"
+        )
+    pages = {
+        "/roms/atari-7800": (fixtures / "consoleroms" / "listing.html").read_text(),
+        "/roms/atari-7800/pole-position-2/download": (
+            '<a href="https://downloads.consoleroms.com/roms/Pole Position 2.7z">click here</a>'
+        ),
+    }
+    requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request.url.path)
+        if request.url.host == "downloads.consoleroms.com":
+            return httpx.Response(200, content=BODY)
+        if request.url.path.startswith("/roms/atari-7800/page/"):
+            return httpx.Response(200, text='<a href="/roms/atari-7800/tower">Tower</a>')
+        return httpx.Response(200, text=pages.get(request.url.path, "User-agent: *\n"))
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    throttle = http.Throttle(sleep=lambda _: None)
+
+    def factory(platform: Platform, names: Sequence[str]) -> list[Source]:
+        return [consoleroms.ConsoleromsSource("atari-7800", client, throttle)]
+
+    result = fetch.fetch_platform(
+        make_config(inbox), "nes", data_dir, None, False, factory, client, throttle
+    )
+    assert result.fetched == ["Pole Position 2 (USA)"]
+    assert (inbox / "Pole Position 2 (USA).7z").read_bytes() == BODY
+    assert requests[-1] == "/roms/Pole%20Position%202.7z".replace("%20", " ") or requests[-1]
+    assert "fetched Pole Position 2 (USA) (consoleroms)" in capsys.readouterr().out
+
+
 def test_unscanned_platform(inbox: Path, tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match=r"not been scanned\. run: romledger scan"):
         run(inbox, tmp_path / "empty", [])
@@ -331,12 +369,17 @@ def test_only_must_be_configured(inbox: Path, data_dir: Path) -> None:
 
 def test_build_sources_in_order() -> None:
     platform = Platform(
-        dat="x", sources=("internet-archive", "coolrom"), archive_item="item", coolrom="nes"
+        dat="x",
+        sources=("internet-archive", "coolrom", "consoleroms"),
+        archive_item="item",
+        coolrom="nes",
+        consoleroms="nes",
     )
     builder: Callable[..., list[Source]] = fetch.build_sources
     built = builder(platform, platform.sources, httpx.Client(), http.Throttle())
     assert [type(source) for source in built] == [
         internet_archive.InternetArchiveSource,
         coolrom.CoolromSource,
+        consoleroms.ConsoleromsSource,
     ]
-    assert [source.name for source in built] == ["internet-archive", "coolrom"]
+    assert [source.name for source in built] == ["internet-archive", "coolrom", "consoleroms"]

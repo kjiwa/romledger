@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "romledger",
   "version": "0.3.2",
-  "description": "Shows on Vimm's Lair, CoolROM and the Internet Archive which games your romledger library has or is missing.",
+  "description": "Shows on Vimm's Lair, CoolROM, ConsoleRoms, emu-land and the Internet Archive which games your romledger library has or is missing.",
   "permissions": ["storage"],
   "optional_permissions": ["downloads"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
@@ -27,6 +27,16 @@
     {
       "matches": ["https://coolrom.com/roms/*", "https://www.coolrom.com/roms/*"],
       "js": ["lib/romledger.js", "content/page.js", "content/coolrom.js"],
+      "css": ["romledger.css"]
+    },
+    {
+      "matches": ["https://www.consoleroms.com/roms/*"],
+      "js": ["lib/romledger.js", "content/page.js", "content/consoleroms.js"],
+      "css": ["romledger.css"]
+    },
+    {
+      "matches": ["https://www.emu-land.net/*/*/*"],
+      "js": ["lib/romledger.js", "content/page.js", "content/emuland.js"],
       "css": ["romledger.css"]
     },
     {

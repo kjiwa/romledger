@@ -1,30 +1,54 @@
 # One table per RomM platform slug (verified with igir's {romm} token on 2026-10-13).
-# dat: <set>/<name> under libretro-database metadat. vimm, coolrom: site system codes.
+# dat: <set>/<name> under libretro-database metadat. vimm, coolrom, consoleroms, emuland: site
+# system codes.
 # [ignore] lists site systems that are deliberately unsupported (no console DAT is mapped).
 
 [ignore]
 vimm = ["WiiWare", "X360-D"]
 coolrom = ["c64", "cps1", "cps2", "mame", "model2", "namcosystem22", "neogeo", "neogeocd"]
+consoleroms = [
+    "3do", "amiga", "apple-2", "atari-st", "bbc-micro", "commodore-64-preservation",
+    "commodore-64-tapes", "cps1", "cps2", "cps3", "dos", "famicom", "mame", "new-geo", "pc-fx",
+    "scummvm", "sega-naomi", "sharp-x68000", "turbo-duo", "wonderswan", "wonderswan-color",
+    "zx-spectrum",
+]
+emuland = [
+    "arcade/cps", "arcade/ki", "arcade/mame", "arcade/n22", "arcade/neogeo", "arcade/zinc",
+    "computers/amiga", "computers/atari_8bit", "computers/atari_st", "computers/c64",
+    "computers/coco", "computers/cpc", "computers/msx1", "computers/msx2", "computers/mtx",
+    "computers/oric", "computers/x86", "computers/zx81", "computers/zx_spectrum",
+    "consoles/3do", "consoles/arcadia", "consoles/chaf", "consoles/coleco",
+    "consoles/famicom_disk_system", "consoles/intellivision", "consoles/neogeocd",
+    "consoles/sg-1000", "consoles/vectrex", "portable/pmini", "portable/sv", "portable/ws",
+]
 
 [atari2600]
 dat = "no-intro/Atari - 2600"
 vimm = "Atari2600"
 coolrom = "atari2600"
+consoleroms = "atari-2600"
+emuland = "consoles/2600"
 
 [atari5200]
 dat = "no-intro/Atari - 5200"
 vimm = "Atari5200"
 coolrom = "atari5200"
+consoleroms = "atari-5200"
+emuland = "consoles/5200"
 
 [atari7800]
 dat = "no-intro/Atari - 7800"
 vimm = "Atari7800"
 coolrom = "atari7800"
+consoleroms = "atari-7800"
+emuland = "consoles/7800"
 
 [jaguar]
 dat = "no-intro/Atari - Jaguar"
 vimm = "Jaguar"
 coolrom = "atarijaguar"
+consoleroms = "atari-jaguar"
+emuland = "consoles/jaguar"
 
 [atari-jaguar-cd]
 dat = "redump/Atari - Jaguar CD"
@@ -34,100 +58,143 @@ vimm = "JaguarCD"
 dat = "no-intro/Atari - Lynx"
 vimm = "Lynx"
 coolrom = "atarilynx"
+consoleroms = "atari-lynx"
+emuland = "portable/lynx"
 
 [sega32]
 dat = "no-intro/Sega - 32X"
 vimm = "32X"
+consoleroms = "sega-32x"
+emuland = "consoles/32x"
 
 [sms]
 dat = "no-intro/Sega - Master System - Mark III"
 vimm = "SMS"
 coolrom = "mastersystem"
+consoleroms = "sega-master-system"
+emuland = "consoles/sms"
 
 [genesis]
 dat = "no-intro/Sega - Mega Drive - Genesis"
 vimm = "Genesis"
 coolrom = "genesis"
+consoleroms = "sega-genesis"
+emuland = "consoles/genesis"
 
 [gamegear]
 dat = "no-intro/Sega - Game Gear"
 vimm = "GG"
 coolrom = "gamegear"
+consoleroms = "sega-game-gear"
+emuland = "portable/gg"
 
 [segacd]
 dat = "redump/Sega - Mega-CD - Sega CD"
 vimm = "SegaCD"
 coolrom = "segacd"
+consoleroms = "sega-cd"
+emuland = "consoles/segacd"
 
 [saturn]
 dat = "redump/Sega - Saturn"
 vimm = "Saturn"
 coolrom = "saturn"
+consoleroms = "sega-saturn"
+emuland = "consoles/saturn"
 
 [dc]
 dat = "redump/Sega - Dreamcast"
 vimm = "Dreamcast"
 coolrom = "dc"
+consoleroms = "sega-dreamcast"
+emuland = "consoles/dreamcast"
 
 [nes]
 dat = "no-intro/Nintendo - Nintendo Entertainment System"
 vimm = "NES"
+consoleroms = "nes"
+emuland = "consoles/dendy"
 
 [snes]
 dat = "no-intro/Nintendo - Super Nintendo Entertainment System"
 vimm = "SNES"
+consoleroms = "snes"
+emuland = "consoles/snes"
 
 [n64]
 dat = "no-intro/Nintendo - Nintendo 64"
 vimm = "N64"
+consoleroms = "n64"
+emuland = "consoles/n64"
 
 [gb]
 dat = "no-intro/Nintendo - Game Boy"
 vimm = "GB"
+consoleroms = "gb"
+emuland = "portable/gb"
 
 [gbc]
 dat = "no-intro/Nintendo - Game Boy Color"
 vimm = "GBC"
+consoleroms = "gbc"
+emuland = "portable/gbc"
 
 [gba]
 dat = "no-intro/Nintendo - Game Boy Advance"
 vimm = "GBA"
+consoleroms = "gba"
+emuland = "portable/gba"
 
 [nds]
 dat = "no-intro/Nintendo - Nintendo DS"
 vimm = "DS"
+consoleroms = "nds"
+emuland = "portable/nds"
 
 [3ds]
 dat = "no-intro/Nintendo - Nintendo 3DS"
 vimm = "3DS"
+emuland = "portable/nintendo-3ds"
 
 [virtualboy]
 dat = "no-intro/Nintendo - Virtual Boy"
 vimm = "VB"
+consoleroms = "virtual-boy"
+emuland = "portable/vboy"
 
 [ngc]
 dat = "redump/Nintendo - GameCube"
 vimm = "GameCube"
+consoleroms = "gamecube"
+emuland = "consoles/gamecube"
 
 [wii]
 dat = "redump/Nintendo - Wii"
 vimm = "Wii"
+consoleroms = "wii"
+emuland = "consoles/wii"
 
 [wiiu]
 dat = "no-intro/Nintendo - Wii U (Digital)"
 vimm = "WiiU"
+emuland = "consoles/wii_u"
 
 [tg16]
 dat = "no-intro/NEC - PC Engine - TurboGrafx 16"
 vimm = "TG16"
+consoleroms = "turbografx16"
+emuland = "consoles/pce"
 
 [turbografx-cd]
 dat = "redump/NEC - PC Engine CD - TurboGrafx-CD"
 vimm = "TGCD"
+emuland = "consoles/pcecd"
 
 [neo-geo-pocket]
 dat = "no-intro/SNK - Neo Geo Pocket"
 coolrom = "neogeopocket"
+consoleroms = "neo-geo-pocket"
+emuland = "portable/ngp"
 
 [neo-geo-pocket-color]
 dat = "no-intro/SNK - Neo Geo Pocket Color"
@@ -136,30 +203,41 @@ dat = "no-intro/SNK - Neo Geo Pocket Color"
 dat = "redump/Sony - PlayStation"
 vimm = "PS1"
 coolrom = "psx"
+consoleroms = "psx"
+emuland = "consoles/psx"
 
 [ps2]
 dat = "redump/Sony - PlayStation 2"
 vimm = "PS2"
 coolrom = "ps2"
+consoleroms = "ps2"
+emuland = "consoles/ps2"
 
 [ps3]
 dat = "redump/Sony - PlayStation 3"
 vimm = "PS3"
 coolrom = "ps3"
+consoleroms = "ps3"
+emuland = "consoles/ps3"
 
 [psp]
 dat = "redump/Sony - PlayStation Portable"
 vimm = "PSP"
 coolrom = "psp"
+consoleroms = "psp"
+emuland = "portable/psp"
 
 [philips-cd-i]
 dat = "redump/Philips - CD-i"
 vimm = "CDi"
+consoleroms = "cd-i"
 
 [xbox]
 dat = "redump/Microsoft - Xbox"
 vimm = "Xbox"
+emuland = "consoles/xbox"
 
 [xbox360]
 dat = "redump/Microsoft - Xbox 360"
 vimm = "Xbox360"
+emuland = "consoles/xbox360"
