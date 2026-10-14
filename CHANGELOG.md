@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 - `import` extracts ROMs from zips and files them under their DAT names. Zips whose ROM name differs
   from the DAT, such as CoolROM downloads, were set aside as duplicates and never imported. A zip
