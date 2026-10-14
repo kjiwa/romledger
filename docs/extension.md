@@ -11,19 +11,21 @@ downloads anything.
 
 ## Install
 
-The extension is the `extension` folder of this repository. It is not published to any store.
+The extension is not in any browser store. Download `romledger-extension-<version>.zip` from the
+[latest release](https://github.com/kjiwa/romledger/releases/latest) and unzip it. A source
+checkout works too: use its `extension` folder.
 
 - Chrome and other Chromium browsers: open `chrome://extensions`, turn on Developer mode, choose
-  Load unpacked, and select the `extension` folder.
+  Load unpacked, and select the unzipped folder.
 - Firefox 142 or later: open `about:debugging#/runtime/this-firefox`, choose Load Temporary
-  Add-on, and select `extension/manifest.json`. Firefox removes a temporary add-on when it
-  closes, so repeat this after each restart. Firefox support is checked with `addons-linter`
-  only; it has not been run in a real Firefox here.
+  Add-on, and select `manifest.json` in the unzipped folder. Firefox removes a temporary add-on
+  when it closes, so repeat this after each restart. Firefox support is checked with
+  `addons-linter` only; it is untested in a real Firefox.
 
 ## Connect it to romledger
 
 1. Run `romledger serve` and keep the link it prints.
-2. Open the extension's options. Enter the service URL (`http://127.0.0.1:8730` if it runs on this
+2. Open the extension's options. Enter the service URL (the field starts as `http://127.0.0.1:8730`, for a service on this
    machine) and the token (the part after `?token=` in the link).
 3. Choose Save and test, then allow the browser to reach that address. The page reports the
    number of configured platforms.
@@ -57,15 +59,3 @@ default ISO matches a Redump DAT, so download that one.
 
 The toolbar popup lists every platform's progress. If it says the page layout was not recognized,
 the site changed; see [troubleshooting.md](troubleshooting.md).
-
-## Check it
-
-```sh
-node --test "tests/extension/*.test.js"
-npx --yes addons-linter@10.14.0 extension
-sh scripts/extension-check.sh
-```
-
-The last command loads the unpacked extension in Chromium against a fictional library and fixture
-pages. `addons-linter` warns that Firefox ignores `background.service_worker`; that key is for
-Chrome, and Firefox uses `background.scripts`.

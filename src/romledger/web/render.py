@@ -5,7 +5,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from romledger import __version__
+from romledger import DOCS_URL, __version__
 from romledger.web import deps, views
 
 ROOT = Path(__file__).parent
@@ -17,6 +17,7 @@ def _globals(request: Request) -> dict[str, Any]:
     return {
         "job": deps.services(request).jobs.current(),
         "version": __version__,
+        "docs_url": DOCS_URL,
         "path": request.url.path,
     }
 

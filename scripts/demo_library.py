@@ -87,7 +87,7 @@ INBOX_FILES = {
     "Wild Harbor (USA).nes.part": 524_288,
 }
 SHOW_DEMO_PATH = """() => document.querySelectorAll("p.path").forEach(
-    (element) => { element.textContent = "/mnt/roms/inbox"; })"""
+    (element) => { element.textContent = "~/roms/inbox"; })"""
 SCAN_LOG = "".join(f"scanning {slug} ...\n" for slug in PLATFORMS) + "scanned 4 platform(s)\n"
 
 

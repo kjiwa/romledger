@@ -5,10 +5,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from romledger import dats, igir, scan
+from romledger import DOCS_URL, dats, igir, scan
 from romledger.config import Config, ConfigError
 
-NO_PLATFORMS = "no platforms configured. Add a [platforms.<slug>] table; see docs/setup.md."
+NO_PLATFORMS = f"no platforms configured. Add a [platforms.<slug>] table; see {DOCS_URL}/setup.md."
 
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]

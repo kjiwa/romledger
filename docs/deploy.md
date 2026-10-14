@@ -2,8 +2,8 @@
 
 Run romledger as a container on a home server, a single-board computer or a workstation, next to
 your library. The image bundles Python, Node.js and igir for `linux/amd64` and `linux/arm64`.
-Nothing is published to a registry: you build the image yourself and move it to the host that
-runs it.
+Nothing is published to a registry: you build the image yourself, on the host that runs it or on
+another machine.
 
 ## Requirements
 
@@ -14,16 +14,18 @@ runs it.
 
 ## Build the image
 
-On the machine that will run it:
+On the machine that will run it, from a checkout of the repository:
 
 ```sh
 docker build -t romledger:latest .
 ```
 
-For another architecture, name the target platform. Buildx emulates it when it differs from the
-host, which is slower than a native build:
+`docker compose up -d --build` (see [Run it](#run-it)) builds it too. To build for another
+architecture, name the target platform. Buildx emulates it when it differs from the host, which
+is slower than a native build:
 
 ```sh
+docker buildx build --platform linux/amd64 -t romledger:latest -o type=docker,dest=romledger.tar .
 docker buildx build --platform linux/arm64 -t romledger:latest -o type=docker,dest=romledger.tar .
 ```
 
@@ -35,7 +37,7 @@ docker buildx build --platform linux/arm64 -t romledger:latest -o type=docker,de
 
 ## Move the image to another host
 
-Copy the archive and load it. A pipe over SSH needs no intermediate file:
+If you built elsewhere, copy the archive and load it. A pipe over SSH needs no intermediate file:
 
 ```sh
 docker save romledger:latest | ssh HOST docker load
@@ -52,7 +54,8 @@ ssh HOST docker load -i romledger.tar
 
 ## Run it
 
-Copy [compose.yaml](../compose.yaml) to a directory on the host and create the config:
+Work in a checkout, where [compose.yaml](https://github.com/kjiwa/romledger/blob/master/compose.yaml)
+lives, or copy that file to the host. Create the config:
 
 ```sh
 mkdir config data
@@ -72,14 +75,17 @@ inboxes = ["/library/inbox"]
 Point `ROMLEDGER_LIBRARY` at your library directory (default `./library`) and start it:
 
 ```sh
-ROMLEDGER_LIBRARY=/mnt/roms docker compose up -d
+ROMLEDGER_LIBRARY=/mnt/roms docker compose up -d --build
 ```
+
+`--build` builds the image from the checkout. Without a checkout, load an image as in
+[Move the image to another host](#move-the-image-to-another-host) and leave `--build` off.
 
 The port is published on `127.0.0.1` only. To reach the dashboard from other machines on your
 network, also set `ROMLEDGER_BIND` to the host's address, or `0.0.0.0` for every interface.
 
 The container runs as user 1000. That user must be able to write `data/` (hence the `chown`), the
-`roms/` tree and the inbox. `data/` holds the DATs, igir's hash cache and `state.db`; keep it on a local disk, not
+`roms/` tree and the inbox. `data/romledger/` holds the DATs, igir's hash cache and `state.db`; keep it on a local disk, not
 on the network share.
 
 Read the sign-in link from the log and open it once in a browser. The link names `localhost`; when
@@ -115,11 +121,13 @@ and let RomM's scheduled rescan pick up new games; see `hooks.after_import` in
 
 ## Update
 
-Build the new image, move it, and recreate the container:
+Pull the new source, then rebuild and recreate the container:
 
 ```sh
-docker compose up -d
+docker compose up -d --build
 ```
+
+If you load images instead, load the new one and run `docker compose up -d`.
 
 Compose recreates the container when the `romledger:latest` image has changed. `data/` survives.
 

@@ -1,5 +1,6 @@
 services:
   romledger:
+    build: .
     image: romledger:latest
     init: true
     restart: unless-stopped
