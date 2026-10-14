@@ -23,7 +23,7 @@ SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Ques
 GENESIS = {"Delta Run (USA)": "d" * 40, "Echo Run (USA)": "e" * 40}
 ITEM = "gb-item"
 MISSING_SHA1 = "f" * 40
-JAPAN_TWIN = {"gb": {"Alpha Quest (Japan)": "9" * 40}}
+JAPAN_TWIN = {"gb": {"Omega Quest (Japan)": "9" * 40}}
 FLAG = '<img src="/images/flags/{file}.png" class="flag" title="{title}">'
 
 
@@ -78,7 +78,7 @@ def pages() -> dict[tuple[str, str], str]:
             (10, "Alpha Quest", ""),
             (11, "Beta Quest", ""),
             (12, "Zeta Quest", ""),
-            (13, "Alpha Quest", FLAG.format(file="japan", title="Japan")),
+            (13, "Omega Quest", FLAG.format(file="japan", title="Japan")),
         )
     )
     cool = "".join(
@@ -140,7 +140,7 @@ def check_vimm_list(context: BrowserContext) -> list[str]:
         "Alpha Quest In library (approximate)",
         "Beta Quest Missing (approximate)",
         "Zeta Quest Not in any DAT",
-        "Alpha Quest Not wanted (approximate)",
+        "Omega Quest Not wanted (approximate)",
     ]
     return [] if found == expected else [f"vimm list: {found}"]
 

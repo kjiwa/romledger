@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from romledger import DOCS_URL, http, registry
+from romledger import DOCS_URL, catalog, http, registry
 
 CONFIG_ENV = "ROMLEDGER_CONFIG"
 DATA_ENV = "ROMLEDGER_DATA"
@@ -47,6 +47,7 @@ class Platform:
     dat: str
     regions: tuple[str, ...] = ("USA", "WORLD")
     languages: tuple[str, ...] = ("EN",)
+    include: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
     archive_item: str | None = None
     coolrom: str | None = None
@@ -206,7 +207,7 @@ def _parse_platform(
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: {key} must be a table. Write it as [{key}].")
     _reject_unknown(
-        path, f"{key}.", raw, {"dat", "regions", "languages", "sources", "archive_item"}
+        path, f"{key}.", raw, {"dat", "regions", "languages", "include", "sources", "archive_item"}
     )
     defaults = Platform(dat="")
     sources = _sources(path, raw, key)
@@ -214,10 +215,22 @@ def _parse_platform(
         dat=_dat(path, slug, raw, platforms_registry),
         regions=_codes(path, raw, f"{key}.regions", "regions", defaults.regions, REGIONS),
         languages=_codes(path, raw, f"{key}.languages", "languages", defaults.languages, LANGUAGES),
+        include=_include(path, raw, key),
         sources=sources,
         archive_item=_archive_item(path, raw, key, sources),
         coolrom=_coolrom_code(path, slug, key, sources, platforms_registry),
     )
+
+
+def _include(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:
+    names = _strings(path, raw, f"{key}.include", "include", default=())
+    for name in names:
+        if name not in catalog.CATEGORIES:
+            raise ConfigError(
+                f"{path}: {key}.include has unknown category {name!r}. "
+                f"Allowed: {', '.join(catalog.CATEGORIES)}."
+            )
+    return tuple(dict.fromkeys(names))
 
 
 def _sources(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:

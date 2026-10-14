@@ -24,6 +24,7 @@ inboxes = ["~/roms/inbox"]
 [platforms.nes]
 regions = ["USA", "WORLD"]
 languages = ["EN"]
+include = ["unlicensed"]
 
 [platforms.atari7800]
 sources = ["coolrom", "internet-archive"]
@@ -44,8 +45,9 @@ proxy = "socks5h://proxy.example:1080"
 | `library.roms` | yes | Library directory (RomM layout). Games for `<slug>` live in `<roms>/<slug>/`. |
 | `library.inboxes` | yes | One or more mixed-platform directories where new files arrive. |
 | `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
-| `platforms.<slug>.regions` | no | Wanted regions, igir codes. Default `["USA", "WORLD"]`. |
-| `platforms.<slug>.languages` | no | Wanted languages, igir codes. Default `["EN"]`. |
+| `platforms.<slug>.regions` | no | Wanted regions, igir codes, best first. Default `["USA", "WORLD"]`. |
+| `platforms.<slug>.languages` | no | Wanted languages, igir codes, best first. Default `["EN"]`. |
+| `platforms.<slug>.include` | no | Categories of release to want that are left out by default: `unlicensed`, `aftermarket`, `prerelease`, `programs`, `bad`. Default none. |
 | `platforms.<slug>.sources` | no | Sources `fetch` tries, in order: `coolrom`, `internet-archive`. Default none. `coolrom` needs a platform CoolROM carries. |
 | `platforms.<slug>.archive_item` | with `internet-archive` | Internet Archive item that holds `<game name>.zip` files, such as a No-Intro set. |
 | `network.proxy` | no | Proxy URL for every request. Schemes: `http`, `https`, `socks5`, `socks5h`. |
@@ -62,8 +64,19 @@ If you run [RomM](https://docs.romm.app), its filesystem watcher or scheduled re
 `hooks.after_import` hook unnecessary. Whether inotify events arrive over SMB or NFS is
 unverified, so prefer the scheduled rescan if the library is on a network share.
 
-Each platform wants one release per game (igir `--single`): the preferred region among the
-listed regions and languages.
+Each platform wants one release per title. romledger groups the DAT's games by title, drops
+the categories you did not `include`, keeps the games whose region and language you listed, and
+prefers the release with the fewest extra tags (such as `Evercade` or `Collection`), then the
+earliest region and language in your lists, then the newest revision. A title is had when any
+wanted release of it is. The categories, by tag in the game name or in any of its ROM names:
+
+- `unlicensed`: `Unl`, `Pirate`
+- `aftermarket`: `Aftermarket`, `Homebrew`
+- `prerelease`: `Proto`, `Beta`, `Demo`, `Sample`, `Kiosk`, `Debug`
+- `programs`: `Program`, `Test Program`
+- `bad`: `[b]` bad dumps
+
+A game with no language tag is taken to speak its region's language.
 
 Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
 wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
@@ -107,14 +120,16 @@ romledger scan [PLATFORM...]
 ```
 
 Hashes the files in `<library.roms>/<slug>` and in every inbox, and matches them to the DAT.
-The first scan of a large library is slow; later scans reuse the hash cache.
+The first scan of a large library is slow; later scans reuse the hash cache. Counts are per
+wanted title (see [Config file](#config-file)).
 
-- have: matched in the library.
-- inbox: matched in an inbox only.
-- missing: wanted but in neither.
+- have: any wanted release of the title is in the library.
+- inbox: a wanted release is in an inbox only.
+- missing: wanted but in neither. Listed by the preferred release.
 - unmatched: library files that match no DAT entry.
 
-Files under `<inbox>/unmatched/` and `<inbox>/duplicates/` are ignored, as are AppleDouble
+Files under `<inbox>/unmatched/`, `<inbox>/unwanted/` and `<inbox>/duplicates/` are ignored,
+as are AppleDouble
 (`._*`), `.DS_Store`, and partial downloads (`*.part`, `*.crdownload`, `*.download`).
 
 ## dats index
@@ -177,7 +192,8 @@ romledger import [--dry-run]
 
 Files every inbox game that matches a DAT of a configured platform into
 `<library.roms>/<slug>/`, hashing contents, so names and folders in the inbox do not matter.
-Import applies no region or language filter. Then it rescans the platforms that received files
+Import files only wanted releases, so a title in a region you did not list stays out of the
+library. Then it rescans the platforms that received files
 and runs `hooks.after_import`.
 
 A zip that holds a ROM plus other files (a readme) is filed whole as `<DAT game name>.zip`: the
@@ -187,15 +203,17 @@ recreated.
 Nothing is ever deleted. Files that are not moved are relocated inside their inbox, keeping
 their relative path:
 
-- `<inbox>/duplicates/`: matched a DAT entry the library already has.
+- `<inbox>/duplicates/`: matched a wanted DAT entry the library already has.
+- `<inbox>/unwanted/`: a valid dump that is not wanted: another region or language, or a category
+  you did not `include`.
 - `<inbox>/unmatched/`: matched no DAT entry.
 
 A name collision there gets `.1`, `.2`, ... before the extension. Output lists
-`moved <slug> <n>`, `duplicates <n>`, and `unmatched <n>`; an inbox with nothing to do prints
-`inbox is empty`.
+`moved <slug> <n>`, `duplicates <n>`, `unwanted <n>`, and `unmatched <n>`; an inbox with nothing
+to do prints `inbox is empty`.
 
-`--dry-run` changes nothing. It prints what would be filed and the unmatched files. It cannot tell
-duplicates from new games, so its counts include games the library already has.
+`--dry-run` changes nothing. It prints what would be filed and the unwanted and unmatched files.
+It cannot tell duplicates from new games, so its counts include games the library already has.
 
 Exit status is 0, 1 if an `after_import` hook failed (everything else still completed), or 2 for
 errors.
@@ -218,7 +236,8 @@ loads from a CDN.
 - Platform: missing, inbox or have games, a search box, and Vimm's Lair search links for missing
   games.
 - Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
-  there, and the counts set aside by `import`. Press Import to file them.
+  there, and the counts set aside by `import` (unmatched, unwanted, duplicates). Press Import to
+  file them.
 - Activity: scans and imports started from the dashboard, with their output. One runs at a time.
 
 The service reads the config file on every request, so edits and a remounted library take effect
@@ -241,15 +260,16 @@ Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors ar
 | Request | Meaning |
 | --- | --- |
 | `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom` and `archive_item`: the platform's code on each site, or null). |
-| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing games with `links.vimm`. |
+| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing titles, each by its preferred release, with `links.vimm`. |
 | `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
 | `GET /api/lookup?name=<game>&platform=<slug>&regions=<names>` | Match by name: exact, else by title ignoring tags (`exact` is false). `regions` is an optional comma list of No-Intro region names (`USA,Europe`) that narrows the candidates, as do extra tags in the name. `matches` lists every game that still fits. `name` is at most 300 characters. |
 | `GET /api/jobs/current` | The running scan or import, or null. |
 | `POST /api/scan`, `POST /api/import` | Start a job; 202, or 409 while another runs. |
 
-A match is `{platform, game, state, exact}`. `state` is `have`, `inbox`, `missing`, `unwanted` (in
-the DAT, excluded by the platform's regions and languages), `unscanned` (platform not scanned yet)
-or `unknown` (not in any DAT).
+A match is `{platform, game, state, exact}`. `state` is the state of the game's title, so any
+release of a title you have reports `have`. It is one of `have`, `inbox`, `missing`, `unwanted`
+(in the DAT, but its title is not wanted: other regions or languages, or a category left out of
+`include`), `unscanned` (platform not scanned yet) or `unknown` (not in any DAT).
 
 Upload from a script with `curl -H "Authorization: Bearer $TOKEN" -F files=@game.nes
 http://127.0.0.1:8730/inbox/upload`; add `-H "Accept: application/json"` for a JSON reply. Names

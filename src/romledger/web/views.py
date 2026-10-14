@@ -10,7 +10,6 @@ from romledger.context import Context
 
 PAGE_SIZE = 200
 STATE_FILTERS = ("missing", "inbox", "have", "all")
-SET_ASIDE = (igir.UNMATCHED_DIR, igir.DUPLICATES_DIR)
 JUNK_NAMES = (".DS_Store",)
 JUNK_PREFIX = "._"
 PART_SUFFIX = ".part"
@@ -111,7 +110,7 @@ def list_inbox(inbox: Path, limit: int = PAGE_SIZE) -> InboxListing:
     total = 0
     for directory, names, filenames in os.walk(inbox):
         if Path(directory) == inbox:
-            names[:] = sorted(name for name in names if name not in SET_ASIDE)
+            names[:] = sorted(name for name in names if name not in igir.SET_ASIDE)
         for filename in sorted(filenames):
             if filename in JUNK_NAMES or filename.startswith(JUNK_PREFIX):
                 continue
@@ -137,7 +136,7 @@ def _size_of(path: Path) -> int | None:
 def set_aside_counts(inboxes: Sequence[Path]) -> dict[str, int]:
     return {
         name: sum(len(filenames) for inbox in inboxes for _, _, filenames in os.walk(inbox / name))
-        for name in SET_ASIDE
+        for name in igir.SET_ASIDE
     }
 
 

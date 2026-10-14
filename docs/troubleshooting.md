@@ -33,6 +33,11 @@ Cause: the DAT name has no set prefix. Fix: write `no-intro/<name>` or `redump/<
 Cause: not an igir region code, or lower case. Fix: use an upper-case code from the list in
 the message.
 
+## `platforms.X.include has unknown category 'Y'`
+
+Cause: `include` lists a name that is not a category. Fix: use one of `unlicensed`,
+`aftermarket`, `prerelease`, `programs`, `bad`.
+
 ## `platforms.X.languages has unknown code 'Y'`
 
 Cause: not an igir language code, or lower case. Fix: use an upper-case code from the list
@@ -125,7 +130,7 @@ permissions or reinstall it.
 
 ## `platforms.X.regions is empty`
 
-Cause: `regions` or `languages` is `[]`, which would filter out every game. Fix: list at least
+Cause: `regions` or `languages` is `[]`, which would want no game. Fix: list at least
 one code or remove the key to use the default.
 
 ## `hooks.after_import must be a list of commands`

@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
+from xml.etree import ElementTree
 
-from romledger import datindex, state
+from romledger import catalog, datindex, dats, state
 
 SHA = "A" * 40
 DAT = f"""clrmamepro (
@@ -35,10 +36,12 @@ game (
 def test_parse_reads_hashes_sizes_and_games() -> None:
     roms = list(datindex.parse(DAT.splitlines()))
     assert roms == [
-        datindex.Rom(SHA.lower(), "b" * 32, "0000abcd", 1024, "Alpha (USA)"),
-        datindex.Rom(None, None, "11111111", 12, "Beta (Europe) (En,Fr)"),
-        datindex.Rom("c" * 40, None, None, None, "Beta (Europe) (En,Fr)"),
-        datindex.Rom(None, None, None, None, "Bare (Japan)"),
+        state.DatRom(SHA.lower(), "b" * 32, "0000abcd", 1024, "Alpha (USA)", "Alpha (USA).nes"),
+        state.DatRom(
+            None, None, "11111111", 12, "Beta (Europe) (En,Fr)", 'weird "quoted" size 9 (x).nes'
+        ),
+        state.DatRom("c" * 40, None, None, None, "Beta (Europe) (En,Fr)", "b2.nes"),
+        state.DatRom(None, None, None, None, "Bare (Japan)", None),
     ]
 
 
@@ -91,3 +94,42 @@ def test_ensure_reindexes_when_only_the_mtime_changes(tmp_path: Path) -> None:
         stat = dat.stat()
         os.utime(dat, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
         assert datindex.ensure(database, "nes", dat) is True
+
+
+def test_ensure_stores_rom_names_for_the_catalog(tmp_path: Path) -> None:
+    dat = tmp_path / "t.dat"
+    dat.write_text(DAT)
+    with state.State(tmp_path / "state.db") as database:
+        datindex.ensure(database, "nes", dat)
+        games = datindex.catalog_games(database.dat_roms("nes"))
+    assert games == [
+        catalog.Game("Alpha (USA)", ("Alpha (USA).nes",)),
+        catalog.Game("Bare (Japan)", ()),
+        catalog.Game("Beta (Europe) (En,Fr)", ('weird "quoted" size 9 (x).nes', "b2.nes")),
+    ]
+
+
+def test_write_subset_keeps_the_header_name_and_chosen_games(tmp_path: Path) -> None:
+    roms = [
+        state.DatRom(SHA, "b" * 32, "0000abcd", 1024, "Alpha & <Co> (USA)", 'A "1".nes'),
+        state.DatRom(None, None, None, None, "Bare (USA)", None),
+    ]
+    path = tmp_path / "subset.dat"
+    datindex.write_subset(path, "Nintendo - NES", roms)
+    root = ElementTree.parse(path).getroot()  # noqa: S314
+    assert root.findtext("header/name") == "Nintendo - NES"
+    games = {game.get("name"): game.findall("rom") for game in root.findall("game")}
+    assert list(games) == ["Alpha & <Co> (USA)", "Bare (USA)"]
+    assert [rom.attrib for rom in games["Alpha & <Co> (USA)"]] == [
+        {"name": 'A "1".nes', "size": "1024", "crc": "0000abcd", "md5": "b" * 32, "sha1": SHA}
+    ]
+    assert games["Bare (USA)"] == []
+
+
+def test_subset_header_name_round_trips_with_an_ampersand(tmp_path: Path) -> None:
+    dat = tmp_path / "t.dat"
+    dat.write_text(DAT.replace('name "Test"', 'name "Nintendo & Co - NES"'))
+    path = tmp_path / "subset.dat"
+    datindex.write_subset(path, dats.name_of(dat), [])
+    assert ElementTree.parse(path).getroot().findtext("header/name") == dats.name_of(dat)  # noqa: S314
+    assert dats.name_of(dat) == "Nintendo & Co - NES"

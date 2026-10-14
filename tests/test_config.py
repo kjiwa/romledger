@@ -39,6 +39,32 @@ def test_platform_defaults(tmp_path: Path) -> None:
     platform = load(write(tmp_path, valid_text(tmp_path))).platforms["nes"]
     assert platform.regions == ("USA", "WORLD")
     assert platform.languages == ("EN",)
+    assert platform.include == ()
+
+
+def test_include_parsed_and_deduplicated(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + 'include = ["unlicensed", "bad", "unlicensed"]\n'
+    assert load(write(tmp_path, text)).platforms["nes"].include == ("unlicensed", "bad")
+
+
+def test_empty_include_is_allowed(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + "include = []\n"
+    assert load(write(tmp_path, text)).platforms["nes"].include == ()
+
+
+def test_unknown_include_category_rejected(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + 'include = ["homebrew"]\n'
+    with pytest.raises(
+        config.ConfigError,
+        match=r"platforms\.nes\.include has unknown category 'homebrew'.*Allowed: unlicensed, ",
+    ):
+        load(write(tmp_path, text))
+
+
+def test_include_must_be_a_list_of_strings(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + 'include = "bad"\n'
+    with pytest.raises(config.ConfigError, match=r"platforms\.nes\.include must be a list"):
+        load(write(tmp_path, text))
 
 
 def test_platform_overrides(tmp_path: Path) -> None:

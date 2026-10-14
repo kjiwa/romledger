@@ -12,7 +12,9 @@ TAIL_LINES = 20
 REPORT_COLUMNS = {"DAT Name", "Status", "Game Name", "ROM Files"}
 JUNK_EXCLUDES = ("**/._*", "**/.DS_Store", "**/*.part", "**/*.crdownload", "**/*.download")
 UNMATCHED_DIR = "unmatched"
+UNWANTED_DIR = "unwanted"
 DUPLICATES_DIR = "duplicates"
+SET_ASIDE = (UNMATCHED_DIR, UNWANTED_DIR, DUPLICATES_DIR)
 
 
 class ToolError(Exception):
@@ -25,12 +27,6 @@ class ReportRow:
     status: str
     game: str
     path: str
-
-
-@dataclass(frozen=True)
-class Filters:
-    regions: Sequence[str]
-    languages: Sequence[str]
 
 
 Runner = Callable[..., Any]
@@ -48,16 +44,13 @@ def command() -> list[str]:
 
 
 def inbox_excludes(inboxes: Sequence[Path]) -> tuple[str, ...]:
-    return tuple(
-        f"{inbox}/{name}/**" for inbox in inboxes for name in (UNMATCHED_DIR, DUPLICATES_DIR)
-    )
+    return tuple(f"{inbox}/{name}/**" for inbox in inboxes for name in SET_ASIDE)
 
 
 def report(
     dats: Sequence[Path],
     inputs: Sequence[Path],
     cache_path: Path,
-    filters: Filters | None = None,
     excludes: Sequence[str] = (),
     runner: Runner = subprocess.run,
 ) -> list[ReportRow]:
@@ -65,10 +58,7 @@ def report(
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "report.csv"
         argv = _argv("report", dats, inputs, excludes, cache_path)
-        if filters:
-            argv += _filter_args(filters)
-        argv += ["--report-output", str(output)]
-        _run(argv, runner)
+        _run([*argv, "--report-output", str(output)], runner)
         return _parse(output)
 
 
@@ -110,14 +100,6 @@ def _argv(
     for pattern in (*patterns, *excludes):
         argv += ["--input-exclude", pattern]
     return [*argv, "--cache-path", str(cache_path)]
-
-
-def _filter_args(filters: Filters) -> list[str]:
-    regions, languages = ",".join(filters.regions), ",".join(filters.languages)
-    return [
-        *("--single", "--filter-region", regions, "--filter-language", languages),
-        *("--prefer-region", regions, "--prefer-language", languages),
-    ]
 
 
 def _failure(argv: list[str], result: Any) -> str:
