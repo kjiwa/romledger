@@ -104,7 +104,8 @@ def test_move_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         runner,
     )
     assert runner.argv == [
-        *["igir", "move", "--allow-excess-sets", "--dat", "/data/a.dat", "--input", "/in/a"],
+        *["igir", "move", "extract", "--allow-excess-sets", "--dat", "/data/a.dat"],
+        *["--input", "/in/a"],
         *(arg for junk in igir.JUNK_EXCLUDES for arg in ("--input-exclude", f"/in/a/{junk}")),
         *["--input-exclude", "/in/a/unmatched/**"],
         *["--cache-path", str(cache), "--output", "/roms/{romm}"],
@@ -128,9 +129,11 @@ def test_inbox_excludes() -> None:
         "/in/a/unmatched/**",
         "/in/a/unwanted/**",
         "/in/a/duplicates/**",
+        "/in/a/extracted/**",
         "/in/b/unmatched/**",
         "/in/b/unwanted/**",
         "/in/b/duplicates/**",
+        "/in/b/extracted/**",
     )
 
 

@@ -14,7 +14,8 @@ JUNK_EXCLUDES = ("**/._*", "**/.DS_Store", "**/*.part", "**/*.crdownload", "**/*
 UNMATCHED_DIR = "unmatched"
 UNWANTED_DIR = "unwanted"
 DUPLICATES_DIR = "duplicates"
-SET_ASIDE = (UNMATCHED_DIR, UNWANTED_DIR, DUPLICATES_DIR)
+EXTRACTED_DIR = "extracted"
+SET_ASIDE = (UNMATCHED_DIR, UNWANTED_DIR, DUPLICATES_DIR, EXTRACTED_DIR)
 
 
 class ToolError(Exception):
@@ -57,7 +58,7 @@ def report(
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "report.csv"
-        argv = _argv("report", dats, inputs, excludes, cache_path)
+        argv = _argv(["report"], dats, inputs, excludes, cache_path)
         _run([*argv, "--report-output", str(output)], runner)
         return _parse(output)
 
@@ -71,7 +72,7 @@ def move(
     runner: Runner = subprocess.run,
 ) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    argv = _argv("move", dats, inputs, excludes, cache_path)
+    argv = _argv(["move", "extract"], dats, inputs, excludes, cache_path)
     _run([*argv, "--output", output_template], runner)
 
 
@@ -85,13 +86,13 @@ def _run(argv: list[str], runner: Runner) -> None:
 
 
 def _argv(
-    verb: str,
+    verbs: Sequence[str],
     dats: Sequence[Path],
     inputs: Sequence[Path],
     excludes: Sequence[str],
     cache_path: Path,
 ) -> list[str]:
-    argv = [*command(), verb, "--allow-excess-sets"]
+    argv = [*command(), *verbs, "--allow-excess-sets"]
     for dat in dats:
         argv += ["--dat", str(dat)]
     for directory in inputs:

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `import` extracts ROMs from zips and files them under their DAT names. Zips whose ROM name differs
+  from the DAT, such as CoolROM downloads, were set aside as duplicates and never imported. A zip
+  igir keeps because it holds extra files moves to `<inbox>/extracted`.
+
 ## 0.3.0
 
 - `romledger init` writes a starter config and creates the library and inbox folders;

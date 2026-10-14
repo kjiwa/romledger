@@ -18,7 +18,7 @@ and what is not.
    already have it).
 
 The inbox is a plain folder. Copy files into it yourself, zipped or not, and the next import
-processes whatever is there. A zip is matched by the ROM inside it, so you do not unzip it.
+processes whatever is there. A zip is matched by the ROM inside it and the ROM is extracted, so you do not unzip it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kjiwa/romledger/master/docs/images/overview-desktop-dark.png">
