@@ -4,8 +4,8 @@ Errors print as `romledger: error: <message>` and exit with status 2.
 
 ## `config file not found`
 
-Cause: no file at the path. Fix: pass `--config`, set `ROMLEDGER_CONFIG`, or create the
-file from the example in the message.
+Cause: no file at the path. Fix: run `romledger init`, or pass `--config` or set
+`ROMLEDGER_CONFIG`.
 
 ## `not a directory. Is the drive or share mounted?`
 

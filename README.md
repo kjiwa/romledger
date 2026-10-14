@@ -4,24 +4,21 @@ Track which retro games you have and which are missing, verified against No-Intr
 It runs on one computer: point it at a folder of ROMs and it reports, per platform, what is there
 and what is not.
 
-## Status
+## How it works
 
-Works today:
+1. Run `romledger init` once. It creates the config file, `library/` and `inbox/`.
+2. Download a game: use the [browser extension](https://github.com/kjiwa/romledger/blob/master/docs/extension.md)
+   on Vimm's Lair, drop or upload files in the dashboard, or run `romledger fetch`. The files land in
+   the inbox.
+3. Import. Under `romledger serve` it runs by itself; otherwise press Import in the dashboard or run
+   `romledger import`. Each file is checked against the DAT, renamed to its DAT name and filed under
+   `library/<platform>/`.
+4. Files that do not fit are set aside inside the inbox, never deleted: `inbox/unmatched/` (not in
+   any DAT), `inbox/unwanted/` (a valid dump you did not ask for) and `inbox/duplicates/` (you
+   already have it).
 
-- Validate a config file (`romledger config`)
-- Download No-Intro and Redump DATs (`romledger dats update`)
-- Match your library and inboxes to the DATs (`romledger scan`)
-- Show progress per platform (`romledger status`)
-- List missing games, with Vimm's Lair search links (`romledger missing nes --links`)
-- Import from the inboxes into a per-platform folder layout (`romledger import`)
-- Browse progress, missing games and the inbox, and upload files, in a local dashboard that also
-  imports new inbox files by itself (`romledger serve`)
-- Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
-- Mark games as in your library or missing while you browse Vimm's Lair, CoolROM and the Internet
-  Archive, and optionally save Vimm's Lair downloads into an inbox (browser extension)
-- Check that the supported sites and the igir pin still match (`romledger canary`; runs weekly in CI)
-
-Vimm's Lair is manual; see [docs/sources.md](https://github.com/kjiwa/romledger/blob/master/docs/sources.md).
+The inbox is a plain folder. Copy files into it yourself, zipped or not, and the next import
+processes whatever is there. A zip is matched by the ROM inside it, so you do not unzip it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kjiwa/romledger/master/docs/images/overview-desktop-dark.png">
@@ -61,27 +58,11 @@ It asks for a ROM folder and the platforms to track, creates `<roms>/library` an
 and writes `~/.config/romledger/config.toml`. `romledger platforms` lists the platform names.
 Without a terminal, pass `romledger init --roms ~/roms --platform nes --platform snes`.
 
-To write the file by hand instead, use this:
-
-```toml
-[library]
-roms = "~/roms/library"
-inboxes = ["~/roms/inbox"]
-
-[platforms.nes]
-```
-
-Both directories must exist. Platform names are the folder names RomM uses, such as `nes` and
-`snes`. An unknown name makes `romledger config` print the known ones. `dat` is filled in for
-known platforms.
-
-Check it, then fetch DATs and scan:
+Then fetch the DATs, scan and open the dashboard:
 
 ```sh
-romledger config
 romledger dats update
 romledger scan
-romledger status
 romledger serve --open
 ```
 

@@ -117,9 +117,10 @@ def build(root: Path) -> None:
         (root / name).mkdir()
     for name, size in INBOX_FILES.items():
         (root / "inbox" / name).write_bytes(b"\0" * size)
-    for name in ("unmatched", "duplicates"):
+    for name in ("unmatched", "unwanted", "duplicates"):
         (root / "inbox" / name).mkdir()
     (root / "inbox" / "unmatched" / "mystery.bin").write_bytes(b"\0")
+    (root / "inbox" / "unwanted" / "Neon Raiders (Japan).sfc").write_bytes(b"\0")
     tables = "".join(f"[platforms.{slug}]\n" for slug in PLATFORMS)
     (root / "config.toml").write_text(
         f'[library]\nroms = "{root / "roms"}"\ninboxes = ["{root / "inbox"}"]\n{tables}'

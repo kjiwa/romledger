@@ -74,6 +74,14 @@ If you run [RomM](https://docs.romm.app), its filesystem watcher or scheduled re
 `hooks.after_import` hook unnecessary. Whether inotify events arrive over SMB or NFS is
 unverified, so prefer the scheduled rescan if the library is on a network share.
 
+Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
+wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
+password on a terminal. It never prints the password, and shows proxy URLs as `scheme://***@host`.
+
+See [sources.md](sources.md) before you list a source.
+
+## What counts as wanted
+
 Each platform wants one release per title. romledger groups the DAT's games by title, drops
 the categories you did not `include`, keeps the games whose region and language you listed, and
 prefers the release with the fewest extra tags (such as `Evercade` or `Collection`), then the
@@ -88,11 +96,26 @@ wanted release of it is. The categories, by tag in the game name or in any of it
 
 A game with no language tag is taken to speak its region's language.
 
-Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
-wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
-password on a terminal. It never prints the password, and shows proxy URLs as `scheme://***@host`.
+Run `romledger platforms` to see the platform slugs, their DATs and which ones your config
+tracks. Set `regions`, `languages` and `include` per platform (see [Config file](#config-file)).
 
-See [sources.md](sources.md) before you list a source.
+## Where files go
+
+`import` files each inbox game that matches a wanted release into `<library.roms>/<slug>/`,
+named after its DAT entry (`<DAT game name>.<ext>`), whatever it was called before. Matching is
+by content hash, so names and folders in the inbox do not matter. A zip is filed as a zip: it is
+matched by its ROM and renamed to `<DAT game name>.zip`, and any extra files stay inside.
+
+Nothing is ever deleted. Files that are not filed move into a folder inside their inbox, keeping
+their relative path:
+
+- `<inbox>/duplicates/`: matched a wanted DAT entry the library already has.
+- `<inbox>/unwanted/`: a valid dump that is not wanted: another region or language, or a category
+  you did not `include`.
+- `<inbox>/unmatched/`: matched no DAT entry, so it is unknown or damaged.
+
+A name collision there gets `.1`, `.2`, ... before the extension. To change what is wanted, edit
+`regions`, `languages` or `include`, then move files back out of `unwanted/` into the inbox.
 
 ## Data directory
 
@@ -131,7 +154,7 @@ romledger scan [PLATFORM...]
 
 Hashes the files in `<library.roms>/<slug>` and in every inbox, and matches them to the DAT.
 The first scan of a large library is slow; later scans reuse the hash cache. Counts are per
-wanted title (see [Config file](#config-file)).
+wanted title (see [What counts as wanted](#what-counts-as-wanted)).
 
 - have: any wanted release of the title is in the library.
 - inbox: a wanted release is in an inbox only.
@@ -200,27 +223,12 @@ skipped for the run. Exit status is 0, 1 if any game failed or a site's layout c
 romledger import [--dry-run]
 ```
 
-Files every inbox game that matches a DAT of a configured platform into
-`<library.roms>/<slug>/`, hashing contents, so names and folders in the inbox do not matter.
-Import files only wanted releases, so a title in a region you did not list stays out of the
-library. Then it rescans the platforms that received files
-and runs `hooks.after_import`.
+Files the inbox into the library; see [Where files go](#where-files-go). Only wanted releases are
+filed. Afterwards it rescans the platforms that received files and runs `hooks.after_import`. An
+inbox that igir empties is recreated.
 
-A zip that holds a ROM plus other files (a readme) is filed whole as `<DAT game name>.zip`: the
-extra files stay inside, and the match is on the ROM's hash. An inbox that igir empties is
-recreated.
-
-Nothing is ever deleted. Files that are not moved are relocated inside their inbox, keeping
-their relative path:
-
-- `<inbox>/duplicates/`: matched a wanted DAT entry the library already has.
-- `<inbox>/unwanted/`: a valid dump that is not wanted: another region or language, or a category
-  you did not `include`.
-- `<inbox>/unmatched/`: matched no DAT entry.
-
-A name collision there gets `.1`, `.2`, ... before the extension. Output lists
-`moved <slug> <n>`, `duplicates <n>`, `unwanted <n>`, and `unmatched <n>`; an inbox with nothing
-to do prints `inbox is empty`.
+Output lists `moved <slug> <n>`, `duplicates <n>`, `unwanted <n>` and `unmatched <n>`; an inbox
+with nothing to do prints `inbox is empty`.
 
 `--dry-run` changes nothing. It prints what would be filed and the unwanted and unmatched files.
 It cannot tell duplicates from new games, so its counts include games the library already has.
@@ -228,9 +236,7 @@ It cannot tell duplicates from new games, so its counts include games the librar
 Exit status is 0, 1 if an `after_import` hook failed (everything else still completed), or 2 for
 errors.
 
-Manual downloads from Vimm's Lair: download in a browser into an inbox, then run
-`romledger import`, or let `serve` do it (see below). Partial downloads are skipped until the
-browser renames them.
+Partial downloads are skipped until the browser renames them. `serve` imports on its own; see below.
 
 ## serve
 
