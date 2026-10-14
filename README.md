@@ -39,7 +39,7 @@ Requires [uv](https://docs.astral.sh/uv/), Python 3.11+ and Node.js 22.22+ (roml
 [igir](https://igir.io) through `npx`).
 
 ```sh
-uv tool install git+ssh://git@github.com/kjiwa/romledger
+uv tool install git+https://github.com/kjiwa/romledger
 ```
 
 ## Configure
