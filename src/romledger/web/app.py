@@ -18,7 +18,7 @@ CSP = (
 SECURITY_HEADERS = {
     "Content-Security-Policy": CSP,
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "same-origin",
 }
 TITLES = {
     400: "Request refused",

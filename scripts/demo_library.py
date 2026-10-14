@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import uvicorn
 from playwright.sync_api import Browser, sync_playwright
@@ -132,8 +132,8 @@ def build(root: Path) -> None:
             database.replace_platform(slug, items_for(slug, count), ["/x"] * 3, "demo", stamp)
 
 
-def serve() -> tuple[uvicorn.Server, str]:
-    app = create_app(lambda: load_context(None), TOKEN)
+def serve(**tools: Any) -> tuple[uvicorn.Server, str]:
+    app = create_app(lambda: load_context(None), TOKEN, **tools)
     app.state.services.jobs.start("scan", lambda: print(SCAN_LOG, end="") or True)
     app.state.services.jobs.wait(5)
     with socket.socket() as probe:

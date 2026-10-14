@@ -633,6 +633,22 @@ def test_serve_prints_the_link_and_runs_uvicorn(
     assert calls[1]["port"] == 9000
 
 
+@pytest.mark.parametrize("host", cli.WILDCARD_HOSTS)
+def test_serve_links_localhost_for_a_wildcard_bind(
+    tmp_path: Path,
+    data_dir: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    host: str,
+) -> None:
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
+    assert run(make_config(tmp_path), "serve", "--host", host) == 0
+    token = (data_dir / "serve.token").read_text().strip()
+    assert capsys.readouterr().out == f"romledger dashboard: http://localhost:8730/?token={token}\n"
+    assert calls[0]["host"] == host
+
+
 def test_serve_reports_an_unmounted_library(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

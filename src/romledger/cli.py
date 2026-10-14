@@ -29,6 +29,7 @@ from romledger.web import auth
 from romledger.web.app import create_app
 
 DEFAULT_HOST = "127.0.0.1"
+WILDCARD_HOSTS = ("0.0.0.0", "::")  # noqa: S104
 DEFAULT_PORT = 8730
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
 
@@ -249,7 +250,8 @@ def serve(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     token = auth.load_token(context.data_dir)
     app = create_app(lambda: load_context(args.config), token)
-    url = f"http://{args.host}:{args.port}/?token={token}"
+    link_host = "localhost" if args.host in WILDCARD_HOSTS else args.host
+    url = f"http://{link_host}:{args.port}/?token={token}"
     print(f"romledger dashboard: {url}", flush=True)
     if args.open:
         webbrowser.open(url)
