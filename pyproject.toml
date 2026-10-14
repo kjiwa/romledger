@@ -9,7 +9,11 @@ description = "Track which retro games you have and which are missing, verified 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.143.0",
     "httpx[socks]>=0.28.1",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
@@ -30,6 +34,9 @@ select = ["E", "F", "I", "UP", "B", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+"src/romledger/web/app.py" = ["S101"]
+"src/romledger/web/auth.py" = ["S105"]
+"scripts/demo_library.py" = ["S105", "S311"]
 
 [tool.mypy]
 strict = true

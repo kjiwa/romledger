@@ -12,10 +12,16 @@ Works today:
 - Show progress per platform (`romledger status`)
 - List missing games, with Vimm's Lair search links (`romledger missing nes --links`)
 - Import from the inboxes into a RomM layout (`romledger import`)
+- Browse progress, missing games and the inbox, and upload files, in a local dashboard (`romledger serve`)
 - Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
 - Check that the supported sites and the igir pin still match (`romledger canary`; runs weekly in CI)
 
 Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-desktop-dark.png">
+  <img alt="The romledger overview page: one card per platform with a progress bar and counts of games had, in the inbox, missing and unmatched." src="docs/images/overview-desktop-light.png">
+</picture>
 
 ## How it fits
 
@@ -52,6 +58,7 @@ romledger config
 romledger dats update
 romledger scan
 romledger status
+romledger serve --open
 ```
 
 See [docs/setup.md](docs/setup.md) for all options,

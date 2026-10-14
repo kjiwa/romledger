@@ -1,9 +1,11 @@
 import json
 import os
+import webbrowser
 from pathlib import Path
 
 import httpx
 import pytest
+import uvicorn
 
 from romledger import __version__, canary, cli, config, dats, fetch, http, importer, scan, state
 
@@ -580,3 +582,69 @@ def test_canary_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
         cli.main(["canary", "--bogus"])
     assert exit_info.value.code == 2
     assert "usage:" in capsys.readouterr().err
+
+
+def write_dat(data_dir: Path) -> None:
+    dat = dats.dat_path(data_dir, "no-intro/Nintendo - Nintendo Entertainment System")
+    dat.parent.mkdir(parents=True)
+    dat.write_text('clrmamepro (\n\tversion "1"\n)\ngame (\n\tname "A (USA)"\n)\n')
+
+
+def test_dats_index_builds_then_reports_unchanged(
+    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = make_config(tmp_path)
+    write_dat(data_dir)
+    assert run(path, "dats", "index") == 0
+    assert run(path, "dats", "index", "nes") == 0
+    assert capsys.readouterr().out == "nes indexed\nnes unchanged\n"
+    with state.State(data_dir / "state.db") as database:
+        stamp = database.index_stamp("nes")
+        assert stamp is not None
+        assert stamp.version == "1"
+
+
+def test_dats_index_without_a_dat_prints_fix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(make_config(tmp_path), "dats", "index") == 2
+    assert capsys.readouterr().err.rstrip().endswith("run: romledger dats update")
+
+
+def test_serve_prints_the_link_and_runs_uvicorn(
+    tmp_path: Path,
+    data_dir: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+    opened: list[str] = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(webbrowser, "open", opened.append)
+    path = make_config(tmp_path)
+    assert run(path, "serve") == 0
+    token = (data_dir / "serve.token").read_text().strip()
+    assert capsys.readouterr().out == f"romledger dashboard: http://127.0.0.1:8730/?token={token}\n"
+    assert calls == [{"host": "127.0.0.1", "port": 8730, "access_log": False}]
+    assert opened == []
+    assert run(path, "serve", "--host", "192.0.2.10", "--port", "9000", "--open") == 0
+    assert opened == [f"http://192.0.2.10:9000/?token={token}"]
+    assert calls[1]["host"] == "192.0.2.10"
+    assert calls[1]["port"] == 9000
+
+
+def test_serve_reports_an_unmounted_library(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(make_config(tmp_path, mkdirs=False), "serve") == 2
+    assert "NAS share mounted" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("port", ["0", "70000", "abc", "-1"])
+def test_serve_rejects_bad_ports(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], port: str
+) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        run(make_config(tmp_path), "serve", "--port", port)
+    assert exit_info.value.code == 2
+    assert "not a port between 1 and 65535" in capsys.readouterr().err

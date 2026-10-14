@@ -1,11 +1,12 @@
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
+from typing import NamedTuple
 
-SCHEMA_VERSION = 1
-SCHEMA = """
+SCHEMA_VERSION = 2
+BASE_SCHEMA = """
 CREATE TABLE entries (
     platform TEXT NOT NULL,
     game TEXT NOT NULL,
@@ -20,6 +21,39 @@ CREATE TABLE scans (
     dat_version TEXT NOT NULL
 );
 """
+INDEX_SCHEMA = """
+CREATE TABLE IF NOT EXISTS dat_index (
+    platform TEXT NOT NULL,
+    game TEXT NOT NULL,
+    sha1 TEXT,
+    md5 TEXT,
+    crc TEXT,
+    size INTEGER
+);
+CREATE INDEX IF NOT EXISTS dat_index_sha1 ON dat_index (sha1);
+CREATE INDEX IF NOT EXISTS dat_index_game ON dat_index (platform, game);
+CREATE TABLE IF NOT EXISTS dat_games (
+    platform TEXT NOT NULL,
+    game TEXT NOT NULL,
+    norm TEXT NOT NULL,
+    region TEXT,
+    PRIMARY KEY (platform, game)
+);
+CREATE INDEX IF NOT EXISTS dat_games_norm ON dat_games (platform, norm);
+CREATE TABLE IF NOT EXISTS dat_versions (
+    platform TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL
+);
+"""
+MIGRATIONS = {0: BASE_SCHEMA + INDEX_SCHEMA, 1: INDEX_SCHEMA}
+
+
+class DatStamp(NamedTuple):
+    version: str
+    size: int
+    mtime_ns: int
 
 
 @dataclass(frozen=True)
@@ -37,13 +71,40 @@ class Counts:
     unmatched: int
 
 
+@dataclass(frozen=True)
+class IndexedGame:
+    game: str
+    norm: str
+    region: str | None
+
+
+@dataclass(frozen=True)
+class Located:
+    platform: str
+    game: str
+    region: str | None
+    state: str | None
+    scanned: bool
+
+
+LOCATE = """
+SELECT g.platform, g.game, g.region, e.state, s.platform IS NOT NULL
+FROM dat_games g
+LEFT JOIN entries e ON e.platform = g.platform AND e.game = g.game
+LEFT JOIN scans s ON s.platform = g.platform
+WHERE {where}
+ORDER BY g.platform, g.game
+"""
+
+
 class State:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(path)
-        if self._db.execute("PRAGMA user_version").fetchone()[0] == 0:
+        self._db = sqlite3.connect(path, check_same_thread=False)
+        version = self._db.execute("PRAGMA user_version").fetchone()[0]
+        if version in MIGRATIONS:
             with self._db:
-                self._db.executescript(SCHEMA)
+                self._db.executescript(MIGRATIONS[version])
                 self._db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def __enter__(self) -> "State":
@@ -105,3 +166,72 @@ class State:
             "SELECT scanned_at FROM scans WHERE platform = ?", (platform,)
         ).fetchone()
         return None if row is None else str(row[0])
+
+    def entries(
+        self, platform: str, states: Sequence[str], query: str, limit: int, offset: int
+    ) -> tuple[list[Item], int]:
+        where, args = self._entry_filter(platform, states, query)
+        total = self._db.execute(f"SELECT COUNT(*) FROM entries WHERE {where}", args)  # noqa: S608
+        rows = self._db.execute(
+            f"SELECT game, state, path FROM entries WHERE {where} "  # noqa: S608
+            "ORDER BY game LIMIT ? OFFSET ?",
+            (*args, limit, offset),
+        )
+        return [Item(*row) for row in rows], int(total.fetchone()[0])
+
+    def index_stamp(self, platform: str) -> DatStamp | None:
+        row = self._db.execute(
+            "SELECT version, size, mtime_ns FROM dat_versions WHERE platform = ?", (platform,)
+        ).fetchone()
+        return None if row is None else DatStamp(*row)
+
+    def replace_index(
+        self,
+        platform: str,
+        roms: Iterable[tuple[str | None, str | None, str | None, int | None, str]],
+        games: Iterable[IndexedGame],
+        stamp: DatStamp,
+    ) -> None:
+        with self._db:
+            for table in ("dat_index", "dat_games"):
+                self._db.execute(f"DELETE FROM {table} WHERE platform = ?", (platform,))  # noqa: S608
+            self._db.executemany(
+                "INSERT INTO dat_index (platform, sha1, md5, crc, size, game) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [(platform, *rom) for rom in roms],
+            )
+            self._db.executemany(
+                "INSERT INTO dat_games VALUES (?, ?, ?, ?)",
+                [(platform, item.game, item.norm, item.region) for item in games],
+            )
+            self._db.execute(
+                "INSERT OR REPLACE INTO dat_versions VALUES (?, ?, ?, ?)", (platform, *stamp)
+            )
+
+    def locate_sha1(self, sha1: str) -> list[Located]:
+        where = "(g.platform, g.game) IN (SELECT platform, game FROM dat_index WHERE sha1 = ?)"
+        return self._locate(where, (sha1,))
+
+    def locate_game(self, platform: str, game: str) -> list[Located]:
+        return self._locate("g.platform = ? AND g.game = ?", (platform, game))
+
+    def locate_title(self, platform: str, norm: str) -> list[Located]:
+        return self._locate("g.platform = ? AND g.norm = ?", (platform, norm))
+
+    def _locate(self, where: str, args: tuple[str, ...]) -> list[Located]:
+        rows = self._db.execute(LOCATE.format(where=where), args)
+        return [Located(row[0], row[1], row[2], row[3], bool(row[4])) for row in rows]
+
+    @staticmethod
+    def _entry_filter(
+        platform: str, states: Sequence[str], query: str
+    ) -> tuple[str, tuple[str, ...]]:
+        where, args = ["platform = ?"], [platform]
+        if states:
+            where.append(f"state IN ({', '.join('?' * len(states))})")
+            args.extend(states)
+        if query:
+            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            where.append("game LIKE ? ESCAPE '\\'")
+            args.append(f"%{escaped}%")
+        return " AND ".join(where), tuple(args)

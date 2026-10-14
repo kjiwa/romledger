@@ -1,7 +1,10 @@
+import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
 
+from romledger import state
 from romledger.state import Counts, Item, State
 
 ITEMS = [
@@ -62,3 +65,48 @@ def test_reopen_persists(tmp_path: Path) -> None:
         fill(database)
     with State(path) as database:
         assert database.missing("nes") == ["Beta (USA)", "Zed (USA)"]
+
+
+def test_version_one_database_migrates_without_losing_scans(tmp_path: Path) -> None:
+    path = tmp_path / "state.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(state.BASE_SCHEMA + "PRAGMA user_version = 1;")
+    connection.execute("INSERT INTO scans VALUES ('nes', 't', 'v')")
+    connection.commit()
+    connection.close()
+    with State(path) as database:
+        assert database.scanned_at("nes") == "t"
+        assert database.index_stamp("nes") is None
+        assert database.locate_sha1("a" * 40) == []
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 2
+
+
+def test_entries_filter_page_and_escape_wildcards(tmp_path: Path) -> None:
+    items = [*ITEMS, Item("100% Fun (USA)", "missing", None), Item("a_b (USA)", "missing", None)]
+    with State(tmp_path / "state.db") as database:
+        fill(database, items)
+        names = [item.game for item in database.entries("nes", ["missing"], "", 10, 0)[0]]
+        assert names == ["100% Fun (USA)", "Beta (USA)", "Zed (USA)", "a_b (USA)"]
+        page, total = database.entries("nes", ["missing"], "", 2, 1)
+        assert ([item.game for item in page], total) == (["Beta (USA)", "Zed (USA)"], 4)
+        assert database.entries("nes", [], "", 10, 0)[1] == 6
+        assert database.entries("nes", ["have", "inbox"], "", 10, 0)[1] == 2
+        assert [i.game for i in database.entries("nes", [], "%", 10, 0)[0]] == ["100% Fun (USA)"]
+        assert [i.game for i in database.entries("nes", [], "_", 10, 0)[0]] == ["a_b (USA)"]
+        assert database.entries("nes", [], "zzz", 10, 0) == ([], 0)
+
+
+def test_state_is_usable_from_another_thread(tmp_path: Path) -> None:
+    errors: list[BaseException] = []
+
+    def use(database: State) -> None:
+        try:
+            database.counts()
+        except BaseException as error:
+            errors.append(error)
+
+    with State(tmp_path / "state.db") as database:
+        worker = threading.Thread(target=use, args=(database,))
+        worker.start()
+        worker.join()
+    assert errors == []

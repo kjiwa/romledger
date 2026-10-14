@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_parts.html" import icon, badges, meter, scan_button %}
+{% block title %}{{ platform.name }}{% endblock %}
+{% block main %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Overview</a></nav>
+<div class="page-head">
+  <div>
+    <h1>{{ platform.name }}</h1>
+    <p class="slug">{{ platform.slug }}</p>
+  </div>
+  {{ scan_button() }}
+</div>
+
+{% if not platform.counts %}
+<section class="empty" aria-labelledby="empty-title">
+  <h2 id="empty-title">Not scanned yet</h2>
+  <p>Scan to see which games you have and which are missing.</p>
+  <pre><code>romledger scan {{ platform.slug }}</code></pre>
+</section>
+{% else %}
+<section class="card summary" aria-label="Summary">
+  {{ meter(platform) }}
+  {{ badges(platform.counts) }}
+</section>
+
+<form class="filters" method="get" action="/platforms/{{ platform.slug }}" role="search">
+  <div class="field field-grow">
+    <label for="q">Search games</label>
+    <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+  </div>
+  <div class="field">
+    <label for="state">Show</label>
+    <select id="state" name="state">
+      {% for value, label in (("missing", "Missing"), ("inbox", "In inbox"), ("have", "Have"), ("all", "All")) %}
+      <option value="{{ value }}"{% if value == state %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="button" type="submit">Filter</button>
+</form>
+
+<p class="muted result-count" role="status">
+  {% if page.total %}Showing {{ first|number }} to {{ last|number }} of {{ page.total|number }} games.{% else %}No games match.{% endif %}
+</p>
+
+{% if page.games %}
+<ul class="games">
+  {% for game in page.games %}
+  <li class="game">
+    <span class="game-name">{{ game.name }}</span>
+    <span class="badge badge-{{ game.state }}">{{ game.state }}</span>
+    {% if game.archive %}
+    <span class="game-links">
+      {% if game.vimm %}<a href="{{ game.vimm }}" target="_blank" rel="noopener noreferrer">Vimm's Lair{{ icon("external") }}<span class="sr-only"> (opens in a new tab)</span></a>{% endif %}
+      <a href="{{ game.archive }}" target="_blank" rel="noopener noreferrer">Internet Archive{{ icon("external") }}<span class="sr-only"> (opens in a new tab)</span></a>
+    </span>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if previous or following %}
+<nav class="pager" aria-label="Pages">
+  {% if previous %}<a class="button" href="{{ previous }}" rel="prev">Previous</a>{% else %}<span></span>{% endif %}
+  {% if following %}<a class="button" href="{{ following }}" rel="next">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

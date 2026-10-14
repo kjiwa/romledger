@@ -117,6 +117,16 @@ The first scan of a large library is slow; later scans reuse the hash cache.
 Files under `<inbox>/unmatched/` and `<inbox>/duplicates/` are ignored, as are AppleDouble
 (`._*`), `.DS_Store`, and partial downloads (`*.part`, `*.crdownload`, `*.download`).
 
+## dats index
+
+```sh
+romledger dats index [PLATFORM...]
+```
+
+Rebuilds the hash index (SHA-1, MD5, CRC per game) that `serve` uses for lookups, from the DATs
+already downloaded. `scan` does this itself whenever a platform's DAT version changed, so run it
+only to index without scanning. Prints `<platform> indexed|unchanged`.
+
 ## status
 
 ```sh
@@ -188,3 +198,55 @@ Manual downloads from Vimm's Lair: download in a browser into an inbox, then run
 `romledger import`. Partial downloads are skipped until the browser renames them.
 
 Disc images: igir can read CHD; matching Redump CHDs is unverified.
+
+## serve
+
+```sh
+romledger serve [--host 127.0.0.1] [--port 8730] [--open]
+```
+
+Runs the dashboard and JSON API, and prints a link ending in `?token=...`. Open the link once; the
+browser keeps a session cookie. Pages and files are served from the local machine only; nothing
+loads from a CDN.
+
+- Overview: progress per platform.
+- Platform: missing, inbox or have games, a search box, and Vimm's Lair and Internet Archive
+  search links for missing games.
+- Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
+  there, and the counts set aside by `import`. Press Import to file them.
+- Activity: scans and imports started from the dashboard, with their output. One runs at a time.
+
+The service reads the config file on every request, so edits and a remounted share take effect
+without a restart. Scan and import need the DATs (`romledger dats update`) and igir, as on the
+command line.
+
+### Access token
+
+Every request needs the token. It is generated on first run into `<data>/serve.token` (mode 0600),
+or taken from `$ROMLEDGER_TOKEN` (at least 16 characters). Delete the file to issue a new token.
+The default bind is `127.0.0.1`. Binding wider (`--host 0.0.0.0`) exposes the library to the
+network: the connection is plain HTTP, so anyone who can read the traffic sees the token. Use it
+on a trusted LAN or behind a reverse proxy that adds TLS.
+
+### API
+
+Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors are
+`{"detail": "<message>"}`.
+
+| Request | Meaning |
+| --- | --- |
+| `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan). |
+| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing games with `links.vimm` and `links.archive`. |
+| `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
+| `GET /api/lookup?name=<game>&platform=<slug>` | Match by name: exact, else by title ignoring tags (`exact` is false); `matches` is empty when several games fit. |
+| `GET /api/jobs/current` | The running scan or import, or null. |
+| `POST /api/scan`, `POST /api/import` | Start a job; 202, or 409 while another runs. |
+
+A match is `{platform, game, state, exact}`. `state` is `have`, `inbox`, `missing`, `unwanted` (in
+the DAT, excluded by the platform's regions and languages), `unscanned` (platform not scanned yet)
+or `unknown` (not in any DAT).
+
+Upload from a script with `curl -H "Authorization: Bearer $TOKEN" -F files=@game.nes
+http://127.0.0.1:8730/inbox/upload`; add `-H "Accept: application/json"` for a JSON reply. Names
+are reduced to their last path segment, and an existing name gets `.1`, `.2`, ... before the
+extension. A file is written as `<name>.part` and renamed when complete.

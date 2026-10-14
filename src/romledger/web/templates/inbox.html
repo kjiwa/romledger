@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_parts.html" import icon %}
+{% block title %}Inbox{% endblock %}
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Inbox</h1>
+    <p class="lede">Files wait here until you import them into the library.</p>
+  </div>
+  <form method="post" action="/import">
+    <button class="button button-primary" type="submit"{% if job %} disabled{% endif %}>{{ icon("import") }}Import</button>
+  </form>
+</div>
+
+{% if uploaded %}
+<p class="notice notice-ok" role="status">{{ icon("check") }}Uploaded {{ uploaded }} file{{ "" if uploaded == 1 else "s" }}.</p>
+{% endif %}
+
+<section aria-labelledby="upload-title" class="card">
+  <h2 id="upload-title">Add files</h2>
+  <form id="upload-form" method="post" action="/inbox/upload" enctype="multipart/form-data">
+    <div class="dropzone" data-dropzone>
+      {{ icon("upload") }}
+      <p class="dropzone-title">Drop files here</p>
+      <p class="muted">or</p>
+      <input class="file-input" id="files" name="files" type="file" multiple required>
+      <label class="button" for="files">Choose files</label>
+      <button class="button button-primary no-script" type="submit">Upload</button>
+    </div>
+  </form>
+  <ul class="uploads" id="upload-list" aria-live="polite"></ul>
+</section>
+
+<section aria-labelledby="files-title" class="section">
+  <h2 id="files-title">Waiting in the inbox</h2>
+  <p class="muted path">{{ inbox }}</p>
+  {% if listing.files %}
+  <ul class="files">
+    {% for file in listing.files %}
+    <li class="file">
+      <span class="file-name">{{ file.name }}</span>
+      {% if file.partial %}<span class="badge badge-inbox">uploading</span>{% endif %}
+      <span class="file-size muted">{{ file.size|size }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if listing.total > listing.files|length %}
+  <p class="muted">and {{ (listing.total - listing.files|length)|number }} more.</p>
+  {% endif %}
+  {% else %}
+  <p class="empty-inline">The inbox is empty. Drop files above, or copy them to the folder shown.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="aside-title" class="section">
+  <h2 id="aside-title">Set aside by import</h2>
+  <p class="muted">Import moves files it cannot file into these folders inside the inbox.</p>
+  <dl class="facts">
+    <div><dt>Unmatched</dt><dd>{{ set_aside.unmatched|number }}</dd></div>
+    <div><dt>Duplicates</dt><dd>{{ set_aside.duplicates|number }}</dd></div>
+  </dl>
+</section>
+{% endblock %}

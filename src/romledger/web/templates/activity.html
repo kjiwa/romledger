@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_parts.html" import icon %}
+{% block title %}Activity{% endblock %}
+{% block main %}
+<div class="page-head">
+  <div>
+    <h1>Activity</h1>
+    <p class="lede">Scans and imports started from this dashboard, newest first.</p>
+  </div>
+</div>
+
+{% if records %}
+<ul class="records">
+  {% for record in records %}
+  <li class="record">
+    <details{% if loop.first %} open{% endif %}>
+      <summary>
+        <span class="record-title">{{ record.kind|capitalize }}</span>
+        {% if record.ok %}<span class="badge badge-have">done</span>{% else %}<span class="badge badge-danger">failed</span>{% endif %}
+        <span class="muted record-when"><time datetime="{{ record.started }}">{{ record.started|stamp }}</time> &middot; {{ duration(record.started, record.finished) }}</span>
+      </summary>
+      <pre class="output"><code>{{ record.output or "No output." }}</code></pre>
+    </details>
+  </li>
+  {% endfor %}
+</ul>
+{% elif not job %}
+<section class="empty" aria-labelledby="empty-title">
+  <h2 id="empty-title">Nothing has run yet</h2>
+  <p>Results of scans and imports appear here. Start one from the Overview or Inbox page.</p>
+</section>
+{% endif %}
+{% endblock %}

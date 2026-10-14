@@ -11,14 +11,12 @@ import httpx
 from romledger import http
 from romledger.sources.base import Candidate, Site
 from romledger.sources.errors import SourceChanged
+from romledger.titles import normalize, region_of
 
 NAME = "coolrom"
 BASE_URL = "https://coolrom.com"
 HOSTS = ("coolrom.com", "dl.coolrom.com")
 MIN_GAP = 10.0
-TAGS = re.compile(r"\([^)]*\)")
-FIRST_TAG = re.compile(r"\(([^),]*)")
-NOT_ALNUM = re.compile(r"[^a-z0-9]+")
 ASSIGNMENT = re.compile(r'getElementById\("dl"\)\.innerHTML\s*=\s*("(?:[^"\\]|\\.)*");')
 SIGNED_LINK = re.compile(r'href="(https://dl\.coolrom\.com/[^"]+)"')
 
@@ -66,25 +64,12 @@ class _SectionParser(HTMLParser):
             self.rows.append(Row(match[1], "".join(self._text).strip(), self._classes[-1]))
 
 
-def normalize(title: str) -> str:
-    ascii_title = unicodedata.normalize("NFKD", TAGS.sub("", title)).lower()
-    return NOT_ALNUM.sub("", ascii_title)
-
-
 def letter_of(title: str) -> str | None:
     decomposed = unicodedata.normalize("NFKD", title).lower()
     first = next(
         (char for char in decomposed if char in "abcdefghijklmnopqrstuvwxyz0123456789"), None
     )
     return None if first is None else ("0" if first.isdigit() else first)
-
-
-def region_of(game: str) -> str | None:
-    match = FIRST_TAG.search(game)
-    if match is None:
-        return None
-    region = match[1].strip().lower()
-    return "usa" if region == "world" else region
 
 
 def parse_section(html: str, code: str, url: str) -> list[Row]:
@@ -108,7 +93,8 @@ def parse_signed_link(html: str, url: str) -> str:
 
 
 def pick(rows: list[Row], game: str) -> Row | None:
-    same = [row for row in rows if normalize(row.title) == normalize(game)]
+    wanted = normalize(game)
+    same = [row for row in rows if wanted and normalize(row.title) == wanted]
     region = region_of(game)
     pool = [row for row in same if row.region.lower() == region] or same
     if len(pool) > 1:

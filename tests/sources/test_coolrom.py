@@ -130,19 +130,6 @@ def test_parse_signed_link_handles_escaped_quotes() -> None:
 @pytest.mark.parametrize(
     ("title", "expected"),
     [
-        ("Saint Sword (Japan)", "saintsword"),
-        ("Saint Sword", "saintsword"),
-        ("Pokémon: Red (USA) (Rev 1)", "pokemonred"),
-        ("SAME! Same! Same!", "samesamesame"),
-    ],
-)
-def test_normalize(title: str, expected: str) -> None:
-    assert coolrom.normalize(title) == expected
-
-
-@pytest.mark.parametrize(
-    ("title", "expected"),
-    [
         ("Sagaia (USA)", "s"),
         ("'89 Dennou", "0"),
         ("... Zero", "z"),
@@ -152,20 +139,6 @@ def test_normalize(title: str, expected: str) -> None:
 )
 def test_letter_of(title: str, expected: str | None) -> None:
     assert coolrom.letter_of(title) == expected
-
-
-@pytest.mark.parametrize(
-    ("game", "expected"),
-    [
-        ("Alpha (USA) (Rev 1)", "usa"),
-        ("Alpha (USA, Europe)", "usa"),
-        ("Alpha (World)", "usa"),
-        ("Alpha (Japan)", "japan"),
-        ("Alpha", None),
-    ],
-)
-def test_region_of(game: str, expected: str | None) -> None:
-    assert coolrom.region_of(game) == expected
 
 
 def test_find_prefers_the_region_row(site: Site, throttle: http.Throttle) -> None:
@@ -294,3 +267,8 @@ def test_live_section_page() -> None:
         candidate = source.find("Xenophobe (USA)")
     assert candidate is not None
     assert candidate.filename == "Xenophobe (USA).zip"
+
+
+def test_pick_never_matches_titles_that_normalize_to_nothing() -> None:
+    row = coolrom.Row("1", "\u30b2\u30fc\u30e0", "Japan")
+    assert coolrom.pick([row], "\u30b2\u30fc\u30e0 (Japan)") is None
