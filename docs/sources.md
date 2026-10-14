@@ -1,9 +1,9 @@
 # Sources
 
 A source is automated only if it offers an official API, or its robots.txt and terms allow
-automated access, or you hold the site owner's permission. You are responsible for having it before you list a
-source. All other sources are
-manual: download in your browser into an inbox, then run `romledger import`.
+automated access, or you hold the site owner's permission. You are responsible for having it
+before you list a source. All other sources are manual: download in your browser into an inbox;
+the next import files it (see [Where files go](setup.md#where-files-go)).
 
 romledger identifies itself as `romledger/<version> (+https://github.com/kjiwa/romledger)`, never
 as a browser. If a site refuses it, `fetch` reports the error and stops using that site.
@@ -39,7 +39,25 @@ endpoints. Set `platforms.<slug>.archive_item` to an item holding No-Intro style
 
 ## Vimm's Lair
 
-Manual. Vimm's game pages sit behind a bot challenge, so romledger never fetches from them.
-`romledger missing PLATFORM --links` prints a search link per game. Download in your browser into
-an inbox, then run `romledger import`. Partial browser downloads are skipped until finished.
-For GameCube, pick the default ISO; the other formats do not match the Redump DAT.
+Manual. Game pages sit behind a Cloudflare Turnstile challenge, which only a person in a browser
+passes, so romledger never fetches from them. The automation that is possible is on your side of
+the challenge:
+
+- `romledger missing PLATFORM --links` prints a search link per game.
+- The [browser extension](extension.md) marks what you have and can save Vimm's Lair downloads
+  into an inbox, where `serve` imports them.
+
+Partial browser downloads are skipped until finished. For GameCube, pick the default ISO; the
+other formats do not match the Redump DAT.
+
+## Not supported yet
+
+None of these has been evaluated against the rule above, so nothing is claimed about their terms.
+Check a site's robots.txt and terms before adding it.
+
+- Minerva Archive (unverified)
+- CDRomance (unverified)
+- EdgeEmu (unverified)
+- emu-land.net (unevaluated)
+- consoleroms.com (unevaluated)
+- romulation.org (unevaluated)
