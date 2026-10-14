@@ -1,8 +1,8 @@
 # Play your library
 
 romledger fills `roms/<platform>/` in your library. Pick a front end that reads that layout, then an
-emulator for each platform. Everything here was read from the projects' own pages when this guide
-was written; items marked unverified could not be confirmed there.
+emulator for each platform. Claims come from the projects' own pages; items marked unverified are
+not confirmed there.
 
 ## Choose a front end
 
@@ -18,7 +18,7 @@ was written; items marked unverified could not be confirmed there.
 
 RomM expects `roms/<platform>/` in the library, with optional `bios/<platform>/` beside it, and
 the platform folder names must match its slugs, such as `nes`, `snes`, `gba`, `3ds`, `dc` and
-`psx`. Mount the parent of `roms/` as `/romm/library`
+`psx`. `import` names the folders with igir's `{romm}` token, which targets those names. Mount the parent of `roms/` as `/romm/library`
 ([folder structure](https://docs.romm.app/4.9.0/getting-started/folder-structure/)). Folder names
 that differ can be remapped with `system.platforms` in RomM's `config.yml`.
 
@@ -29,7 +29,8 @@ GameCube, Wii and PS2 are not in its list. Saves and states are written to the s
 To pick up games that `import` filed, schedule a rescan with `SCAN_INTERVAL_CRON` (default
 midnight daily; restart the container to apply). RomM also documents a filesystem watcher, but its
 pages name the setting two ways, so check the
-[environment variables](https://docs.romm.app/4.9.0/reference/environment-variables/) page.
+[environment variables](https://docs.romm.app/4.9.0/reference/environment-variables/) page. The
+RomM links in this guide are to version 4.9.0 of its documentation.
 
 ### Android
 
@@ -58,8 +59,7 @@ directories button builds the tree. Its folder names differ from RomM's for some
 symlinks, or remap names in RomM instead of renaming the library.
 
 [RetroDECK](https://flathub.org/apps/details/net.retrodeck.retrodeck) is a Flatpak built on
-ES-DE. Its default ROM folder is `~/retrodeck/roms/` (from a search snippet of its docs;
-unverified).
+ES-DE. Its default ROM folder is `~/retrodeck/roms/` (unverified).
 
 On macOS, [RetroArch](https://www.retroarch.com/?page=platforms) has a universal build for
 macOS 10.13 or later. [OpenEmu](https://github.com/OpenEmu/OpenEmu) was last released in
@@ -67,8 +67,10 @@ December 2023 with Intel-only binaries; whether it runs on current macOS is unve
 
 ## Choose emulators
 
-One suggestion per platform, with the systems each project's own page lists. A blank for Android
-means the page does not say.
+One suggestion for each common platform, with the systems each project's own page lists. An
+operating system missing from a row means the page does not list it. For other platforms, such as
+Master System, Game Gear, Sega CD, TurboGrafx-16 and the Atari consoles, RetroArch's
+[cores](https://docs.libretro.com/) cover most.
 
 | Platform | Emulator | Systems |
 | --- | --- | --- |
@@ -93,10 +95,11 @@ Azahar continues Citra. Whether Citra is discontinued is unverified here.
 Use BIOS files dumped from consoles you own. romledger does not fetch them, and neither does
 this guide.
 
-- DuckStation needs a PS1 or PS2 BIOS in its user directory: `AppData\Local\DuckStation` on
+- DuckStation needs a PS1 BIOS (its README accepts a PS2 BIOS too) in its user directory: `AppData\Local\DuckStation` on
   Windows, `~/.local/share/duckstation` on Linux, `~/Library/Application Support/DuckStation`
   on macOS.
-- PCSX2 cannot run games without a BIOS. Where it goes is unverified.
+- PCSX2 cannot run games without a BIOS. Where it goes is unverified, as is where Ymir looks for
+  its Saturn BIOS.
 - Sega CD games need Sega CD BIOS files in the front end's system directory
   ([Genesis Plus GX](https://docs.libretro.com/library/genesis_plus_gx/)). A Mega Drive BIOS is
   optional.
@@ -106,7 +109,8 @@ this guide.
 - In RomM, put BIOS files in `bios/<platform>/`, and upload EmulatorJS BIOS files on the
   platform's Firmware tab.
 
-NES, SNES, N64, GameCube, Wii, 3DS and PSP: no BIOS was named on the pages read.
+NES, SNES, N64, GameCube, Wii, 3DS and PSP: no BIOS is named in the emulators' documentation
+(unverified for some).
 
 ## Pair a controller
 
@@ -122,6 +126,6 @@ NES, SNES, N64, GameCube, Wii, 3DS and PSP: no BIOS was named on the pages read.
   ([Sony](https://www.playstation.com/en-us/support/hardware/pair-dualsense-controller-bluetooth/)).
 - Xbox on Windows and Android: see
   [Xbox's Bluetooth page](https://support.xbox.com/en-US/help/hardware-network/accessories/using-bluetooth-for-xbox-gaming).
-  Its steps could not be read when this guide was written.
+  Its steps are unverified here.
 - Linux and Switch Pro controllers on a PC, Android or Mac: no official instructions were found.
   Your desktop's Bluetooth settings are the starting point.
