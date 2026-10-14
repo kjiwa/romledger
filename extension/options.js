@@ -3,6 +3,7 @@
 const api = globalThis.browser ?? globalThis.chrome;
 const form = document.getElementById("form");
 const result = document.getElementById("result");
+const DEFAULT_URL = "http://127.0.0.1:8730";
 
 function show(text, kind) {
   result.textContent = text;
@@ -11,7 +12,7 @@ function show(text, kind) {
 
 async function load() {
   const stored = await api.storage.local.get(["url", "token"]);
-  form.url.value = stored.url || "";
+  form.url.value = stored.url || DEFAULT_URL;
   form.token.value = stored.token || "";
 }
 

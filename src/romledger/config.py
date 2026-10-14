@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from romledger import http, registry
+from romledger import DOCS_URL, http, registry
 
 CONFIG_ENV = "ROMLEDGER_CONFIG"
 DATA_ENV = "ROMLEDGER_DATA"
@@ -25,8 +25,8 @@ SOURCES = ("coolrom", "internet-archive")
 
 EXAMPLE = """\
 [library]
-roms = "/mnt/roms/roms"
-inboxes = ["/mnt/roms/inbox"]
+roms = "~/roms/library"
+inboxes = ["~/roms/inbox"]
 
 [platforms.nes]
 """
@@ -156,7 +156,7 @@ def _parse_hooks(path: Path, table: dict[str, Any]) -> Hooks:
     ):
         raise ConfigError(
             f"{path}: hooks.after_import must be a list of commands, each a non-empty list of "
-            'non-empty strings, e.g. [["touch", "/mnt/roms/.imported"]].'
+            'non-empty strings, e.g. [["touch", "/path/to/roms/.imported"]].'
         )
     return Hooks(after_import=tuple(tuple(argv) for argv in commands))
 
@@ -272,7 +272,7 @@ def _directory(path: Path, dotted: str, value: str) -> Path:
 def _table(path: Path, data: dict[str, Any], name: str, *, required: bool) -> dict[str, Any]:
     if name not in data:
         if required:
-            raise ConfigError(f"{path}: missing [{name}] table. Add it; see the example in README.")
+            raise ConfigError(f"{path}: missing [{name}] table. Add it; see {DOCS_URL}/setup.md.")
         return {}
     value = data[name]
     if not isinstance(value, dict):

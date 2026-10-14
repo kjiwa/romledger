@@ -18,8 +18,8 @@ Unknown keys and wrong types are errors. Paths must be absolute; `~` is expanded
 
 ```toml
 [library]
-roms = "/mnt/roms/roms"
-inboxes = ["/mnt/roms/inbox"]
+roms = "~/roms/library"
+inboxes = ["~/roms/inbox"]
 
 [platforms.nes]
 regions = ["USA", "WORLD"]
@@ -33,7 +33,7 @@ archive_item = "No-Intro_Atari7800"
 dat = "no-intro/Some - Custom System"
 
 [hooks]
-after_import = [["touch", "/mnt/roms/.imported"]]
+after_import = [["touch", "/path/to/roms/.imported"]]
 
 [network]
 proxy = "socks5h://proxy.example:1080"
@@ -41,7 +41,7 @@ proxy = "socks5h://proxy.example:1080"
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `library.roms` | yes | RomM library roms directory. Games for `<slug>` live in `<roms>/<slug>/`. |
+| `library.roms` | yes | Library directory (RomM layout). Games for `<slug>` live in `<roms>/<slug>/`. |
 | `library.inboxes` | yes | One or more mixed-platform directories where new files arrive. |
 | `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
 | `platforms.<slug>.regions` | no | Wanted regions, igir codes. Default `["USA", "WORLD"]`. |

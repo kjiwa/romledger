@@ -40,7 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Track which retro games you have and which are missing.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("--config", metavar="FILE", help="config file (default: see docs/setup.md)")
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        help="config file (default: $ROMLEDGER_CONFIG, else "
+        "$XDG_CONFIG_HOME/romledger/config.toml, i.e. ~/.config/romledger/config.toml)",
+    )
     commands = parser.add_subparsers(dest="command", required=True, metavar="command")
     commands.add_parser("config", help="validate the config file and print a summary")
     dats_parser = commands.add_parser("dats", help="manage platform DATs")

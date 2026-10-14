@@ -88,7 +88,7 @@ Master System, Game Gear, Sega CD, TurboGrafx-16 and the Atari consoles, RetroAr
 | Dreamcast | [Flycast](https://github.com/flyinghead/flycast) | Windows, Linux, macOS, Android |
 | Saturn | [Ymir](https://flathub.org/apps/io.github.strikerx3.ymir) | Windows, Linux, macOS (search results only; unverified) |
 
-Azahar continues Citra. Whether Citra is discontinued is unverified here.
+Azahar continues Citra. Whether Citra is discontinued is untested.
 
 ### BIOS files
 
@@ -126,6 +126,6 @@ NES, SNES, N64, GameCube, Wii, 3DS and PSP: no BIOS is named in the emulators' d
   ([Sony](https://www.playstation.com/en-us/support/hardware/pair-dualsense-controller-bluetooth/)).
 - Xbox on Windows and Android: see
   [Xbox's Bluetooth page](https://support.xbox.com/en-US/help/hardware-network/accessories/using-bluetooth-for-xbox-gaming).
-  Its steps are unverified here.
+  Its steps are untested.
 - Linux and Switch Pro controllers on a PC, Android or Mac: no official instructions were found.
   Your desktop's Bluetooth settings are the starting point.

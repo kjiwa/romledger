@@ -14,7 +14,7 @@ Fix: mount it, or correct the path in the config file.
 
 ## `unknown platform 'X'. Use one of: ...; or set dat.`
 
-Symptom: `[platforms.X]` has no `dat` and X is not a known RomM slug. Cause: typo or an
+Symptom: `[platforms.X]` has no `dat` and X is not a known platform slug. Cause: typo or an
 unsupported platform. Fix: use a listed slug, or set `dat = "<no-intro or redump>/<name>"`.
 
 ## `platforms.X.dat 'Y' must look like <no-intro|redump>/<name>`
@@ -124,7 +124,7 @@ one code or remove the key to use the default.
 ## `hooks.after_import must be a list of commands`
 
 Cause: the value is not a list of argument lists, or an argument is empty. Fix: write
-`after_import = [["touch", "/mnt/roms/.imported"]]`.
+`after_import = [["touch", "/path/to/roms/.imported"]]`.
 
 ## `unknown key hooks.X`
 
@@ -232,24 +232,9 @@ the URL or in `HTTPS_PROXY`.
 
 ## `finding <key>: <title>`
 
-Cause: `canary` found drift; the exit status is 1. Run `romledger canary --json` for the detail. Fix by
-key:
+Cause: `canary` found drift; the exit status is 1. Run `romledger canary --json` for the detail.
 
-- `<site>:new-platform:<code>`: the site lists a platform the registry does not know. Add
-  `<site> = "<code>"` to that platform in `src/romledger/platforms.toml`, or add the code to
-  `[ignore]` there.
-- `<site>:missing-platform:<code>`: the site's platform list no longer has a registry code. Correct
-  the code in `platforms.toml`.
-- `<site>:contract:platform-links`: the site's platform index page has no platform links. Update
-  romledger or report it.
-- `coolrom:contract:section`, `coolrom:contract:download-link`, `vimm:contract:list`,
-  `internet-archive:contract:metadata`: a page no longer has what romledger expects, so `fetch` for
-  that source will fail the same way. Update romledger or report it.
-- `dat:missing:<slug>`: libretro-database has no such DAT. Correct `dat` for that platform in
-  `platforms.toml`.
-- `igir:update:<tag>`: a newer igir exists. Maintainers, in a source checkout: run `uv run pytest -m igir --no-cov`, then update
-  `IGIR_VERSION` in `src/romledger/igir.py`.
-- `igir:contract:release`: GitHub's release answer has no tag name. Report it.
+Maintainers: see the key list in [CONTRIBUTING.md](https://github.com/kjiwa/romledger/blob/master/CONTRIBUTING.md#drift-checks).
 
 ## `unverified <prefix>`
 
@@ -288,5 +273,4 @@ above.
 ## `... page layout not recognized: ...`
 
 Shown in the extension popup. Cause: Vimm's Lair or CoolROM changed its markup, so the extension
-found no game data or links. Fix: report it; the page parsers are in `extension/content/` and
-`extension/lib/romledger.js`.
+found no game data or links. Fix: report it.
