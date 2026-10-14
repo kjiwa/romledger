@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- `romledger init` writes a starter config and creates the library and inbox folders;
+  `romledger platforms` lists the platform slugs. The missing-config error points at `init`.
+- The wanted library is computed in romledger: non-retail releases are left out (a platform's
+  `include` adds categories back) and one preferred release is kept per title by tags, region,
+  language and revision. `import` files only wanted games and sets valid but unwanted dumps aside
+  in `<inbox>/unwanted`.
+- The database schema is v3 and resets existing scans; run `scan` again after upgrading.
+- `serve` imports inbox files once they stop changing; `--no-auto-import` turns it off.
+- The extension can save Vimm's Lair downloads to `Downloads/romledger` through an optional
+  `downloads` permission.
+- An ambiguous name lookup returns every candidate, narrowed by region and tags; the extension
+  shows the best state.
+- Fix inboxes that igir empties, zips that hold extra files beside a ROM, and a slow title-tag
+  match. The Internet Archive search link is removed.
+
 ## 0.2.0
 
 - Install from PyPI: `uv tool install romledger` or `pipx install romledger`.
