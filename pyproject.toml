@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "romledger"
-version = "0.3.2"
+version = "0.4.0"
 description = "Track which retro games you have and which are missing, verified against No-Intro and Redump DATs."
 readme = "README.md"
 requires-python = ">=3.11"
