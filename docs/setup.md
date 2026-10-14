@@ -236,7 +236,7 @@ Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors ar
 
 | Request | Meaning |
 | --- | --- |
-| `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan). |
+| `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom` and `archive_item`: the platform's code on each site, or null). |
 | `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing games with `links.vimm` and `links.archive`. |
 | `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
 | `GET /api/lookup?name=<game>&platform=<slug>` | Match by name: exact, else by title ignoring tags (`exact` is false); `matches` is empty when several games fit. |

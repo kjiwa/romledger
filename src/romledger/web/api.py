@@ -24,7 +24,7 @@ def known_platform(context: Context, slug: str) -> None:
 
 @router.get("/platforms")
 def platforms(context: Ctx, database: Database) -> list[dict[str, Any]]:
-    return [_platform(view) for view in views.platform_views(context, database)]
+    return [_platform(view, context) for view in views.platform_views(context, database)]
 
 
 @router.get("/platforms/{slug}/missing")
@@ -87,8 +87,10 @@ def import_all(context: Ctx, services: Services) -> dict[str, Any]:
     return dataclasses.asdict(actions.start_import(context, services))
 
 
-def _platform(view: views.PlatformView) -> dict[str, Any]:
+def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
     counts = view.counts
+    registered = context.platforms.get(view.slug)
+    configured = context.config.platforms[view.slug]
     return {
         "slug": view.slug,
         "name": view.name,
@@ -99,4 +101,9 @@ def _platform(view: views.PlatformView) -> dict[str, Any]:
         "missing": counts.missing if counts else None,
         "unmatched": counts.unmatched if counts else None,
         "percent": view.percent,
+        "sites": {
+            "vimm": registered.vimm if registered else None,
+            "coolrom": configured.coolrom,
+            "archive_item": configured.archive_item,
+        },
     }

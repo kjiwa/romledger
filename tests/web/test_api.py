@@ -18,6 +18,7 @@ def test_platforms_before_and_after_a_scan(env: Env) -> None:
     after = env.client.get("/api/platforms").json()[0]
     assert (after["have"], after["inbox"], after["missing"], after["wanted"]) == (1, 1, 1, 3)
     assert after["percent"] == 33
+    assert after["sites"] == {"vimm": "NES", "coolrom": None, "archive_item": None}
 
 
 def test_missing_lists_games_with_links(env: Env) -> None:
