@@ -10,6 +10,10 @@ from romledger import canary, dats, http, igir, registry
 
 VIMM_LIST = "vimm.net/vault/?p=list&system=NES&section=x"
 COOLROM_SECTION = "coolrom.com/roms/atari7800/x/"
+CONSOLEROMS_LISTING = "www.consoleroms.com/roms/atari-7800"
+CONSOLEROMS_DOWNLOAD = "www.consoleroms.com/roms/atari-7800/pole-position-2/download"
+CONSOLEROMS_SITEMAP = "www.consoleroms.com/sitemaps/consoles.xml"
+EMULAND_INDEX = "www.emu-land.net/en"
 ARCHIVE_METADATA = "archive.org/metadata/No-Intro_NES"
 IGIR_RELEASE = "api.github.com/repos/emmercm/igir/releases/latest"
 Page = httpx.Response | Callable[[], httpx.Response]
@@ -32,6 +36,20 @@ class World:
             "vimm.net/robots.txt": httpx.Response(200, text=""),
             "vimm.net/vault/": html((fixtures / "vimm" / "vault.html").read_text()),
             VIMM_LIST: html((fixtures / "vimm" / "list.html").read_text()),
+            "www.consoleroms.com/robots.txt": httpx.Response(
+                200, text="User-agent: *\nDisallow:\n"
+            ),
+            CONSOLEROMS_SITEMAP: httpx.Response(
+                200,
+                text=(fixtures / "consoleroms" / "consoles.xml").read_text(),
+                headers={"Content-Type": "application/xml"},
+            ),
+            CONSOLEROMS_LISTING: html((fixtures / "consoleroms" / "listing.html").read_text()),
+            CONSOLEROMS_DOWNLOAD: html((fixtures / "consoleroms" / "download.html").read_text()),
+            "www.emu-land.net/robots.txt": httpx.Response(
+                200, text="User-agent: *\nDisallow: /*act=getmfl\nCrawl-delay: 2\n"
+            ),
+            EMULAND_INDEX: html((fixtures / "emuland" / "index.html").read_text()),
             "archive.org/robots.txt": httpx.Response(
                 200, text="User-agent: *\nDisallow: /control/\n"
             ),
@@ -167,6 +185,146 @@ def test_coolrom_download_contract(world: World, fake_throttle: FakeThrottle) ->
     assert "no download link" in report.findings[0].detail
 
 
+def test_consoleroms_requests_never_touch_the_download_host(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.run(fake_throttle)
+    hosts = {key.split("/", 1)[0] for key in world.requested()}
+    assert "downloads.consoleroms.com" not in hosts
+    assert world.requested().count(CONSOLEROMS_DOWNLOAD) == 1
+
+
+def test_consoleroms_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
+    sitemap = world.pages[CONSOLEROMS_SITEMAP]
+    assert isinstance(sitemap, httpx.Response)
+    world.pages[CONSOLEROMS_SITEMAP] = httpx.Response(
+        200, text=sitemap.text.replace("/roms/snes<", "/other/snes<")
+    )
+    report = world.run(fake_throttle)
+    assert keys(report) == ["consoleroms:missing-platform:snes"]
+
+
+def test_consoleroms_empty_platform_list_is_page_drift(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages[CONSOLEROMS_SITEMAP] = httpx.Response(200, text="<urlset></urlset>")
+    report = world.run(fake_throttle)
+    assert keys(report) == ["consoleroms:contract:platform-links"]
+    assert report.inconclusive == []
+
+
+def test_consoleroms_new_platform_proposes_a_registry_line(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    sitemap = world.pages[CONSOLEROMS_SITEMAP]
+    assert isinstance(sitemap, httpx.Response)
+    world.pages[CONSOLEROMS_SITEMAP] = httpx.Response(
+        200,
+        text=sitemap.text.replace(
+            "</urlset>", "<url><loc>https://www.consoleroms.com/roms/vic-20</loc></url></urlset>"
+        ),
+    )
+    report = world.run(fake_throttle)
+    assert keys(report) == ["consoleroms:new-platform:vic-20"]
+    assert 'consoleroms = "vic-20"' in report.findings[0].detail
+
+
+def test_consoleroms_ignored_codes_are_in_the_sitemap(world: World) -> None:
+    sitemap = world.pages[CONSOLEROMS_SITEMAP]
+    assert isinstance(sitemap, httpx.Response)
+    for code in registry.ignored()["consoleroms"]:
+        assert f"/roms/{code}<" in sitemap.text
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        html("<html><body>moved</body></html>"),
+        httpx.Response(404),
+    ],
+    ids=["no-rows", "not-found"],
+)
+def test_consoleroms_listing_contract(
+    world: World, fake_throttle: FakeThrottle, page: httpx.Response
+) -> None:
+    world.pages[CONSOLEROMS_LISTING] = page
+    report = world.run(fake_throttle)
+    assert keys(report) == ["consoleroms:contract:listing"]
+    assert "/roms/atari-7800" in report.findings[0].detail
+    assert CONSOLEROMS_DOWNLOAD not in world.requested()
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        html("<html>no link</html>"),
+        html('<a href="https://downloads.consoleroms.com/roms/x.exe">click here</a>'),
+    ],
+    ids=["no-link", "wrong-suffix"],
+)
+def test_consoleroms_download_contract(
+    world: World, fake_throttle: FakeThrottle, page: httpx.Response
+) -> None:
+    world.pages[CONSOLEROMS_DOWNLOAD] = page
+    report = world.run(fake_throttle)
+    assert keys(report) == ["consoleroms:contract:download-link"]
+
+
+def test_emuland_requests_keep_the_crawl_delay(world: World, fake_throttle: FakeThrottle) -> None:
+    client = httpx.Client(transport=httpx.MockTransport(world.handle))
+    throttle, sleeps = fake_throttle(1.0)
+    canary.run(client, throttle, registry.load(), registry.ignored())
+    assert 2.0 in sleeps
+
+
+def test_emuland_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
+    index = world.pages[EMULAND_INDEX]
+    assert isinstance(index, httpx.Response)
+    world.pages[EMULAND_INDEX] = html(index.text.replace("/en/consoles/snes", "/en/x"))
+    report = world.run(fake_throttle)
+    assert keys(report) == ["emuland:missing-platform:consoles/snes"]
+
+
+def test_emuland_empty_platform_index_is_page_drift(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    world.pages[EMULAND_INDEX] = html("<html>moved</html>")
+    report = world.run(fake_throttle)
+    assert keys(report) == ["emuland:contract:platform-links"]
+    assert report.inconclusive == []
+
+
+def test_emuland_new_platform_proposes_a_registry_line(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    index = world.pages[EMULAND_INDEX]
+    assert isinstance(index, httpx.Response)
+    world.pages[EMULAND_INDEX] = html(
+        index.text.replace("</body>", '<a href="/en/consoles/odyssey2">x</a></body>')
+    )
+    report = world.run(fake_throttle)
+    assert keys(report) == ["emuland:new-platform:consoles/odyssey2"]
+    assert 'emuland = "consoles/odyssey2"' in report.findings[0].detail
+
+
+def test_emuland_links_outside_the_platform_groups_are_not_platforms(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    index = world.pages[EMULAND_INDEX]
+    assert isinstance(index, httpx.Response)
+    world.pages[EMULAND_INDEX] = html(
+        index.text.replace("</body>", '<a href="/en/news/today">x</a></body>')
+    )
+    assert world.run(fake_throttle) == canary.Report([], [], [])
+
+
+def test_emuland_ignored_codes_are_in_the_index(world: World) -> None:
+    index = world.pages[EMULAND_INDEX]
+    assert isinstance(index, httpx.Response)
+    for code in registry.ignored()["emuland"]:
+        assert f'href="/en/{code}"' in index.text
+
+
 def test_vimm_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
     page = world.pages["vimm.net/vault/"]
     assert isinstance(page, httpx.Response)
@@ -286,11 +444,19 @@ CHALLENGE = html("<html><title>Just a moment...</title></html>")
 SITES = {
     "coolrom": "coolrom.com/roms/",
     "vimm": "vimm.net/vault/",
+    "consoleroms": CONSOLEROMS_SITEMAP,
+    "emuland": EMULAND_INDEX,
     "archive": ARCHIVE_METADATA,
 }
 
 
-GROUPS = {"coolrom": "coolrom", "vimm": "vimm", "archive": "internet-archive"}
+GROUPS = {
+    "coolrom": "coolrom",
+    "vimm": "vimm",
+    "consoleroms": "consoleroms",
+    "emuland": "emuland",
+    "archive": "internet-archive",
+}
 
 
 @pytest.mark.parametrize("site", SITES)

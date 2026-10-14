@@ -4,7 +4,7 @@ from importlib.resources import files
 
 DAT_SETS = ("no-intro", "redump")
 IGNORE_TABLE = "ignore"
-SITES = ("vimm", "coolrom")
+SITES = ("vimm", "coolrom", "consoleroms", "emuland")
 
 
 @dataclass(frozen=True)
@@ -13,6 +13,8 @@ class Entry:
     dat: str
     vimm: str | None = None
     coolrom: str | None = None
+    consoleroms: str | None = None
+    emuland: str | None = None
 
 
 def load() -> dict[str, Entry]:
@@ -45,13 +47,13 @@ def _codes(site: str, value: object) -> frozenset[str]:
 def _entry(slug: str, raw: object) -> Entry:
     if not isinstance(raw, dict):
         raise ValueError(f"platforms.toml: {slug} must be a table")
-    unknown = set(raw) - {"dat", "vimm", "coolrom"}
+    unknown = set(raw) - {"dat", *SITES}
     if unknown:
         raise ValueError(f"platforms.toml: {slug}: unknown keys {sorted(unknown)}")
     dat = raw.get("dat")
     if not isinstance(dat, str) or dat.split("/", 1)[0] not in DAT_SETS:
         raise ValueError(f"platforms.toml: {slug}: dat must be '<{'|'.join(DAT_SETS)}>/<name>'")
-    return Entry(slug, dat, _optional(slug, raw, "vimm"), _optional(slug, raw, "coolrom"))
+    return Entry(slug, dat, *(_optional(slug, raw, site) for site in SITES))
 
 
 def _optional(slug: str, raw: dict[str, object], key: str) -> str | None:

@@ -358,16 +358,19 @@ def test_sources_default_to_none(tmp_path: Path) -> None:
     assert platform.sources == ()
     assert platform.archive_item is None
     assert platform.coolrom is None
+    assert platform.consoleroms == "nes"
 
 
 def test_sources_parsed(tmp_path: Path) -> None:
     text = valid_text(tmp_path).replace("platforms.nes", "platforms.atari7800").splitlines()
     text = [line for line in text if not line.startswith("dat")]
-    text.extend(['sources = ["coolrom", "internet-archive", "coolrom"]', 'archive_item = "x"'])
+    sources = '["coolrom", "consoleroms", "internet-archive", "coolrom"]'
+    text.extend([f"sources = {sources}", 'archive_item = "x"'])
     platform = load(write(tmp_path, "\n".join(text))).platforms["atari7800"]
-    assert platform.sources == ("coolrom", "internet-archive")
+    assert platform.sources == ("coolrom", "consoleroms", "internet-archive")
     assert platform.archive_item == "x"
     assert platform.coolrom == "atari7800"
+    assert platform.consoleroms == "atari-7800"
 
 
 def test_unknown_source(tmp_path: Path) -> None:
@@ -389,12 +392,23 @@ def test_archive_item_without_internet_archive_is_kept(tmp_path: Path) -> None:
     assert load(write(tmp_path, text)).platforms["nes"].archive_item == "x"
 
 
-@pytest.mark.parametrize("slug", ["nes", "custom"])
-def test_coolrom_requires_a_registry_code(tmp_path: Path, slug: str) -> None:
+@pytest.mark.parametrize(
+    ("slug", "source", "label"),
+    [
+        ("nes", "coolrom", "CoolROM"),
+        ("custom", "coolrom", "CoolROM"),
+        ("wiiu", "consoleroms", "ConsoleRoms"),
+        ("custom", "consoleroms", "ConsoleRoms"),
+    ],
+)
+def test_site_source_requires_a_registry_code(
+    tmp_path: Path, slug: str, source: str, label: str
+) -> None:
     text = valid_text(tmp_path).replace("[platforms.nes]", f"[platforms.{slug}]")
     text = text.replace("no-intro/Nintendo - Nintendo Entertainment System", "no-intro/Custom")
-    with pytest.raises(config.ConfigError, match=rf"platforms\.{slug}\.sources lists coolrom"):
-        load(write(tmp_path, text + 'sources = ["coolrom"]\n'))
+    match = rf"platforms\.{slug}\.sources lists {source} but {label} has no system"
+    with pytest.raises(config.ConfigError, match=match):
+        load(write(tmp_path, text + f'sources = ["{source}"]\n'))
 
 
 def test_no_network_by_default(tmp_path: Path) -> None:

@@ -160,7 +160,7 @@ would disagree. Fix: set it to a full path.
 
 ## `<platform> has no sources configured; set platforms.<platform>.sources`
 
-Cause: `fetch` ran for a platform with no `sources`. Fix: add `sources = ["coolrom"]` and/or
+Cause: `fetch` ran for a platform with no `sources`. Fix: add `sources = ["consoleroms"]`, `["coolrom"]` and/or
 `["internet-archive"]` to `[platforms.<platform>]`; see [sources.md](sources.md).
 
 ## `<platform> does not list source 'X'. Configured sources: ...`
@@ -170,7 +170,7 @@ add X to `platforms.<platform>.sources`.
 
 ## `platforms.X.sources has unknown source 'Y'`
 
-Cause: typo or an unsupported source. Fix: use `coolrom` or `internet-archive`.
+Cause: typo or an unsupported source. Fix: use `consoleroms`, `coolrom` or `internet-archive`.
 
 ## `missing platforms.X.archive_item`
 
@@ -181,6 +181,11 @@ Archive item that holds the platform's `<game name>.zip` files.
 
 Cause: CoolROM does not carry the platform (no Nintendo systems), or a custom platform has no
 CoolROM code. Fix: remove `coolrom` from the list.
+
+## `platforms.X.sources lists consoleroms but ConsoleRoms has no system for 'X'`
+
+Cause: ConsoleRoms does not carry the platform, or a custom platform has no ConsoleRoms code. Fix:
+remove `consoleroms` from the list.
 
 ## `network.proxy ... must be <scheme>://[user@]host[:port]`
 
@@ -230,6 +235,10 @@ the run and does not count it as a failure. Fix: honor it, and download by hand.
 
 Cause: several CoolROM rows fit the game and none is the DAT game's region. Fix: download that
 game by hand.
+
+## `warning: ambiguous: <game> matches N ConsoleRoms rows; skipped`
+
+Cause: several ConsoleRoms rows fit the game's title. Fix: download that game by hand.
 
 ## `warning: skipping <source>: ...`
 
@@ -284,5 +293,5 @@ above.
 
 ## `... page layout not recognized: ...`
 
-Shown in the extension popup. Cause: Vimm's Lair or CoolROM changed its markup, so the extension
+Shown in the extension popup. Cause: Vimm's Lair, CoolROM, ConsoleRoms or emu-land changed its markup, so the extension
 found no game data or links. Fix: report it.

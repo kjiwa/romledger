@@ -29,6 +29,21 @@ systems; listing `coolrom` for a platform it does not carry is an error.
   holds it, so romledger asks for the link immediately before each download.
 - Crawl it only with the site's permission; see the top of this page.
 
+## ConsoleRoms
+
+Source name `consoleroms`, hosts `www.consoleroms.com` and `downloads.consoleroms.com`. Carries
+about thirty of the registry's platforms, Nintendo systems included; listing `consoleroms` for a
+platform it does not carry is an error.
+
+- Games are matched by title with tags and punctuation ignored. Only a unique match is used; an
+  ambiguous title is skipped with a warning, and you download it by hand.
+- Listings show no region, so a download may be another region's dump or one the DAT does not
+  list; either way `import` sets it aside and `fetch` skips that title next time.
+- Downloads are zip or 7z files. ConsoleRoms publishes no hashes.
+- It follows `robots.txt`, which allows crawling, and honours any crawl delay it sets. It keeps at
+  least 1 second between requests.
+- Crawl it only if the site's terms and permission allow; see the top of this page.
+
 ## Internet Archive
 
 Source name `internet-archive`, host `archive.org`, through its public metadata and download
@@ -53,6 +68,14 @@ the challenge:
 Partial browser downloads are skipped until finished. For GameCube, pick the default ISO; the
 other formats do not match the Redump DAT.
 
+## emu-land.net
+
+Manual. Its downloads go through endpoints that its `robots.txt` disallows, so romledger never
+fetches from it.
+
+- `romledger missing PLATFORM --links` and the dashboard print a search link per game.
+- The [browser extension](extension.md) marks games in your library on its pages.
+
 ## Not supported yet
 
 None of these has been evaluated against the rule above, so nothing is claimed about their terms.
@@ -61,6 +84,4 @@ Check a site's robots.txt and terms before adding it.
 - Minerva Archive (unverified)
 - CDRomance (unverified)
 - EdgeEmu (unverified)
-- emu-land.net (unevaluated)
-- consoleroms.com (unevaluated)
 - romulation.org (unevaluated)

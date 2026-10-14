@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
-from romledger import igir, links, state
+from romledger import igir, links, registry, state
 from romledger.context import Context
 
 PAGE_SIZE = 200
@@ -38,6 +38,7 @@ class Game:
     name: str
     state: str
     vimm: str | None
+    emuland: str | None
 
 
 @dataclass(frozen=True)
@@ -71,9 +72,9 @@ def platform_views(context: Context, database: state.State) -> list[PlatformView
     ]
 
 
-def vimm_code(context: Context, slug: str) -> str | None:
+def site_code(context: Context, slug: str, site: str) -> str | None:
     registered = context.platforms.get(slug)
-    return registered.vimm if registered else None
+    return getattr(registered, site) if registered else None
 
 
 def platform_view(context: Context, database: state.State, slug: str) -> PlatformView:
@@ -90,14 +91,16 @@ def games_page(
     limit: int = PAGE_SIZE,
 ) -> Page:
     items, total = database.entries(slug, states, query, limit, offset)
-    vimm = vimm_code(context, slug)
-    return Page([_game(item, vimm) for item in items], total, offset, limit)
+    entry = context.platforms.get(slug)
+    return Page([_game(item, entry) for item in items], total, offset, limit)
 
 
-def _game(item: state.Item, vimm: str | None) -> Game:
-    if item.state != "missing":
-        return Game(item.game, item.state, None)
-    return Game(item.game, item.state, links.vimm_search(vimm, item.game) if vimm else None)
+def _game(item: state.Item, entry: registry.Entry | None) -> Game:
+    if item.state != "missing" or entry is None:
+        return Game(item.game, item.state, None, None)
+    vimm = links.vimm_search(entry.vimm, item.game) if entry.vimm else None
+    emuland = links.emuland_search(item.game) if entry.emuland else None
+    return Game(item.game, item.state, vimm, emuland)
 
 
 def page_url(path: str, params: dict[str, str | int], offset: int) -> str:

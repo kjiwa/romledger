@@ -1,6 +1,6 @@
 # Browser extension
 
-The extension marks games on Vimm's Lair, CoolROM and the Internet Archive as in your library, in
+The extension marks games on Vimm's Lair, CoolROM, ConsoleRoms, emu-land and the Internet Archive as in your library, in
 your inbox, missing or not wanted, so you can browse and pick what to download. It never clicks or
 downloads anything; the one option that touches downloads is off until you turn it on (see
 [Save Vimm's Lair downloads](#save-vimms-lair-downloads-to-a-folder)).
@@ -53,6 +53,8 @@ there.
 | Vimm's Lair | A game (`/vault/<id>`) | A box with the state of each disc or file, matched by SHA-1 and then by title. |
 | Vimm's Lair | A platform list | A badge after every game, matched by title. |
 | CoolROM | A game or a platform listing | A badge by title. |
+| ConsoleRoms | A game or a platform listing | A badge by title. |
+| emu-land | A game or a platform listing | A badge by title. |
 | Internet Archive | An item that you set as a platform's `archive_item` | The platform's progress. |
 
 | Badge | Meaning |

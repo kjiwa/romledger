@@ -21,7 +21,7 @@ LANGUAGES = [
     *("JA", "KO", "NL", "NO", "PT", "RU", "SV", "ZH"),
 ]
 
-SOURCES = ("coolrom", "internet-archive")
+SOURCES = ("consoleroms", "coolrom", "internet-archive")
 
 
 class ConfigError(Exception):
@@ -43,6 +43,7 @@ class Platform:
     sources: tuple[str, ...] = ()
     archive_item: str | None = None
     coolrom: str | None = None
+    consoleroms: str | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +207,7 @@ def _parse_platform(
     )
     defaults = Platform(dat="")
     sources = _sources(path, raw, key)
+    entry = platforms_registry.get(slug, registry.Entry(slug, ""))
     return Platform(
         dat=_dat(path, slug, raw, platforms_registry),
         regions=_codes(path, raw, f"{key}.regions", "regions", defaults.regions, REGIONS),
@@ -213,7 +215,10 @@ def _parse_platform(
         include=_include(path, raw, key),
         sources=sources,
         archive_item=_archive_item(path, raw, key, sources),
-        coolrom=_coolrom_code(path, slug, key, sources, platforms_registry),
+        coolrom=_site_code(path, slug, key, sources, entry.coolrom, "coolrom", "CoolROM"),
+        consoleroms=_site_code(
+            path, slug, key, sources, entry.consoleroms, "consoleroms", "ConsoleRoms"
+        ),
     )
 
 
@@ -246,19 +251,19 @@ def _archive_item(
     return None
 
 
-def _coolrom_code(
+def _site_code(
     path: Path,
     slug: str,
     key: str,
     sources: tuple[str, ...],
-    platforms_registry: Mapping[str, registry.Entry],
+    code: str | None,
+    source: str,
+    label: str,
 ) -> str | None:
-    entry = platforms_registry.get(slug)
-    code = entry.coolrom if entry else None
-    if "coolrom" in sources and code is None:
+    if source in sources and code is None:
         raise ConfigError(
-            f"{path}: {key}.sources lists coolrom but CoolROM has no system for {slug!r}. "
-            "Remove coolrom from the list."
+            f"{path}: {key}.sources lists {source} but {label} has no system for {slug!r}. "
+            f"Remove {source} from the list."
         )
     return code
 

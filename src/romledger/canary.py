@@ -6,7 +6,7 @@ from functools import partial
 import httpx
 
 from romledger import dats, http, igir, registry
-from romledger.sources import coolrom, internet_archive
+from romledger.sources import consoleroms, coolrom, internet_archive
 from romledger.sources.base import Site
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
@@ -14,11 +14,20 @@ COOLROM_PLATFORM = "atari7800"
 VIMM_URL = "https://vimm.net"
 VIMM_HOSTS = ("vimm.net",)
 VIMM_SYSTEM = "NES"
+EMULAND_URL = "https://www.emu-land.net"
+EMULAND_HOSTS = ("www.emu-land.net",)
+CONSOLEROMS_PLATFORM = "atari-7800"
 ARCHIVE_ITEM = "No-Intro_NES"
 IGIR_RELEASE_URL = "https://api.github.com/repos/emmercm/igir/releases/latest"
 COOLROM_PLATFORM_LINK = re.compile(r'href="/roms/([a-z0-9]+)/"')
 VIMM_PLATFORM_LINK = re.compile(r'href="/vault/([A-Za-z0-9-]+)"')
 VIMM_ROW_LINK = re.compile(r'href="/vault/\d+"')
+CONSOLEROMS_PLATFORM_LINK = re.compile(
+    r"<loc>https://www\.consoleroms\.com/roms/([a-z0-9-]+)</loc>"
+)
+EMULAND_PLATFORM_LINK = re.compile(
+    r'href="/en/((?:consoles|portable|computers|arcade)/[A-Za-z0-9_-]+)/?"'
+)
 CHALLENGE_MARKERS = ("just a moment", "checking if you are human")
 
 
@@ -69,6 +78,11 @@ def run(
         [
             _run_steps("coolrom", _coolrom_steps(client, throttle, entries, ignored["coolrom"])),
             _run_steps("vimm", _vimm_steps(client, throttle, entries, ignored["vimm"])),
+            _run_steps(
+                "consoleroms",
+                _consoleroms_steps(client, throttle, entries, ignored["consoleroms"]),
+            ),
+            _run_steps("emuland", _emuland_steps(client, throttle, entries, ignored["emuland"])),
             _run_steps("internet-archive", _archive_steps(client, throttle)),
             _run_steps("dat", _dat_steps(client, throttle, entries)),
             _run_steps("igir", _igir_steps(client, throttle, pinned_igir, token)),
@@ -205,6 +219,86 @@ def _vimm_list(site: Site) -> list[Finding]:
     if not VIMM_ROW_LINK.search(_page(site, url).text):
         raise Drift(f"{url}: no game row links found")
     return []
+
+
+def _consoleroms_steps(
+    client: httpx.Client,
+    throttle: http.Throttle,
+    entries: Mapping[str, registry.Entry],
+    ignored: frozenset[str],
+) -> list[Step]:
+    site = Site(consoleroms.BASE_URL, consoleroms.HOSTS, consoleroms.MIN_GAP, client, throttle)
+    first_rows: list[consoleroms.Row] = []
+    return [
+        _step(
+            (
+                "consoleroms:contract:platform-links",
+                "consoleroms:missing-platform",
+                "consoleroms:new-platform",
+            ),
+            "ConsoleRoms platform list changed",
+            partial(_consoleroms_platforms, site, entries, ignored),
+        ),
+        _step(
+            ("consoleroms:contract:listing",),
+            "ConsoleRoms listing page changed",
+            partial(_consoleroms_listing, site, first_rows),
+        ),
+        _step(
+            ("consoleroms:contract:download-link",),
+            "ConsoleRoms download page changed",
+            partial(_consoleroms_download, site, first_rows),
+        ),
+    ]
+
+
+def _consoleroms_platforms(
+    site: Site, entries: Mapping[str, registry.Entry], ignored: frozenset[str]
+) -> list[Finding]:
+    url = f"{consoleroms.BASE_URL}/sitemaps/consoles.xml"
+    found = set(CONSOLEROMS_PLATFORM_LINK.findall(_page(site, url).text))
+    mapped = {entry.consoleroms for entry in entries.values() if entry.consoleroms}
+    return _platform_findings("consoleroms", url, found, mapped, ignored)
+
+
+def _consoleroms_listing(site: Site, first_rows: list[consoleroms.Row]) -> list[Finding]:
+    url = f"{consoleroms.BASE_URL}/roms/{CONSOLEROMS_PLATFORM}"
+    rows, _ = consoleroms.parse_listing(_page(site, url).text, CONSOLEROMS_PLATFORM, url)
+    first_rows.append(rows[0])
+    return []
+
+
+def _consoleroms_download(site: Site, first_rows: list[consoleroms.Row]) -> list[Finding]:
+    if not first_rows:
+        raise Skipped
+    url = f"{consoleroms.BASE_URL}/roms/{CONSOLEROMS_PLATFORM}/{first_rows[0].slug}/download"
+    consoleroms.parse_download_link(_page(site, url).text, url)
+    return []
+
+
+def _emuland_steps(
+    client: httpx.Client,
+    throttle: http.Throttle,
+    entries: Mapping[str, registry.Entry],
+    ignored: frozenset[str],
+) -> list[Step]:
+    site = Site(EMULAND_URL, EMULAND_HOSTS, http.DEFAULT_GAP, client, throttle)
+    return [
+        _step(
+            ("emuland:contract:platform-links", "emuland:missing-platform", "emuland:new-platform"),
+            "emu-land platform list changed",
+            partial(_emuland_platforms, site, entries, ignored),
+        )
+    ]
+
+
+def _emuland_platforms(
+    site: Site, entries: Mapping[str, registry.Entry], ignored: frozenset[str]
+) -> list[Finding]:
+    url = f"{EMULAND_URL}/en"
+    found = set(EMULAND_PLATFORM_LINK.findall(_page(site, url).text))
+    mapped = {entry.emuland for entry in entries.values() if entry.emuland}
+    return _platform_findings("emuland", url, found, mapped, ignored)
 
 
 def _platform_findings(

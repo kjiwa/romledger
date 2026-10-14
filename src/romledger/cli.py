@@ -95,7 +95,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     missing = commands.add_parser("missing", help="list the games a platform is missing")
     missing.add_argument("platform", metavar="PLATFORM")
-    missing.add_argument("--links", action="store_true", help="append a Vimm's Lair search URL")
+    missing.add_argument(
+        "--links",
+        action="store_true",
+        help="append Vimm's Lair and emu-land search URLs, tab-separated",
+    )
     serve_parser = commands.add_parser("serve", help="run the local dashboard and API")
     serve_parser.add_argument(
         "--host", default=DEFAULT_HOST, help=f"address to bind (default: {DEFAULT_HOST})"
@@ -266,11 +270,17 @@ def show_missing(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     (slug,) = selected(context, [args.platform])
     games = scan.missing_games(context.data_dir, slug)
-    vimm = context.platforms[slug].vimm if slug in context.platforms else None
+    entry = context.platforms.get(slug)
     for game in games:
-        link = links.vimm_search(vimm, game) if args.links and vimm else None
-        print(f"{game}\t{link}" if link else game)
+        found = _search_links(entry, game) if args.links and entry else ()
+        print("\t".join((game, *found)) if any(found) else game)
     return 0
+
+
+def _search_links(entry: registry.Entry, game: str) -> tuple[str, str]:
+    vimm = links.vimm_search(entry.vimm, game) if entry.vimm else None
+    emuland = links.emuland_search(game) if entry.emuland else None
+    return vimm or "", emuland or ""
 
 
 def index_dats(args: argparse.Namespace) -> int:

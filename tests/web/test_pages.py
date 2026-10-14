@@ -28,6 +28,7 @@ def test_platform_page_filters_and_links(env: Env) -> None:
     assert "Beta (USA)" in missing.text
     assert "Alpha (USA)" not in missing.text
     assert "https://vimm.net/vault/" in missing.text
+    assert "https://www.emu-land.net/en/search_games?q=Beta" in missing.text
     assert "archive.org" not in missing.text
     have = env.client.get("/platforms/nes?state=have")
     assert "Alpha (USA)" in have.text
