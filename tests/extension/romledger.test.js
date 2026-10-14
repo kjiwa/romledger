@@ -112,3 +112,32 @@ test("progress words a scanned and an unscanned platform", () => {
     "96 of 180 wanted games (53%)",
   );
 });
+
+test("isVimmDownload matches only Vimm download hosts", () => {
+  const yes = (item) => assert.equal(romledger.isVimmDownload(item), true);
+  const no = (item) => assert.equal(romledger.isVimmDownload(item), false);
+  yes({ url: "https://dl3.vimm.net/", finalUrl: "" });
+  yes({ url: "https://example.com/redirect", finalUrl: "https://DL2.vimm.net/x" });
+  yes({ url: "https://dl3.vimm.net/", finalUrl: "https://cdn.example.com/x" });
+  no({ url: "https://vimm.net/vault/77", finalUrl: "https://vimm.net/vault/77" });
+  no({ url: "https://evil-vimm.net/", finalUrl: "https://dl3.vimm.net.evil.com/" });
+  no({ url: "https://example.com/vimm.net", finalUrl: "" });
+  no({ url: "not a url" });
+  no({});
+});
+
+test("downloadTarget keeps the file name and drops anything that could escape the folder", () => {
+  const target = (filename) => romledger.downloadTarget({ filename });
+  assert.equal(target("/home/user/Downloads/Game (USA).zip"), "romledger/Game (USA).zip");
+  assert.equal(target("C:\\Users\\me\\Downloads\\Game.zip"), "romledger/Game.zip");
+  assert.equal(target("../../etc/passwd"), "romledger/passwd");
+  assert.equal(target("..hidden..zip"), "romledger/hidden..zip");
+  assert.equal(target("Game v1..2.zip"), "romledger/Game v1..2.zip");
+  assert.equal(target("."), null);
+  assert.equal(target(".bashrc"), "romledger/bashrc");
+  assert.equal(target("a\u0000b.zip"), "romledger/ab.zip");
+  assert.equal(target(""), null);
+  assert.equal(target(".."), null);
+  assert.equal(target("dir/"), null);
+  assert.equal(romledger.downloadTarget({}), null);
+});

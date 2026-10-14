@@ -24,6 +24,7 @@ class Services:
     token: str
     tools: Tools = field(default_factory=Tools)
     jobs: Jobs = field(default_factory=Jobs)
+    auto_import: bool = False
 
 
 def services(request: Request) -> Services:

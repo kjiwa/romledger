@@ -1,6 +1,11 @@
 "use strict";
 
+if (typeof importScripts === "function") {
+  importScripts("lib/romledger.js");
+}
+
 const api = globalThis.browser ?? globalThis.chrome;
+const ROUTE_KEY = "routeDownloads";
 const NOT_CONFIGURED = "Open the romledger options and enter the service URL and token.";
 
 async function settings() {
@@ -53,3 +58,36 @@ api.runtime.onMessage.addListener((message, _sender, respond) => {
   route(message).then(respond);
   return true;
 });
+
+async function routeTarget(item) {
+  const stored = await api.storage.local.get(ROUTE_KEY);
+  return stored[ROUTE_KEY] === true ? romledger.downloadTarget(item) : null;
+}
+
+function onDeterminingFilename(item, suggest) {
+  if (!romledger.isVimmDownload(item)) {
+    suggest();
+    return;
+  }
+  routeTarget(item).then((filename) => {
+    if (filename === null) {
+      suggest();
+    } else {
+      suggest({ filename, conflictAction: "uniquify" });
+    }
+  }, () => suggest());
+  return true;
+}
+
+let listening = false;
+
+function listenForDownloads() {
+  const downloads = globalThis.chrome?.downloads;
+  if (!listening && downloads?.onDeterminingFilename) {
+    downloads.onDeterminingFilename.addListener(onDeterminingFilename);
+    listening = true;
+  }
+}
+
+listenForDownloads();
+api.permissions.onAdded.addListener(listenForDownloads);

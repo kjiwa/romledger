@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
@@ -9,7 +11,7 @@ from starlette.exceptions import HTTPException
 
 from romledger import igir, importer
 from romledger.config import ConfigError
-from romledger.web import api, deps, pages, render, upload
+from romledger.web import api, deps, pages, render, upload, watch
 
 CSP = (
     "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
@@ -40,17 +42,30 @@ def create_app(
     igir_report: Any = igir.report,
     igir_move: Any = igir.move,
     hook: Any = importer.run_hook,
+    auto_import: bool = False,
+    poll_seconds: float = watch.POLL_SECONDS,
 ) -> FastAPI:
+    services = deps.Services(
+        context_factory, token, deps.Tools(igir_report, igir_move, hook), auto_import=auto_import
+    )
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if not auto_import:
+            yield
+            return
+        async with watch.running(watch.Watcher(services, poll_seconds)):
+            yield
+
     app = FastAPI(
+        lifespan=lifespan,
         title="romledger",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
         dependencies=[Depends(deps.guard)],
     )
-    app.state.services = deps.Services(
-        context_factory, token, deps.Tools(igir_report, igir_move, hook)
-    )
+    app.state.services = services
     app.include_router(pages.router)
     app.include_router(api.router)
     app.mount("/static", StaticFiles(directory=render.STATIC_DIR), name="static")

@@ -229,12 +229,13 @@ Exit status is 0, 1 if an `after_import` hook failed (everything else still comp
 errors.
 
 Manual downloads from Vimm's Lair: download in a browser into an inbox, then run
-`romledger import`. Partial downloads are skipped until the browser renames them.
+`romledger import`, or let `serve` do it (see below). Partial downloads are skipped until the
+browser renames them.
 
 ## serve
 
 ```sh
-romledger serve [--host 127.0.0.1] [--port 8730] [--open]
+romledger serve [--host 127.0.0.1] [--port 8730] [--open] [--no-auto-import]
 ```
 
 Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the link in your
@@ -248,7 +249,15 @@ loads from a CDN.
 - Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
   there, and the counts set aside by `import` (unmatched, unwanted, duplicates). Press Import to
   file them.
-- Activity: scans and imports started from the dashboard, with their output. One runs at a time.
+- Activity: scans and imports, with their output. One runs at a time.
+
+While `serve` runs it also imports on its own. Every 5 seconds it checks all inboxes, skipping
+`unmatched`, `unwanted` and `duplicates` and files that are still downloading (`.part`,
+`.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or modification time over the last two
+checks, and no scan or import is running, it starts an import. The job shows on the Activity
+page like a manual one. If it fails, or leaves files behind, those files are not retried; add or change a file, or press
+Import, to try again. `--no-auto-import` turns this off; the Inbox and Activity pages say when it
+is on.
 
 The service reads the config file on every request, so edits and a remounted library take effect
 without a restart. Scan and import need the DATs (`romledger dats update`) and igir, as on the

@@ -14,10 +14,11 @@ Works today:
 - Show progress per platform (`romledger status`)
 - List missing games, with Vimm's Lair search links (`romledger missing nes --links`)
 - Import from the inboxes into a per-platform folder layout (`romledger import`)
-- Browse progress, missing games and the inbox, and upload files, in a local dashboard (`romledger serve`)
+- Browse progress, missing games and the inbox, and upload files, in a local dashboard that also
+  imports new inbox files by itself (`romledger serve`)
 - Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
 - Mark games as in your library or missing while you browse Vimm's Lair, CoolROM and the Internet
-  Archive (browser extension)
+  Archive, and optionally save Vimm's Lair downloads into an inbox (browser extension)
 - Check that the supported sites and the igir pin still match (`romledger canary`; runs weekly in CI)
 
 Vimm's Lair is manual; see [docs/sources.md](https://github.com/kjiwa/romledger/blob/master/docs/sources.md).

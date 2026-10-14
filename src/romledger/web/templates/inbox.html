@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>Inbox</h1>
-    <p class="lede">Files wait here until you import them into the library.</p>
+    <p class="lede">{% if auto_import %}Files are imported into the library automatically a few seconds after they stop changing.{% else %}Files wait here until you import them into the library.{% endif %}</p>
   </div>
   <form method="post" action="/import">
     <button class="button button-primary" type="submit"{% if job %} disabled{% endif %}>{{ icon("import") }}Import</button>

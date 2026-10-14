@@ -4,10 +4,11 @@
   "version": "0.2.0",
   "description": "Shows on Vimm's Lair, CoolROM and the Internet Archive which games your romledger library has or is missing.",
   "permissions": ["storage"],
+  "optional_permissions": ["downloads"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": ["lib/romledger.js", "background.js"]
   },
   "action": {
     "default_title": "romledger",

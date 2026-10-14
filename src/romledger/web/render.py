@@ -16,6 +16,7 @@ STATIC_DIR = ROOT / "static"
 def _globals(request: Request) -> dict[str, Any]:
     return {
         "job": deps.services(request).jobs.current(),
+        "auto_import": deps.services(request).auto_import,
         "version": __version__,
         "docs_url": DOCS_URL,
         "path": request.url.path,
