@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- `import` no longer fails partway when igir removes the emptied inbox the command was run from.
+  The moved ROMs are now scanned and the set-aside folders filled in.
+
 ## 0.4.0
 
 - `fetch` can download from ConsoleRoms. List `consoleroms` in a platform's `sources`; it carries

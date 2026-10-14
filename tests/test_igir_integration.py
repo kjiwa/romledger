@@ -155,6 +155,34 @@ def test_import_extracts_a_zip_with_an_extra_file_and_keeps_the_inbox(
 
 
 @needs_igir
+def test_import_survives_the_inbox_being_removed_under_the_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = tmp_path / "data"
+    monkeypatch.setenv(config.DATA_ENV, str(data))
+    dat = data / "dats" / "no-intro" / f"{NES}.dat"
+    dat.parent.mkdir(parents=True)
+    dat.write_text(dat_text(NES))
+    roms, inbox = tmp_path / "roms", tmp_path / "inbox"
+    roms.mkdir()
+    inbox.mkdir()
+    (inbox / "Alpha (USA).nes").write_bytes(GAMES["Alpha (USA)"])
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
+        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
+    )
+    monkeypatch.chdir(inbox)
+
+    assert cli.main(["--config", str(path), "import"]) == 0
+    assert "moved nes 1" in capsys.readouterr().out
+    with pytest.raises(FileNotFoundError):
+        Path.cwd()
+    assert cli.main(["--config", str(path), "status"]) == 0
+    assert capsys.readouterr().out.splitlines()[1].split()[:3] == ["nes", "2", "1"]
+
+
+@needs_igir
 def test_import_files_a_game_whose_name_repeats_in_another_dat_block(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
