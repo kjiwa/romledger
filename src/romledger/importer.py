@@ -3,7 +3,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from romledger import DOCS_URL, datindex, dats, igir, scan, state
@@ -14,6 +14,7 @@ NO_PLATFORMS = f"no platforms configured. Add a [platforms.<slug>] table; see {D
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]
 PathTest = Callable[[Path], bool]
+GameKey = tuple[str, str]
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class ImportResult:
     unwanted: list[Path]
     unmatched: list[Path]
     hook_failures: list[str]
+    extracted: list[Path] = field(default_factory=list)
 
 
 def run_hook(argv: Sequence[str]) -> int:
@@ -66,24 +68,31 @@ def _import(
         unwanted, unmatched = _leftovers(config, data_dir, igir_report, before, wanted)
         moved = _moved(config, data_dir, before, lambda _: True)
         return ImportResult(moved, [], unwanted, unmatched, [])
+    library_before = _library_games(config, subsets, cache, igir_report)
     try:
         igir_move(subsets, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
     finally:
         _restore_inboxes(inboxes)
     after = igir_report(subsets, inboxes, cache, excludes)
-    moved = _moved(config, data_dir, before, lambda path: not path.exists())
-    duplicates = _relocate(_paths(after, scan.FOUND), inboxes, igir.DUPLICATES_DIR)
+    library_after = _library_games(config, subsets, cache, igir_report)
+    duplicates, extracted = _split_found(after, library_before, library_after)
+    moved = _moved(config, data_dir, before, lambda path: not path.exists() or path in extracted)
+    duplicates = _relocate(duplicates, inboxes, igir.DUPLICATES_DIR)
+    extracted = _relocate(extracted, inboxes, igir.EXTRACTED_DIR)
     unwanted, unmatched = _leftovers(config, data_dir, igir_report, before, wanted)
     unwanted = _relocate(unwanted, inboxes, igir.UNWANTED_DIR)
     unmatched = _relocate(unmatched, inboxes, igir.UNMATCHED_DIR)
     for slug in moved:
         scan.scan_platform(config, slug, data_dir, igir_report)
-    return ImportResult(moved, duplicates, unwanted, unmatched, _run_hooks(config, moved, hook))
+    hook_failures = _run_hooks(config, moved, hook)
+    return ImportResult(moved, duplicates, unwanted, unmatched, hook_failures, extracted)
 
 
 def import_lines(result: ImportResult, *, dry_run: bool) -> list[str]:
     verb, moved_to = ("would move", "would move to") if dry_run else ("moved", "moved to")
     lines = [f"{verb} {slug} {count}" for slug, count in result.moved.items()]
+    if result.extracted:
+        lines.append(f"extracted {len(result.extracted)} ({moved_to} <inbox>/{igir.EXTRACTED_DIR})")
     if result.duplicates:
         lines.append(
             f"duplicates {len(result.duplicates)} ({moved_to} <inbox>/{igir.DUPLICATES_DIR})"
@@ -130,6 +139,34 @@ def _leftovers(
     rows = igir_report(full, inboxes, scan.cache_path(data_dir), igir.inbox_excludes(inboxes))
     unwanted = [path for path in _paths(rows, scan.FOUND) if path not in wanted]
     return unwanted, _paths(rows, scan.UNUSED)
+
+
+def _library_games(
+    config: Config, subsets: list[Path], cache: Path, igir_report: scan.IgirReport
+) -> set[GameKey]:
+    roms = config.library.roms
+    if not roms.is_dir():
+        return set()
+    rows = igir_report(subsets, [roms], cache, ())
+    return {(row.dat, row.game) for row in rows if row.status == scan.FOUND}
+
+
+def _split_found(
+    after: Sequence[igir.ReportRow], library_before: set[GameKey], library_after: set[GameKey]
+) -> tuple[list[Path], list[Path]]:
+    games: dict[Path, set[GameKey]] = {}
+    for row in after:
+        if row.status == scan.FOUND and row.path:
+            games.setdefault(Path(row.path), set()).add((row.dat, row.game))
+    duplicates, extracted = [], []
+    for path, keys in games.items():
+        if keys <= library_before:
+            duplicates.append(path)
+        elif keys <= library_after:
+            extracted.append(path)
+        else:
+            print(f"romledger: warning: {path} was not imported; left in place", file=sys.stderr)
+    return duplicates, extracted
 
 
 def _restore_inboxes(inboxes: Sequence[Path]) -> None:

@@ -249,13 +249,14 @@ def test_import_output(
 ) -> None:
     calls: list[bool] = []
     result = importer.ImportResult(
-        {"nes": 2, "snes": 1}, [Path("a")], [Path("w")], [Path("b"), Path("c")], []
+        {"nes": 2, "snes": 1}, [Path("a")], [Path("w")], [Path("b"), Path("c")], [], [Path("e")]
     )
     monkeypatch.setattr(importer, "import_inboxes", fake_import(result, calls))
     assert run(make_config(tmp_path), "import") == 0
     out = capsys.readouterr().out
     assert out == (
         "moved nes 2\nmoved snes 1\n"
+        "extracted 1 (moved to <inbox>/extracted)\n"
         "duplicates 1 (moved to <inbox>/duplicates)\n"
         "unwanted 1 (moved to <inbox>/unwanted)\n"
         "unmatched 2 (moved to <inbox>/unmatched)\n"

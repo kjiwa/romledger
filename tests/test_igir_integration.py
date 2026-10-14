@@ -123,8 +123,9 @@ def test_import_end_to_end(
 
 
 @needs_igir
-def test_import_files_a_zip_with_an_extra_file_and_keeps_the_inbox(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("inner", ["Alpha (USA).nes", "alpha.nes"])
+def test_import_extracts_a_zip_with_an_extra_file_and_keeps_the_inbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], inner: str
 ) -> None:
     data = tmp_path / "data"
     monkeypatch.setenv(config.DATA_ENV, str(data))
@@ -135,7 +136,7 @@ def test_import_files_a_zip_with_an_extra_file_and_keeps_the_inbox(
     roms.mkdir()
     inbox.mkdir()
     with zipfile.ZipFile(inbox / "download.zip", "w") as archive:
-        archive.writestr("Alpha (USA).nes", GAMES["Alpha (USA)"])
+        archive.writestr(inner, GAMES["Alpha (USA)"])
         archive.writestr("readme.txt", "downloaded from somewhere")
     path = tmp_path / "config.toml"
     path.write_text(
@@ -144,9 +145,9 @@ def test_import_files_a_zip_with_an_extra_file_and_keeps_the_inbox(
     )
 
     assert cli.main(["--config", str(path), "import"]) == 0
-    assert capsys.readouterr().out == "moved nes 1\n"
-    assert names(roms / "nes") == {"Alpha (USA).zip"}
-    assert inbox.is_dir()
+    assert capsys.readouterr().out == ("moved nes 1\nextracted 1 (moved to <inbox>/extracted)\n")
+    assert names(roms / "nes") == {"Alpha (USA).nes"}
+    assert names(inbox) == {"extracted/download.zip"}
     assert cli.main(["--config", str(path), "import"]) == 0
     assert capsys.readouterr().out == "inbox is empty\n"
     assert cli.main(["--config", str(path), "status"]) == 0

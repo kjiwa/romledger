@@ -103,12 +103,15 @@ tracks. Set `regions`, `languages` and `include` per platform (see [Config file]
 
 `import` files each inbox game that matches a wanted release into `<library.roms>/<slug>/`,
 named after its DAT entry (`<DAT game name>.<ext>`), whatever it was called before. Matching is
-by content hash, so names and folders in the inbox do not matter. A zip is filed as a zip: it is
-matched by its ROM and renamed to `<DAT game name>.zip`, and any extra files stay inside.
+by content hash, so names and folders in the inbox do not matter. A zip is matched by its ROM,
+which is extracted and filed as `<DAT game name>.<ext>`. igir keeps a zip that holds extra files,
+so the zip is set aside in `<inbox>/extracted/`.
 
 Nothing is ever deleted. Files that are not filed move into a folder inside their inbox, keeping
 their relative path:
 
+- `<inbox>/extracted/`: a file whose game was filed from it during this import, kept by igir
+  because it holds other files.
 - `<inbox>/duplicates/`: matched a wanted DAT entry the library already has.
 - `<inbox>/unwanted/`: a valid dump that is not wanted: another region or language, or a category
   you did not `include`.
@@ -161,9 +164,8 @@ wanted title (see [What counts as wanted](#what-counts-as-wanted)).
 - missing: wanted but in neither. Listed by the preferred release.
 - unmatched: library files that match no DAT entry.
 
-Files under `<inbox>/unmatched/`, `<inbox>/unwanted/` and `<inbox>/duplicates/` are ignored,
-as are AppleDouble
-(`._*`), `.DS_Store`, and partial downloads (`*.part`, `*.crdownload`, `*.download`).
+Files under `<inbox>/unmatched/`, `<inbox>/unwanted/`, `<inbox>/duplicates/` and
+`<inbox>/extracted/` are ignored, as are AppleDouble (`._*`), `.DS_Store`, and partial downloads (`*.part`, `*.crdownload`, `*.download`).
 
 ## dats index
 
@@ -227,8 +229,8 @@ Files the inbox into the library; see [Where files go](#where-files-go). Only wa
 filed. Afterwards it rescans the platforms that received files and runs `hooks.after_import`. An
 inbox that igir empties is recreated.
 
-Output lists `moved <slug> <n>`, `duplicates <n>`, `unwanted <n>` and `unmatched <n>`; an inbox
-with nothing to do prints `inbox is empty`.
+Output lists `moved <slug> <n>`, `extracted <n>`, `duplicates <n>`, `unwanted <n>` and
+`unmatched <n>`; an inbox with nothing to do prints `inbox is empty`.
 
 `--dry-run` changes nothing. It prints what would be filed and the unwanted and unmatched files.
 It cannot tell duplicates from new games, so its counts include games the library already has.
@@ -253,13 +255,13 @@ loads from a CDN.
 - Platform: missing, inbox or have games, a search box, and Vimm's Lair search links for missing
   games.
 - Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
-  there, and the counts set aside by `import` (unmatched, unwanted, duplicates). Press Import to
-  file them.
+  there, and the counts set aside by `import` (unmatched, unwanted, duplicates, extracted). Press
+  Import to file them.
 - Activity: scans and imports, with their output. One runs at a time.
 
 While `serve` runs it also imports on its own. Every 5 seconds it checks all inboxes, skipping
-`unmatched`, `unwanted` and `duplicates` and files that are still downloading (`.part`,
-`.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or modification time over the last two
+`unmatched`, `unwanted`, `duplicates` and `extracted` and files that are still downloading
+(`.part`, `.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or modification time over the last two
 checks, and no scan or import is running, it starts an import. The job shows on the Activity
 page like a manual one. If it fails, or leaves files behind, those files are not retried; add or change a file, or press
 Import, to try again. `--no-auto-import` turns this off; the Inbox and Activity pages say when it

@@ -40,6 +40,7 @@ class Env:
         path.write_text(DAT)
         self.full_dat = path
         self.reports: list[list[Row]] = []
+        self.library_reports: list[list[Row]] = []
         self.report_dats: list[list[Path]] = []
         self.subsets: list[str] = []
         self.moves: list[tuple[str, Sequence[str]]] = []
@@ -55,6 +56,8 @@ class Env:
         cache: Path,
         excludes: Sequence[str],
     ) -> list[Row]:
+        if list(inputs) == [self.roms]:
+            return self.library_reports.pop(0) if self.library_reports else []
         assert excludes == igir.inbox_excludes([self.inbox])
         self.report_dats.append(list(dat_files))
         return self.reports.pop(0)
@@ -134,6 +137,7 @@ def test_classifies_and_relocates(tmp_path: Path) -> None:
         [row("FOUND", "Alpha (USA)", files["dup"]), row("UNUSED", path=files["mystery"])],
         [row("FOUND", "Gamma (Japan)", files["japan"]), row("UNUSED", path=files["mystery"])],
     ]
+    env.library_reports = [[row("FOUND", "Alpha (USA)", "/g/A.nes")]] * 2
     result = env.run()
     assert result.moved == {"nes": 1}
     assert result.duplicates == [env.inbox / "duplicates" / "Alpha.nes"]
@@ -220,6 +224,41 @@ def test_moved_counts_files_that_left_the_inbox(tmp_path: Path) -> None:
         [row("FOUND", "A", stays)],
     ]
     assert env.run().moved == {"nes": 1}
+
+
+def test_archive_kept_by_igir_is_extracted_and_counted_as_moved(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    zipped = env.inbox / "Alpha.zip"
+    zipped.write_text("zip")
+    env.reports = [[row("FOUND", "Alpha (USA)", zipped)], [row("FOUND", "Alpha (USA)", zipped)]]
+    env.library_reports = [[], [row("FOUND", "Alpha (USA)", "/g/A.nes")]]
+    result = env.run()
+    assert result.moved == {"nes": 1}
+    assert result.extracted == [env.inbox / "extracted" / "Alpha.zip"]
+    assert result.duplicates == []
+    assert not zipped.exists()
+
+
+def test_file_igir_did_not_import_stays_put(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = Env(tmp_path)
+    stuck = env.inbox / "Alpha.zip"
+    stuck.write_text("zip")
+    env.reports = [[row("FOUND", "Alpha (USA)", stuck)], [row("FOUND", "Alpha (USA)", stuck)]]
+    result = env.run()
+    assert result.moved == {} and result.extracted == [] and result.duplicates == []
+    assert stuck.exists()
+    assert f"warning: {stuck} was not imported" in capsys.readouterr().err
+
+
+def test_library_report_is_skipped_before_the_library_exists(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    shutil.rmtree(env.roms)
+    env.library_reports = [[row("FOUND", "Alpha (USA)", "/g/A.nes")]]
+    env.reports = [[row("FOUND", "Alpha (USA)", "/gone/A")], []]
+    assert env.run().moved == {"nes": 1}
+    assert len(env.library_reports) == 1
 
 
 def test_path_outside_inbox_is_left_alone(
