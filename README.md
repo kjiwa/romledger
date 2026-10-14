@@ -23,6 +23,8 @@ Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
   <img alt="The romledger overview page: one card per platform with a progress bar and counts of games had, in the inbox, missing and unmatched." src="docs/images/overview-desktop-light.png">
 </picture>
 
+![A terminal running romledger status, which lists wanted, have, inbox, missing and unmatched counts per platform, then romledger missing snes, which lists missing games.](docs/images/demo.gif)
+
 ## How it fits
 
 - [igir](https://igir.io) matches files to DATs and moves them into place.
