@@ -59,7 +59,7 @@ def report(
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "report.csv"
         argv = _argv(["report"], dats, inputs, excludes, cache_path)
-        _run([*argv, "--report-output", str(output)], runner)
+        _run([*argv, "--report-output", str(output)], runner, cache_path.parent)
         return _parse(output)
 
 
@@ -73,12 +73,12 @@ def move(
 ) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     argv = _argv(["move", "extract"], dats, inputs, excludes, cache_path)
-    _run([*argv, "--output", output_template], runner)
+    _run([*argv, "--output", output_template], runner, cache_path.parent)
 
 
-def _run(argv: list[str], runner: Runner) -> None:
+def _run(argv: list[str], runner: Runner, cwd: Path) -> None:
     try:
-        result = runner(argv, capture_output=True, text=True, check=False)
+        result = runner(argv, capture_output=True, text=True, check=False, cwd=cwd)
     except OSError as error:
         raise ToolError(f"cannot run {argv[0]}: {error}. Check that it is executable.") from error
     if result.returncode != 0:

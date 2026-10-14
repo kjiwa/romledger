@@ -40,10 +40,11 @@ def test_command_requires_node(monkeypatch: pytest.MonkeyPatch, found: set[str])
 class Recorder:
     def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
         self.argv: list[str] = []
+        self.kwargs: dict[str, Any] = {}
         self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
 
     def __call__(self, argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        self.argv = argv
+        self.argv, self.kwargs = argv, kwargs
         if self.returncode == 0 and "--report-output" in argv:
             Path(argv[argv.index("--report-output") + 1]).write_text(REPORT)
         return subprocess.CompletedProcess(argv, self.returncode, self.stdout, self.stderr)
@@ -83,6 +84,7 @@ def test_argv_and_parse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
         *["--cache-path", str(tmp_path / "cache" / "igir.cache")],
         *["--report-output", output],
     ]
+    assert runner.kwargs["cwd"] == tmp_path / "cache"
     assert rows == [
         igir.ReportRow("Nintendo", "FOUND", "Alpha (USA)", "/roms/nes/Alpha (USA).nes"),
         igir.ReportRow("Nintendo", "FOUND", "Beta, The (USA)", "/roms/nes/Beta, The (USA).nes"),
@@ -110,6 +112,7 @@ def test_move_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         *["--input-exclude", "/in/a/unmatched/**"],
         *["--cache-path", str(cache), "--output", "/roms/{romm}"],
     ]
+    assert runner.kwargs["cwd"] == cache.parent
 
 
 def test_move_failure_and_unrunnable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
