@@ -69,7 +69,9 @@ def test_config_error_exit_code(tmp_path: Path, capsys: pytest.CaptureFixture[st
 
 def test_missing_config_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["--config", str(tmp_path / "nope.toml"), "config"]) == 2
-    assert "not found" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "not found" in err
+    assert "romledger init" in err
 
 
 def seed(data_dir: Path, platform: str, items: list[state.Item]) -> None:

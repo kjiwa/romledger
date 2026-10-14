@@ -8,6 +8,16 @@
 
 ## Config file
 
+`romledger init` writes this file for you. It prompts for the ROM folder, the platforms and
+whether to add `~/Downloads/romledger` as a second inbox (for the
+[browser extension](extension.md)), then creates `<roms>/library` and `<roms>/inbox`. It never
+overwrites an existing file unless you pass `--force`. Without a terminal it needs
+`--platform SLUG` (repeatable) and uses `--roms DIR`, default `~/roms`.
+
+`romledger platforms` lists every platform slug with its DAT and marks the ones in your config.
+
+The reference for editing by hand follows.
+
 romledger reads the first of these:
 
 1. `--config FILE`
