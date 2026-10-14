@@ -51,8 +51,8 @@ inboxes = ["/mnt/roms/inbox"]
 ```
 
 Both directories must exist. Platform names are RomM slugs, the folder names RomM uses, such as
-`nes` and `snes`; the known ones are listed in `src/romledger/platforms.toml`. `dat` is filled in
-for known platforms.
+`nes` and `snes`. An unknown name makes `romledger config` print the known ones. `dat` is filled
+in for known platforms.
 
 Check it, then fetch DATs and scan:
 

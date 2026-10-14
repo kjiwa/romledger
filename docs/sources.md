@@ -24,6 +24,7 @@ systems; listing `coolrom` for a platform it does not carry is an error.
   between requests. Large platforms take a while by design.
 - CoolROM publishes no hashes. A download link expires about 10 minutes after the page that
   holds it, so romledger asks for the link immediately before each download.
+- Crawl it only with the site's permission; see the top of this page.
 
 ## Internet Archive
 

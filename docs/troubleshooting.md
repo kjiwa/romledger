@@ -93,7 +93,7 @@ file is kept. Fix: upload again, with `-F files=@<file>` from `curl`.
 
 ## `cannot write to <inbox>: ...`
 
-Cause: the inbox is read-only or full. Fix: check the share's permissions and free space.
+Cause: the inbox is read-only or full. Fix: check the directory's permissions and free space.
 
 ## `igir not found and Node.js 22.22+ (with npx) is required to run it`
 

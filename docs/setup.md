@@ -151,7 +151,7 @@ platforms Vimm's Lair carries.
 romledger fetch PLATFORM [--limit N] [--dry-run] [--no-import] [--source NAME]
 ```
 
-Run `scan` first. Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
+Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
 platform's `sources` in order and takes the first match. A download is written as `<name>.part`,
 resumed if it was interrupted, checked against the size the server announced (and the checksum,
 where the source lists one), then renamed. Then it runs `import`, unless `--no-import`.
@@ -164,7 +164,7 @@ then a summary line. A failed game does not stop the others.
   CoolROM is asked for section pages only.
 - `--source NAME`: use only that one configured source.
 
-Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
+Run `scan` first. Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
 robots.txt asks), Internet Archive at least 1 second. A source whose robots.txt disallows a URL is
 skipped for the run. Exit status is 0, 1 if any game failed or a site's layout changed (or an
 `after_import` hook failed), or 2 for errors.
@@ -206,7 +206,8 @@ romledger serve [--host 127.0.0.1] [--port 8730] [--open]
 ```
 
 Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the link in your
-browser; otherwise copy it from the terminal. Open it once; the browser keeps a session cookie. Pages and files are served from the local machine only; nothing
+browser; otherwise copy it from the terminal. Open it once; the browser keeps a session cookie.
+Pages and files are served from the local machine only; nothing
 loads from a CDN.
 
 - Overview: progress per platform.
