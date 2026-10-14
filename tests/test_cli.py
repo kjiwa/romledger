@@ -52,7 +52,7 @@ def test_config_error_exit_code(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert cli.main(["--config", str(path), "config"]) == 2
     captured = capsys.readouterr()
     assert captured.err.startswith("romledger: error: ")
-    assert "NAS share mounted" in captured.err
+    assert "drive or share mounted" in captured.err
     assert "Traceback" not in captured.err
     assert captured.out == ""
 
@@ -637,7 +637,7 @@ def test_serve_reports_an_unmounted_library(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run(make_config(tmp_path, mkdirs=False), "serve") == 2
-    assert "NAS share mounted" in capsys.readouterr().err
+    assert "drive or share mounted" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("port", ["0", "70000", "abc", "-1"])

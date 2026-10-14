@@ -130,7 +130,7 @@ def check_library(config: Config) -> None:
     for directory in (config.library.roms, *config.library.inboxes):
         if not directory.is_dir():
             raise ConfigError(
-                f"{directory}: not a directory. Is the NAS share mounted? "
+                f"{directory}: not a directory. Is the drive or share mounted? "
                 "Mount it, or fix the path in the config file."
             )
 

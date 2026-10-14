@@ -31,7 +31,8 @@ Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
 
 ## Install
 
-Requires Python 3.11+ and Node.js 22.22+ (romledger runs [igir](https://igir.io) through `npx`).
+Requires [uv](https://docs.astral.sh/uv/), Python 3.11+ and Node.js 22.22+ (romledger runs
+[igir](https://igir.io) through `npx`).
 
 ```sh
 uv tool install git+ssh://git@github.com/kjiwa/romledger
@@ -49,7 +50,9 @@ inboxes = ["/mnt/roms/inbox"]
 [platforms.nes]
 ```
 
-Platform names are RomM slugs. `dat` is filled in for known platforms.
+Both directories must exist. Platform names are RomM slugs, the folder names RomM uses, such as
+`nes` and `snes`. An unknown name makes `romledger config` print the known ones. `dat` is filled
+in for known platforms.
 
 Check it, then fetch DATs and scan:
 

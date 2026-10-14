@@ -1,8 +1,8 @@
 # Sources
 
 A source is automated only if it offers an official API, or its robots.txt and terms allow
-automated access, or you hold the owner's permission. Crawling a site requires the site operator's
-permission; you are responsible for having it before you list a source. All other sources are
+automated access, or you hold the site owner's permission. You are responsible for having it before you list a
+source. All other sources are
 manual: download in your browser into an inbox, then run `romledger import`.
 
 romledger identifies itself as `romledger/<version> (+https://github.com/kjiwa/romledger)`, never
@@ -24,7 +24,7 @@ systems; listing `coolrom` for a platform it does not carry is an error.
   between requests. Large platforms take a while by design.
 - CoolROM publishes no hashes. A download link expires about 10 minutes after the page that
   holds it, so romledger asks for the link immediately before each download.
-- Needs the site operator's permission to crawl.
+- Crawl it only with the site's permission; see the top of this page.
 
 ## Internet Archive
 

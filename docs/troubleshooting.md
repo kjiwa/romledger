@@ -7,9 +7,9 @@ Errors print as `romledger: error: <message>` and exit with status 2.
 Cause: no file at the path. Fix: pass `--config`, set `ROMLEDGER_CONFIG`, or create the
 file from the example in the message.
 
-## `not a directory. Is the NAS share mounted?`
+## `not a directory. Is the drive or share mounted?`
 
-Cause: `library.roms` or an inbox does not exist, usually because the share is not mounted.
+Cause: `library.roms` or an inbox does not exist, usually because the drive or share is not mounted.
 Fix: mount it, or correct the path in the config file.
 
 ## `unknown platform 'X'. Use one of: ...; or set dat.`
@@ -93,7 +93,7 @@ file is kept. Fix: upload again, with `-F files=@<file>` from `curl`.
 
 ## `cannot write to <inbox>: ...`
 
-Cause: the inbox is read-only or full. Fix: check the share's permissions and free space.
+Cause: the inbox is read-only or full. Fix: check the directory's permissions and free space.
 
 ## `igir not found and Node.js 22.22+ (with npx) is required to run it`
 
@@ -247,7 +247,7 @@ key:
   that source will fail the same way. Update romledger or report it.
 - `dat:missing:<slug>`: libretro-database has no such DAT. Correct `dat` for that platform in
   `platforms.toml`.
-- `igir:update:<tag>`: a newer igir exists. Run `uv run pytest -m igir --no-cov`, then update
+- `igir:update:<tag>`: a newer igir exists. Maintainers, in a source checkout: run `uv run pytest -m igir --no-cov`, then update
   `IGIR_VERSION` in `src/romledger/igir.py`.
 - `igir:contract:release`: GitHub's release answer has no tag name. Report it.
 
