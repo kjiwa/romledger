@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Track which retro games you have and which are missing, verified against No-Intro and Redump DATs."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.143.0",
     "httpx[socks]>=0.28.1",
