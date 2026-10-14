@@ -1,8 +1,8 @@
 """Build a fictional library and render the dashboard to PNG files.
 
 Run through scripts/screenshots.sh, which supplies Playwright and romledger. With
-`--library DIR` it only writes the library, config and scan results into the empty DIR and prints
-the config path, for scripts/demo.sh.
+`--library DIR` it only writes the library, config.toml and scan results into the empty DIR, for
+scripts/demo.sh.
 """
 
 import os
@@ -169,7 +169,6 @@ def shoot(browser: Browser, base: str, output: Path) -> list[Path]:
 def write_library(directory: Path) -> int:
     directory.mkdir(parents=True, exist_ok=True)
     build(directory)
-    print(directory / "config.toml")
     return 0
 
 

@@ -5,14 +5,16 @@ Run through scripts/browser-check.sh, which supplies Playwright and romledger.
 
 import sys
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urljoin
 
 from demo_library import PAGES, TOKEN, build, serve
 from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 MAX_TABS = 400
-FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled])"
+FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])"
 DROP = """(name) => {
     const data = new DataTransfer();
     data.items.add(new File(["dropped"], name));
@@ -24,8 +26,11 @@ FOCUS_STATE = """() => {
     const style = getComputedStyle(element);
     const label = element.type === "file" && element.labels[0];
     const ring = label ? getComputedStyle(label) : style;
+    const fresh = element.dataset.visited !== "yes";
+    element.dataset.visited = "yes";
     return {
         key: element.outerHTML.slice(0, 80),
+        fresh,
         ring: parseFloat(ring.outlineWidth) > 0 && ring.outlineStyle !== "none",
     };
 }"""
@@ -34,28 +39,30 @@ FOCUS_STATE = """() => {
 def tab_through(page: Page, path: str) -> list[str]:
     problems = []
     page.goto(urljoin(page.url, path))
-    wanted = page.eval_on_selector_all(
-        FOCUSABLE, "(nodes) => nodes.filter((node) => node.getClientRects().length).length"
-    )
-    seen = set()
     for _ in range(MAX_TABS):
         page.keyboard.press("Tab")
         state = page.evaluate(FOCUS_STATE)
-        if state["key"] in seen or state["key"].startswith("<body"):
+        if not state["fresh"] or state["key"].startswith("<body"):
             break
-        seen.add(state["key"])
         if not state["ring"]:
             problems.append(f"{path}: no focus ring on {state['key']}")
-    if len(seen) < wanted:
-        problems.append(f"{path}: Tab reached {len(seen)} of {wanted} controls")
+    unreached = page.eval_on_selector_all(
+        FOCUSABLE,
+        "(nodes) => nodes.filter((node) => node.getClientRects().length"
+        ' && node.dataset.visited !== "yes").map((node) => node.outerHTML.slice(0, 80))',
+    )
+    problems += [f"{path}: Tab never reached {key}" for key in unreached]
     return problems
 
 
 def drop_upload(page: Page, base: str, inbox: Path) -> list[str]:
     page.goto(f"{base}/inbox")
     page.evaluate(DROP, "Dropped Game (USA).nes")
-    page.wait_for_url("**/inbox?uploaded=1")
     problems = []
+    try:
+        page.wait_for_url("**/inbox?uploaded=1")
+    except PlaywrightTimeoutError:
+        return ["drop: upload did not finish: " + page.inner_text("#upload-list")]
     if not (inbox / "Dropped Game (USA).nes").is_file():
         problems.append("drop: file did not reach the inbox")
     if "Dropped Game (USA).nes" not in page.inner_text(".files"):
@@ -78,6 +85,7 @@ def main() -> int:
             problems += drop_upload(page, base, root / "inbox")
             browser.close()
         server.should_exit = True
+        time.sleep(0.5)
     for problem in problems:
         print(problem)
     print("browser checks: " + ("FAILED" if problems else "ok"))
