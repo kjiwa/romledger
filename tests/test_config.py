@@ -193,11 +193,31 @@ def test_check_library_missing_roms(tmp_path: Path) -> None:
         config.check_library(loaded)
 
 
-def test_check_library_missing_inbox(tmp_path: Path) -> None:
+def test_check_library_creates_a_missing_inbox(tmp_path: Path) -> None:
     (tmp_path / "roms").mkdir()
     loaded = load(write(tmp_path, valid_text(tmp_path)))
+    config.check_library(loaded)
+    assert (tmp_path / "inbox").is_dir()
+
+
+def test_check_library_unwritable_inbox_parent(tmp_path: Path) -> None:
+    (tmp_path / "roms").mkdir()
+    loaded = load(write(tmp_path, valid_text(tmp_path)))
+    tmp_path.chmod(0o555)
+    try:
+        with pytest.raises(config.ConfigError, match=r"inbox: cannot create"):
+            config.check_library(loaded)
+    finally:
+        tmp_path.chmod(0o755)
+
+
+def test_check_library_missing_inbox_parent(tmp_path: Path) -> None:
+    (tmp_path / "roms").mkdir()
+    text = valid_text(tmp_path).replace(str(tmp_path / "inbox"), str(tmp_path / "gone" / "inbox"))
+    loaded = load(write(tmp_path, text))
     with pytest.raises(config.ConfigError, match=r"inbox: not a directory"):
         config.check_library(loaded)
+    assert not (tmp_path / "gone").exists()
 
 
 def test_relative_path_rejected(tmp_path: Path) -> None:

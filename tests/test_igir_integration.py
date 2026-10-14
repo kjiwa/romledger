@@ -1,5 +1,6 @@
 import hashlib
 import shutil
+import zipfile
 import zlib
 from pathlib import Path
 
@@ -112,3 +113,34 @@ def test_import_end_to_end(
     assert cli.main(["--config", str(path), "status"]) == 0
     status = capsys.readouterr().out.splitlines()[1].split()
     assert status[:6] == ["nes", "2", "1", "0", "1", "0"]
+
+
+@needs_igir
+def test_import_files_a_zip_with_an_extra_file_and_keeps_the_inbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = tmp_path / "data"
+    monkeypatch.setenv(config.DATA_ENV, str(data))
+    dat = data / "dats" / "no-intro" / f"{NES}.dat"
+    dat.parent.mkdir(parents=True)
+    dat.write_text(dat_text(NES))
+    roms, inbox = tmp_path / "roms", tmp_path / "inbox"
+    roms.mkdir()
+    inbox.mkdir()
+    with zipfile.ZipFile(inbox / "download.zip", "w") as archive:
+        archive.writestr("Alpha (USA).nes", GAMES["Alpha (USA)"])
+        archive.writestr("readme.txt", "downloaded from somewhere")
+    path = tmp_path / "config.toml"
+    path.write_text(
+        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
+        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
+    )
+
+    assert cli.main(["--config", str(path), "import"]) == 0
+    assert capsys.readouterr().out == "moved nes 1\n"
+    assert names(roms / "nes") == {"Alpha (USA).zip"}
+    assert inbox.is_dir()
+    assert cli.main(["--config", str(path), "import"]) == 0
+    assert capsys.readouterr().out == "inbox is empty\n"
+    assert cli.main(["--config", str(path), "status"]) == 0
+    assert capsys.readouterr().out.splitlines()[1].split()[:3] == ["nes", "2", "1"]

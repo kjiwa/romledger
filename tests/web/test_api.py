@@ -37,8 +37,7 @@ def test_missing_lists_games_with_links(env: Env) -> None:
     body = env.client.get("/api/platforms/nes/missing").json()
     assert body["total"] == 1
     assert body["games"][0]["game"] == "Beta (USA)"
-    assert body["games"][0]["links"]["archive"].startswith("https://archive.org/search")
-    assert body["games"][0]["links"]["vimm"].startswith("https://vimm.net/vault/")
+    assert body["games"][0]["links"] == {"vimm": "https://vimm.net/vault/?p=list&system=NES&q=Beta"}
     assert env.client.get("/api/platforms/nes/missing?q=zzz").json()["games"] == []
     assert env.client.get("/api/platforms/nes/missing?limit=0").status_code == 422
 
@@ -68,7 +67,7 @@ def test_lookup_by_name(env: Env) -> None:
     assert approximate.json()["matches"][0]["exact"] is False
 
 
-def test_lookup_name_with_no_single_answer_is_an_empty_list(env: Env) -> None:
+def test_lookup_name_with_no_single_answer_lists_every_candidate(env: Env) -> None:
     seed(env.context)
     path = env.context.data_dir / "state.db"
     with state.State(path) as database:
@@ -82,7 +81,30 @@ def test_lookup_name_with_no_single_answer_is_an_empty_list(env: Env) -> None:
             state.DatStamp("2", 0, 0),
         )
     response = env.client.get("/api/lookup", params={"name": "Dup", "platform": "nes"})
-    assert response.json() == {"matches": []}
+    assert [match["game"] for match in response.json()["matches"]] == ["Dup (USA)", "Dup (USA) (B)"]
+
+
+def test_lookup_name_regions_narrow_the_candidates(env: Env) -> None:
+    seed(env.context)
+    path = env.context.data_dir / "state.db"
+    with state.State(path) as database:
+        database.replace_index(
+            "nes",
+            [],
+            [
+                state.IndexedGame("Dup (USA, Europe)", "dup", "usa"),
+                state.IndexedGame("Dup (Japan)", "dup", "japan"),
+            ],
+            state.DatStamp("2", 0, 0),
+        )
+    params = {"name": "Dup", "platform": "nes", "regions": "Japan,Brazil"}
+    response = env.client.get("/api/lookup", params=params)
+    assert [match["game"] for match in response.json()["matches"]] == ["Dup (Japan)"]
+
+
+def test_lookup_name_is_length_limited(env: Env) -> None:
+    response = env.client.get("/api/lookup", params={"name": "x" * 301, "platform": "nes"})
+    assert response.status_code == 422
 
 
 def test_lookup_argument_errors(env: Env) -> None:

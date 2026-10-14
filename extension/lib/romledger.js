@@ -10,11 +10,28 @@ const romledger = (() => {
     unknown: ["Not in any DAT", "unknown"],
   };
   const HASH_LENGTH = 40;
+  const STATE_ORDER = ["have", "inbox", "missing", "unwanted", "unscanned", "unknown"];
 
   function describe(match) {
     const [text, kind] = STATES[match.state] || STATES.unknown;
     const approximate = match.exact === false && match.state !== "unknown";
     return { text: approximate ? `${text} (approximate)` : text, kind, approximate };
+  }
+
+  function best(matches, fallback = { state: "unknown" }) {
+    if (!matches.length) {
+      return fallback;
+    }
+    const rank = (match) => STATE_ORDER.indexOf(match.state);
+    const picked = matches.reduce((leader, match) => (rank(match) < rank(leader) ? match : leader));
+    return matches.length > 1 ? { ...picked, exact: false } : picked;
+  }
+
+  function regionsOf(row) {
+    if (!row) {
+      return [];
+    }
+    return [...row.querySelectorAll("img.flag")].map((flag) => flag.title);
   }
 
   function decodeBase64(text) {
@@ -98,6 +115,8 @@ const romledger = (() => {
 
   const api = {
     describe,
+    best,
+    regionsOf,
     parseAllMedia,
     stripExtension,
     vimmSystemFromTitle,

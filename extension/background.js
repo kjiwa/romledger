@@ -42,6 +42,7 @@ function route(message) {
   } else if (message.type === "lookup-name") {
     query.set("name", message.name);
     query.set("platform", message.platform);
+    query.set("regions", (message.regions || []).join(","));
   } else {
     return Promise.resolve({ ok: false, error: `Unknown request ${message.type}.` });
   }

@@ -50,7 +50,10 @@ def import_inboxes(
         return ImportResult(
             _moved(config, data_dir, before, lambda _: True), [], _paths(before, scan.UNUSED), []
         )
-    igir_move(dat_files, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
+    try:
+        igir_move(dat_files, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
+    finally:
+        _restore_inboxes(inboxes)
     after = igir_report(dat_files, inboxes, cache, None, excludes)
     moved = _moved(config, data_dir, before, lambda path: not path.exists())
     duplicates = _relocate(_paths(after, scan.FOUND), inboxes, igir.DUPLICATES_DIR)
@@ -78,6 +81,11 @@ def print_result(result: ImportResult, *, dry_run: bool) -> int:
     for failure in result.hook_failures:
         print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
     return 1 if result.hook_failures else 0
+
+
+def _restore_inboxes(inboxes: Sequence[Path]) -> None:
+    for inbox in inboxes:
+        inbox.mkdir(parents=True, exist_ok=True)
 
 
 def _paths(rows: Sequence[igir.ReportRow], status: str) -> list[Path]:

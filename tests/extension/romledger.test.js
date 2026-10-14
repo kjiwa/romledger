@@ -71,6 +71,40 @@ test("describe labels every state and marks approximate matches", () => {
   assert.equal(romledger.describe({ state: "nonsense", exact: true }).kind, "unknown");
 });
 
+test("best picks the most useful state and marks a choice approximate", () => {
+  const match = (state, game) => ({ platform: "nes", game, state, exact: false });
+  const picked = romledger.best([match("missing", "A"), match("have", "B"), match("unwanted", "C")]);
+  assert.equal(picked.state, "have");
+  assert.equal(picked.game, "B");
+  assert.equal(picked.exact, false);
+  const exact = { platform: "nes", game: "A", state: "missing", exact: true };
+  assert.deepEqual(romledger.best([exact]), exact);
+  assert.equal(romledger.best([]).state, "unknown");
+  const fallback = { state: "missing", exact: true };
+  assert.equal(romledger.best([], fallback), fallback);
+  assert.equal(romledger.best([match("unknown", "A"), match("unwanted", "B")]).state, "unwanted");
+  assert.equal(romledger.best([match("inbox", "A"), match("missing", "B")]).state, "inbox");
+});
+
+test("regionsOf reads the flag titles of a Vimm list row", () => {
+  const rows = fixture("vimm-list-10-yard-fight.html")
+    .split("</tr>")
+    .filter((html) => html.includes("<tr>"))
+    .map((html) => ({
+      querySelectorAll: (selector) => {
+        assert.equal(selector, "img.flag");
+        return [...html.matchAll(/<img[^>]*class="flag"[^>]*title="([^"]+)"/g)].map((found) => ({
+          title: found[1],
+        }));
+      },
+    }));
+  assert.deepEqual(rows.map(romledger.regionsOf), [["USA", "Europe"], ["Japan"], ["USA"]]);
+});
+
+test("regionsOf tolerates a link outside a table row", () => {
+  assert.deepEqual(romledger.regionsOf(null), []);
+});
+
 test("progress words a scanned and an unscanned platform", () => {
   assert.equal(romledger.progress({ percent: null }), "Not scanned");
   assert.equal(

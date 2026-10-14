@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 import pytest
@@ -77,7 +78,9 @@ def test_all_clear(world: World, fake_throttle: FakeThrottle) -> None:
     assert report == canary.Report([], [], [])
     dat_requests = [key for method, key in world.requests if method == "HEAD"]
     assert len(dat_requests) == len(registry.load())
-    assert all(key.startswith("raw.githubusercontent.com/") for key in dat_requests)
+    assert all(
+        urlsplit("https://" + key).hostname == "raw.githubusercontent.com" for key in dat_requests
+    )
     assert dats.url("no-intro/Atari - 2600").split("//")[1] in dat_requests
 
 
@@ -307,7 +310,7 @@ def test_inconclusive_site_is_a_note_not_a_finding(
     assert first in report.notes[0]
     assert report.notes[0].isascii()
     assert report.inconclusive[0] == GROUPS[site]
-    assert any(key.startswith("api.github.com") for key in world.requested())
+    assert any(urlsplit("https://" + key).hostname == "api.github.com" for key in world.requested())
 
 
 def test_inconclusive_site_skips_its_remaining_checks(

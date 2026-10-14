@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api")
 
 SHA1_PATTERN = "^[0-9a-fA-F]{40}$"
 MAX_LIMIT = 1000
+MAX_NAME = 300
 
 Services = Annotated[deps.Services, Depends(deps.services)]
 Ctx = Annotated[Context, Depends(deps.context)]
@@ -45,10 +46,7 @@ def missing(
         "total": page.total,
         "offset": offset,
         "limit": limit,
-        "games": [
-            {"game": game.name, "links": {"vimm": game.vimm, "archive": game.archive}}
-            for game in page.games
-        ],
+        "games": [{"game": game.name, "links": {"vimm": game.vimm}} for game in page.games],
     }
 
 
@@ -57,8 +55,9 @@ def find(
     context: Ctx,
     database: Database,
     sha1: Annotated[str | None, Query(pattern=SHA1_PATTERN)] = None,
-    name: Annotated[str | None, Query(min_length=1)] = None,
+    name: Annotated[str | None, Query(min_length=1, max_length=MAX_NAME)] = None,
     platform: str | None = None,
+    regions: Annotated[str, Query(max_length=MAX_NAME)] = "",
 ) -> dict[str, list[dict[str, Any]]]:
     if (sha1 is None) == (name is None):
         raise HTTPException(422, "give either sha1 or name and platform")
@@ -67,8 +66,9 @@ def find(
     if platform is None:
         raise HTTPException(422, "name needs platform")
     known_platform(context, platform)
-    match = lookup.by_name(database, platform, name or "")
-    return {"matches": [] if match is None else [dataclasses.asdict(match)]}
+    named = [region for region in regions.split(",") if region.strip()]
+    matches = lookup.by_name(database, platform, name or "", named)
+    return {"matches": [dataclasses.asdict(match) for match in matches]}
 
 
 @router.get("/jobs/current")

@@ -23,6 +23,8 @@ SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Ques
 GENESIS = {"Delta Run (USA)": "d" * 40, "Echo Run (USA)": "e" * 40}
 ITEM = "gb-item"
 MISSING_SHA1 = "f" * 40
+JAPAN_TWIN = {"gb": {"Alpha Quest (Japan)": "9" * 40}}
+FLAG = '<img src="/images/flags/{file}.png" class="flag" title="{title}">'
 
 
 def write_dat(path: Path, games: dict[str, str]) -> None:
@@ -50,7 +52,7 @@ def seed(root: Path) -> None:
     with state.State(context.data_dir / "state.db") as database:
         for slug, (games, states) in layouts.items():
             dat = dats.dat_path(context.data_dir, context.config.platforms[slug].dat)
-            write_dat(dat, games)
+            write_dat(dat, {**games, **JAPAN_TWIN.get(slug, {})})
             items = [state.Item(name, kind, None) for name, kind in zip(games, states, strict=True)]
             database.replace_platform(slug, items, [], "1", "2026-10-13T12:00:00+00:00")
             datindex.ensure(database, slug, dat)
@@ -71,8 +73,13 @@ def pages() -> dict[tuple[str, str], str]:
         f"<h2>Alpha Quest</h2><script>allMedia={json.dumps(discs)};</script>"
     )
     rows = "".join(
-        f'<tr><td><a href="/vault/{number}">{name}</a></td></tr>'
-        for number, name in enumerate(("Alpha Quest", "Beta Quest", "Zeta Quest"), start=10)
+        f'<tr><td><a href="/vault/{number}">{name}</a></td><td>{flag}</td></tr>'
+        for number, name, flag in (
+            (10, "Alpha Quest", ""),
+            (11, "Beta Quest", ""),
+            (12, "Zeta Quest", ""),
+            (13, "Alpha Quest", FLAG.format(file="japan", title="Japan")),
+        )
     )
     cool = "".join(
         f'<div><a href="/roms/genesis/{number}/{name.replace(" ", "_")}.php">{name}</a></div>'
@@ -127,12 +134,13 @@ def check_vimm_game(context: BrowserContext) -> list[str]:
 def check_vimm_list(context: BrowserContext) -> list[str]:
     page = context.new_page()
     page.goto("https://vimm.net/vault/?p=list&system=GB&q=")
-    found = badges(page, 3)
+    found = badges(page, 4)
     page.close()
     expected = [
         "Alpha Quest In library (approximate)",
         "Beta Quest Missing (approximate)",
         "Zeta Quest Not in any DAT",
+        "Alpha Quest Not wanted (approximate)",
     ]
     return [] if found == expected else [f"vimm list: {found}"]
 
