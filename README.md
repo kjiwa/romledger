@@ -71,5 +71,6 @@ romledger serve --open
 See [docs/setup.md](docs/setup.md) for all options,
 [docs/deploy.md](docs/deploy.md) to run it as a container,
 [docs/extension.md](docs/extension.md) for the browser extension,
+[docs/playing.md](docs/playing.md) to play what you collect,
 [docs/sources.md](docs/sources.md) for download sources and
 [docs/troubleshooting.md](docs/troubleshooting.md) for error messages.
