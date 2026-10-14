@@ -82,7 +82,7 @@ class DatRom(NamedTuple):
     size: int | None
     game: str
     name: str | None
-    block: int = 0
+    block: int
 
 
 @dataclass(frozen=True)

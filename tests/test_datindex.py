@@ -127,8 +127,8 @@ def test_ensure_stores_rom_names_for_the_catalog(tmp_path: Path) -> None:
 
 def test_write_subset_keeps_the_header_name_and_chosen_games(tmp_path: Path) -> None:
     roms = [
-        state.DatRom(SHA, "b" * 32, "0000abcd", 1024, "Alpha & <Co> (USA)", 'A "1".nes'),
-        state.DatRom(None, None, None, None, "Bare (USA)", None),
+        state.DatRom(SHA, "b" * 32, "0000abcd", 1024, "Alpha & <Co> (USA)", 'A "1".nes', 0),
+        state.DatRom(None, None, None, None, "Bare (USA)", None, 1),
     ]
     path = tmp_path / "subset.dat"
     datindex.write_subset(path, "Nintendo - NES", roms)

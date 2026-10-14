@@ -155,7 +155,7 @@ def test_version_two_database_migrates_to_group_scans_and_rom_names(tmp_path: Pa
             state.DatStamp("v", 1, 1),
         )
         assert database.dat_roms("nes") == [
-            state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes")
+            state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes", 0)
         ]
     assert (
         sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == state.SCHEMA_VERSION
