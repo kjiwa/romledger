@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "romledger",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Shows on Vimm's Lair, CoolROM and the Internet Archive which games your romledger library has or is missing.",
   "permissions": ["storage"],
   "optional_permissions": ["downloads"],
