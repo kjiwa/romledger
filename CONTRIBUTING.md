@@ -101,4 +101,4 @@ Fix by key:
 Releases use [gh-cut](https://github.com/kjiwa/gh-cut): `gh cut <version>` bumps the version in
 `pyproject.toml`, `extension/manifest.json` and `uv.lock` through `scripts/release-hooks.sh`, merges
 the bump, tags it and creates the GitHub release. Add the version's section to `CHANGELOG.md`
-first.
+first. Publishing the release runs `.github/workflows/publish.yml`.

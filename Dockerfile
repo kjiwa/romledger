@@ -27,6 +27,7 @@ ENV PATH="/app/.venv/bin:/opt/igir/bin:${PATH}" \
     ROMLEDGER_CONFIG=/config/config.toml \
     ROMLEDGER_DATA=/data/romledger
 USER romledger
+LABEL org.opencontainers.image.source="https://github.com/kjiwa/romledger"
 EXPOSE 8730
 ENTRYPOINT ["romledger"]
 CMD ["serve", "--host", "0.0.0.0"]
