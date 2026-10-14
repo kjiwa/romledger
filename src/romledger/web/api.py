@@ -89,7 +89,6 @@ def import_all(context: Ctx, services: Services) -> dict[str, Any]:
 
 def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
     counts = view.counts
-    registered = context.platforms.get(view.slug)
     configured = context.config.platforms[view.slug]
     return {
         "slug": view.slug,
@@ -102,7 +101,7 @@ def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
         "unmatched": counts.unmatched if counts else None,
         "percent": view.percent,
         "sites": {
-            "vimm": registered.vimm if registered else None,
+            "vimm": views.vimm_code(context, view.slug),
             "coolrom": configured.coolrom,
             "archive_item": configured.archive_item,
         },

@@ -1,3 +1,4 @@
+import dataclasses
 import threading
 
 from fastapi.testclient import TestClient
@@ -19,6 +20,16 @@ def test_platforms_before_and_after_a_scan(env: Env) -> None:
     assert (after["have"], after["inbox"], after["missing"], after["wanted"]) == (1, 1, 1, 3)
     assert after["percent"] == 33
     assert after["sites"] == {"vimm": "NES", "coolrom": None, "archive_item": None}
+
+
+def test_platform_sites_report_configured_codes(env: Env) -> None:
+    nes = env.context.config.platforms["nes"]
+    env.context.config.platforms["nes"] = dataclasses.replace(
+        nes, coolrom="NES", archive_item="item-1"
+    )
+    env.context.platforms.pop("nes")
+    sites = env.client.get("/api/platforms").json()[0]["sites"]
+    assert sites == {"vimm": None, "coolrom": "NES", "archive_item": "item-1"}
 
 
 def test_missing_lists_games_with_links(env: Env) -> None:
