@@ -1,0 +1,80 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { test } = require("node:test");
+
+const romledger = require("../../extension/lib/romledger.js");
+
+function fixture(name) {
+  return fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
+}
+
+test("parseAllMedia reads one entry per disc", () => {
+  const discs = romledger.parseAllMedia(fixture("vimm-baten.html"));
+  assert.deepEqual(
+    discs.map((disc) => [disc.name, disc.sha1]),
+    [
+      ["Baten Kaitos Origins (USA, Canada) (Disc 1)", "b5e6aafae4aa171caa558875ca7d66b465a78f7f"],
+      ["Baten Kaitos Origins (USA, Canada) (Disc 2)", "706774280ed6dba841a9ed600066f8773c80a8c0"],
+    ],
+  );
+});
+
+test("parseAllMedia reads a single cartridge entry", () => {
+  const [disc] = romledger.parseAllMedia(fixture("vimm-pokemon.html"));
+  assert.equal(disc.name, "Pokemon X (USA) (En,Ja,Fr,De,Es,It,Ko)");
+  assert.equal(disc.sha1, "20b7278f10a32ab440b4dff1d382a1401590aceb");
+});
+
+test("parseAllMedia returns null for a changed layout", () => {
+  assert.equal(romledger.parseAllMedia("var other = 1;"), null);
+  assert.equal(romledger.parseAllMedia("allMedia=[not json];"), null);
+  assert.equal(romledger.parseAllMedia('allMedia=[{"GoodTitle":"%%%","GoodSha1":"x"}];'), null);
+  assert.equal(romledger.parseAllMedia('allMedia=[{"GoodTitle":"","GoodSha1":"x"}];'), null);
+});
+
+test("site codes come from titles and paths", () => {
+  assert.equal(romledger.vimmSystemFromTitle("The Vault: Pokemon X (3DS)"), "3DS");
+  assert.equal(romledger.vimmSystemFromTitle("The Vault: Something"), null);
+  assert.equal(romledger.coolromSystemFromPath("/roms/genesis/6013/Sagaia.php"), "genesis");
+  assert.equal(romledger.coolromSystemFromPath("/other"), null);
+  assert.equal(
+    romledger.coolromNameFromPath("/roms/genesis/47761/Saint_Sword_(Japan).php"),
+    "Saint Sword (Japan)",
+  );
+  assert.equal(romledger.coolromNameFromPath("/roms/genesis/1/100%_Fun.php"), "100% Fun");
+  assert.equal(romledger.archiveItemFromPath("/details/No-Intro_NES"), "No-Intro_NES");
+  assert.equal(romledger.archiveItemFromPath("/search"), null);
+});
+
+test("slugFor matches a site code case-insensitively", () => {
+  const platforms = [
+    { slug: "nes", sites: { vimm: "NES", coolrom: null } },
+    { slug: "genesis", sites: { vimm: "Genesis", coolrom: "genesis" } },
+  ];
+  assert.equal(romledger.slugFor(platforms, "coolrom", "GENESIS"), "genesis");
+  assert.equal(romledger.slugFor(platforms, "vimm", "nes"), "nes");
+  assert.equal(romledger.slugFor(platforms, "vimm", "SNES"), null);
+  assert.equal(romledger.slugFor(platforms, "coolrom", ""), null);
+});
+
+test("describe labels every state and marks approximate matches", () => {
+  assert.deepEqual(romledger.describe({ state: "have", exact: true }), {
+    text: "In library",
+    kind: "have",
+    approximate: false,
+  });
+  assert.equal(romledger.describe({ state: "missing", exact: false }).text, "Missing (approximate)");
+  assert.equal(romledger.describe({ state: "unknown", exact: false }).approximate, false);
+  assert.equal(romledger.describe({ state: "nonsense", exact: true }).kind, "unknown");
+});
+
+test("progress words a scanned and an unscanned platform", () => {
+  assert.equal(romledger.progress({ percent: null }), "Not scanned");
+  assert.equal(
+    romledger.progress({ have: 96, wanted: 180, percent: 53 }),
+    "96 of 180 wanted games (53%)",
+  );
+});

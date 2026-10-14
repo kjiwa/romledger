@@ -1,0 +1,124 @@
+html {
+  background: var(--rl-surface);
+  color: var(--rl-text);
+  font: 1rem / 1.5 system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+body.popup {
+  width: 22rem;
+}
+
+.ui {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: var(--rl-space-4);
+}
+
+h1 {
+  margin: 0 0 var(--rl-space-2);
+  font-size: 1.25rem;
+}
+
+.muted {
+  margin: 0;
+  color: var(--rl-muted);
+  font-size: var(--rl-text-sm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rl-space-1);
+  margin-block: var(--rl-space-4);
+}
+
+.field label {
+  font-weight: 600;
+}
+
+input {
+  min-height: 44px;
+  padding: var(--rl-space-2) var(--rl-space-3);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius);
+  background: var(--rl-surface);
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  padding: var(--rl-space-2) var(--rl-space-4);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius);
+  background: var(--rl-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: var(--rl-focus);
+  background: var(--rl-focus);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 3px solid var(--rl-focus);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--rl-focus);
+}
+
+.platforms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rl-space-3);
+  margin: var(--rl-space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platforms li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rl-space-1);
+}
+
+progress {
+  width: 100%;
+}
+
+.notice,
+#result {
+  margin: var(--rl-space-3) 0;
+  padding: var(--rl-space-2) var(--rl-space-3);
+  border-radius: var(--rl-radius);
+  background: var(--rl-unwanted-bg);
+  font-size: var(--rl-text-sm);
+}
+
+.notice[data-kind="error"],
+#result[data-kind="error"] {
+  background: var(--rl-error-bg);
+  color: var(--rl-error);
+}
+
+#result[data-kind="ok"] {
+  background: var(--rl-have-bg);
+  color: var(--rl-have);
+}
+
+#result:empty {
+  display: none;
+}
+
+[hidden] {
+  display: none;
+}

@@ -1,0 +1,106 @@
+:root,
+.romledger-badge,
+.romledger-panel {
+  --rl-surface: #ffffff;
+  --rl-text: #1b1f27;
+  --rl-muted: #5b6372;
+  --rl-border: #c9cfda;
+  --rl-have: #0f6b3a;
+  --rl-have-bg: #dff3e7;
+  --rl-inbox: #1a4fa0;
+  --rl-inbox-bg: #e0eafb;
+  --rl-missing: #8a3b00;
+  --rl-missing-bg: #fdebd6;
+  --rl-unwanted: #4a5160;
+  --rl-unwanted-bg: #e8eaee;
+  --rl-error: #9b1c1c;
+  --rl-error-bg: #fbe3e3;
+  --rl-focus: #2554c7;
+  --rl-space-1: 4px;
+  --rl-space-2: 8px;
+  --rl-space-3: 12px;
+  --rl-space-4: 16px;
+  --rl-text-sm: 0.8125rem;
+  --rl-radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  .romledger-badge,
+  .romledger-panel {
+    --rl-surface: #1b1f27;
+    --rl-text: #e8ebf1;
+    --rl-muted: #a4adbd;
+    --rl-border: #3a4252;
+    --rl-have: #7fd8a3;
+    --rl-have-bg: #123a25;
+    --rl-inbox: #9bbcf5;
+    --rl-inbox-bg: #14305e;
+    --rl-missing: #f3b27a;
+    --rl-missing-bg: #4a2a0c;
+    --rl-unwanted: #c3cad6;
+    --rl-unwanted-bg: #2c3340;
+    --rl-error: #f5a3a3;
+    --rl-error-bg: #4a1818;
+    --rl-focus: #8db0ff;
+  }
+}
+
+.romledger-badge {
+  display: inline-block;
+  padding: 1px var(--rl-space-2);
+  border-radius: 999px;
+  font: 600 var(--rl-text-sm) / 1.5 system-ui, sans-serif;
+  white-space: nowrap;
+  color: var(--rl-unwanted);
+  background: var(--rl-unwanted-bg);
+}
+
+.romledger-badge[data-kind="have"] {
+  color: var(--rl-have);
+  background: var(--rl-have-bg);
+}
+
+.romledger-badge[data-kind="inbox"] {
+  color: var(--rl-inbox);
+  background: var(--rl-inbox-bg);
+}
+
+.romledger-badge[data-kind="missing"] {
+  color: var(--rl-missing);
+  background: var(--rl-missing-bg);
+}
+
+.romledger-badge[data-kind="error"] {
+  color: var(--rl-error);
+  background: var(--rl-error-bg);
+}
+
+.romledger-panel {
+  position: fixed;
+  right: var(--rl-space-4);
+  bottom: var(--rl-space-4);
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rl-space-2);
+  max-width: min(24rem, calc(100vw - 2 * var(--rl-space-4)));
+  padding: var(--rl-space-3);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius);
+  background: var(--rl-surface);
+  color: var(--rl-text);
+  font: var(--rl-text-sm) / 1.4 system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+.romledger-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rl-space-2);
+}
+
+.romledger-name {
+  overflow-wrap: anywhere;
+}

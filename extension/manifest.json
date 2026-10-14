@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "romledger",
+  "version": "0.1.0",
+  "description": "Shows on Vimm's Lair, CoolROM and the Internet Archive which games your romledger library has or is missing.",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "action": {
+    "default_title": "romledger",
+    "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://vimm.net/vault/*"],
+      "js": ["lib/romledger.js", "content/page.js", "content/vimm.js"],
+      "css": ["romledger.css"]
+    },
+    {
+      "matches": ["https://coolrom.com/roms/*", "https://www.coolrom.com/roms/*"],
+      "js": ["lib/romledger.js", "content/page.js", "content/coolrom.js"],
+      "css": ["romledger.css"]
+    },
+    {
+      "matches": ["https://archive.org/details/*"],
+      "js": ["lib/romledger.js", "content/page.js", "content/archive.js"],
+      "css": ["romledger.css"]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "romledger@romledger.invalid",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
