@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "romledger",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Shows on Vimm's Lair, CoolROM, ConsoleRoms, emu-land and the Internet Archive which games your romledger library has or is missing.",
   "permissions": ["storage"],
   "optional_permissions": ["downloads"],
