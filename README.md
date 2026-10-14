@@ -14,6 +14,8 @@ Works today:
 - Import from the inboxes into a RomM layout (`romledger import`)
 - Browse progress, missing games and the inbox, and upload files, in a local dashboard (`romledger serve`)
 - Download missing games from CoolROM and the Internet Archive (`romledger fetch`)
+- Mark games as in your library or missing while you browse Vimm's Lair, CoolROM and the Internet
+  Archive (browser extension)
 - Check that the supported sites and the igir pin still match (`romledger canary`; runs weekly in CI)
 
 Vimm's Lair is manual; see [docs/sources.md](docs/sources.md).
@@ -68,5 +70,6 @@ romledger serve --open
 
 See [docs/setup.md](docs/setup.md) for all options,
 [docs/deploy.md](docs/deploy.md) to run it as a container,
+[docs/extension.md](docs/extension.md) for the browser extension,
 [docs/sources.md](docs/sources.md) for download sources and
 [docs/troubleshooting.md](docs/troubleshooting.md) for error messages.

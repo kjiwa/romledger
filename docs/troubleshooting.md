@@ -263,3 +263,30 @@ Not an error: `canary` could not conclude for that site (`HTTP 403`, `HTTP 429`,
 other unexpected status, `request failed (...)`, `bot challenge page`, or a robots.txt refusal) and skipped its other
 checks. The exit status is not affected. Run it again later. A rate limit on GitHub's API clears
 by itself; set `GITHUB_TOKEN` to raise it.
+
+## `Open the romledger options and enter the service URL and token.`
+
+Shown by the browser extension. Cause: the options are empty. Fix: follow
+[extension.md](extension.md#connect-it-to-romledger).
+
+## `Cannot reach <url>. Is romledger serve running?`
+
+Shown by the browser extension. Cause: nothing answers at the service URL, or the browser has no
+permission for that address. Fix: start `romledger serve`, correct the URL in the options, and
+choose Save and test to grant access.
+
+## `The service rejected the token. Check it in the options.`
+
+Shown by the browser extension. Cause: the token differs from `<data>/serve.token` or
+`$ROMLEDGER_TOKEN`. Fix: copy the part after `?token=` in the link `romledger serve` prints.
+
+## `The service answered HTTP N.`
+
+Shown by the browser extension. Fix: read the server's output and see the entry for that status
+above.
+
+## `... page layout not recognized: ...`
+
+Shown in the extension popup. Cause: Vimm's Lair or CoolROM changed its markup, so the extension
+found no game data or links. Fix: report it; the page parsers are in `extension/content/` and
+`extension/lib/romledger.js`.
