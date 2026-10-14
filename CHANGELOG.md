@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Install from PyPI: `uv tool install romledger` or `pipx install romledger`.
+- The container image is published to `ghcr.io/kjiwa/romledger` for `linux/amd64` and
+  `linux/arm64`, and the Compose example pulls it.
+- Each release attaches `romledger-extension-<version>.zip` for loading the extension unpacked.
+- The extension options page starts with `http://127.0.0.1:8730`.
+- Documentation and examples no longer assume a particular host, a network share or RomM; the
+  contributor material moved to `CONTRIBUTING.md`.
+
 ## 0.1.0
 
 First release.

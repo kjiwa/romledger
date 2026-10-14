@@ -2,22 +2,28 @@
 
 Run romledger as a container on a home server, a single-board computer or a workstation, next to
 your library. The image bundles Python, Node.js and igir for `linux/amd64` and `linux/arm64`.
-Nothing is published to a registry: you build the image yourself, on the host that runs it or on
-another machine.
+It is published to the GitHub Container Registry; you can also build it yourself.
 
 ## Requirements
 
-- Docker with Compose and Buildx, on the machine that builds and on the machine that runs.
+- Docker with Compose on the machine that runs it. Buildx is needed only to build the image yourself.
 - A library directory laid out as in [setup.md](setup.md): `roms/<platform>/` and an `inbox/`.
 - About 2 GiB of memory for the container. A scan of the NES, PS1, PS2 and GBA DATs peaked near
   1 GiB.
 
-## Build the image
+## Get the image
 
-On the machine that will run it, from a checkout of the repository:
+Pull it on the machine that will run it:
 
 ```sh
-docker build -t romledger:latest .
+docker pull ghcr.io/kjiwa/romledger:latest
+```
+
+Releases are also tagged by version, such as `ghcr.io/kjiwa/romledger:0.2.0`. To build it
+yourself instead, run this from a checkout of the repository:
+
+```sh
+docker build -t ghcr.io/kjiwa/romledger:latest .
 ```
 
 `docker compose up -d --build` (see [Run it](#run-it)) builds it too. To build for another
@@ -25,7 +31,7 @@ architecture, name the target platform. Buildx emulates it when it differs from 
 is slower than a native build:
 
 ```sh
-docker buildx build --platform linux/arm64 -t romledger:latest -o type=docker,dest=romledger.tar .
+docker buildx build --platform linux/arm64 -t ghcr.io/kjiwa/romledger:latest -o type=docker,dest=romledger.tar .
 ```
 
 - Docker Desktop (macOS, Windows) emulates other architectures out of the box.
@@ -39,7 +45,7 @@ docker buildx build --platform linux/arm64 -t romledger:latest -o type=docker,de
 If you built elsewhere, copy the archive and load it. A pipe over SSH needs no intermediate file:
 
 ```sh
-docker save romledger:latest | ssh HOST docker load
+docker save ghcr.io/kjiwa/romledger:latest | ssh HOST docker load
 ```
 
 Or from a file you built with `-o type=docker,dest=romledger.tar`:
@@ -49,7 +55,7 @@ scp romledger.tar HOST:
 ssh HOST docker load -i romledger.tar
 ```
 
-`docker load` prints `Loaded image: romledger:latest`.
+`docker load` prints `Loaded image: ghcr.io/kjiwa/romledger:latest`.
 
 ## Run it
 
@@ -120,15 +126,17 @@ and let RomM's scheduled rescan pick up new games; see `hooks.after_import` in
 
 ## Update
 
-Pull the new source, then rebuild and recreate the container:
+Pull the new image and recreate the container:
 
 ```sh
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
+From a source checkout, pull the new source and run `docker compose up -d --build` instead.
 If you load images instead, load the new one and run `docker compose up -d`.
 
-Compose recreates the container when the `romledger:latest` image has changed. `data/` survives.
+Compose recreates the container when the `ghcr.io/kjiwa/romledger:latest` image has changed. `data/` survives.
 
 ## Mount a network share
 

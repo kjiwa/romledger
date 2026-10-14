@@ -1,7 +1,7 @@
 services:
   romledger:
     build: .
-    image: romledger:latest
+    image: ghcr.io/kjiwa/romledger:latest
     init: true
     restart: unless-stopped
     mem_limit: 2g

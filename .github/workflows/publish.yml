@@ -1,0 +1,78 @@
+name: publish
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: gh extension install kjiwa/gh-cut
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: gh cut check "$TAG" "$TITLE"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          TITLE: ${{ github.event.release.name }}
+
+  pypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: uv build
+      - run: uvx twine check dist/*
+      - run: uv publish --trusted-publishing always
+
+  extension:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cd extension && zip -r "../romledger-extension-${TAG#v}.zip" .
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+      - run: gh release upload "$TAG" "romledger-extension-${TAG#v}.zip" --clobber --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+
+  image:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker run --privileged --rm tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 --install arm64
+      - run: docker buildx create --use
+      - run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: |
+          set -- -t "ghcr.io/kjiwa/romledger:${TAG#v}"
+          if [ "$PRERELEASE" = "false" ]; then
+            set -- "$@" -t ghcr.io/kjiwa/romledger:latest
+          fi
+          docker buildx build --platform linux/amd64,linux/arm64 "$@" --push .
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
