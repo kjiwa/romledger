@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_parts.html" import icon %}
+{% block title %}{{ title }}{% endblock %}
+{% block main %}
+<section class="empty empty-error" aria-labelledby="error-title">
+  <p class="slug">Error {{ code }}</p>
+  <h1 id="error-title">{{ title }}</h1>
+  <p>{{ message }}</p>
+  {% if code == 401 %}
+  <p>To print the link, run this in a terminal on the machine that hosts romledger.</p>
+  <pre><code>romledger serve</code></pre>
+  {% else %}
+  <p><a class="button" href="/">Back to the overview</a></p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,8 +1,9 @@
+import sys
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from romledger import dats, igir, state
+from romledger import datindex, dats, igir, state
 from romledger.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
@@ -50,6 +51,13 @@ def missing_games(data_dir: Path, slug: str) -> list[str]:
         return database.missing(slug)
 
 
+def scan_each(slugs: Sequence[str], scan_one: Callable[[str], None]) -> None:
+    for slug in slugs:
+        print(f"scanning {slug} ...", file=sys.stderr)
+        scan_one(slug)
+    print(f"scanned {len(slugs)} platform(s)")
+
+
 def scan_platform(
     config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
 ) -> None:
@@ -68,6 +76,7 @@ def scan_platform(
         database.replace_platform(
             slug, items, unmatched, dats.version_of(dat), datetime.now(UTC).isoformat()
         )
+        datindex.ensure(database, slug, dat)
 
 
 def _report(

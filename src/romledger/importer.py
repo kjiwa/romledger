@@ -8,6 +8,8 @@ from pathlib import Path
 from romledger import dats, igir, scan
 from romledger.config import Config, ConfigError
 
+NO_PLATFORMS = "no platforms configured. Add a [platforms.<slug>] table; see docs/setup.md."
+
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]
 PathTest = Callable[[Path], bool]
@@ -35,9 +37,7 @@ def import_inboxes(
 ) -> ImportResult:
     slugs = list(config.platforms)
     if not slugs:
-        raise ConfigError(
-            "no platforms configured. Add a [platforms.<slug>] table; see docs/setup.md."
-        )
+        raise ConfigError(NO_PLATFORMS)
     scan.require_dats(config, slugs, data_dir)
     dat_files = [dats.dat_path(data_dir, config.platforms[slug].dat) for slug in slugs]
     inboxes = config.library.inboxes
@@ -58,6 +58,26 @@ def import_inboxes(
     for slug in moved:
         scan.scan_platform(config, slug, data_dir, igir_report)
     return ImportResult(moved, duplicates, unmatched, _run_hooks(config, moved, hook))
+
+
+def import_lines(result: ImportResult, *, dry_run: bool) -> list[str]:
+    verb, moved_to = ("would move", "would move to") if dry_run else ("moved", "moved to")
+    lines = [f"{verb} {slug} {count}" for slug, count in result.moved.items()]
+    if result.duplicates:
+        lines.append(
+            f"duplicates {len(result.duplicates)} ({moved_to} <inbox>/{igir.DUPLICATES_DIR})"
+        )
+    if result.unmatched:
+        lines.append(f"unmatched {len(result.unmatched)} ({moved_to} <inbox>/{igir.UNMATCHED_DIR})")
+    return lines or ["inbox is empty"]
+
+
+def print_result(result: ImportResult, *, dry_run: bool) -> int:
+    for line in import_lines(result, dry_run=dry_run):
+        print(line)
+    for failure in result.hook_failures:
+        print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
+    return 1 if result.hook_failures else 0
 
 
 def _paths(rows: Sequence[igir.ReportRow], status: str) -> list[Path]:
@@ -88,14 +108,14 @@ def _relocate(paths: Sequence[Path], inboxes: Sequence[Path], directory: str) ->
                 file=sys.stderr,
             )
             continue
-        destination = _free(inbox / directory / path.relative_to(inbox))
+        destination = free_path(inbox / directory / path.relative_to(inbox))
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(path, destination)
         relocated.append(destination)
     return relocated
 
 
-def _free(path: Path) -> Path:
+def free_path(path: Path) -> Path:
     candidate, number = path, 0
     while candidate.exists():
         number += 1

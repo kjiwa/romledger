@@ -54,6 +54,47 @@ Cause: `scan` or `import` ran before the DAT was downloaded. Fix: run `romledger
 
 Cause: `missing X` ran before the first scan. Fix: run `romledger scan X`.
 
+## `<path>: token is shorter than 16 characters. ...`
+
+Cause: `serve.token` in the data directory, or `ROMLEDGER_TOKEN`, is too short to be safe. Fix:
+delete the file to generate a new token, or set a longer `ROMLEDGER_TOKEN`.
+
+## `--port: 'X' is not a port between 1 and 65535`
+
+Cause: `serve --port` got something else. Fix: pass a number in that range.
+
+## `Missing or invalid access token` (HTTP 401)
+
+Cause: the browser has no session or the token changed. Fix: run `romledger serve` and open the
+link it prints. Scripts send `Authorization: Bearer <token>`.
+
+## `Cross-origin requests are not allowed.` (HTTP 403)
+
+Cause: a POST came from a page on another origin, such as a different host name or port than the
+one the dashboard was opened on. Fix: open the dashboard at the address you started it on.
+
+## `a scan is already running. Wait for it to finish.` (HTTP 409)
+
+Cause: a scan or import was started while another runs. Fix: wait; Activity shows progress.
+
+## `a scan is running; upload again when it finishes` (HTTP 409)
+
+Cause: uploads are refused while a scan or import runs, so the job never sees a half-written
+file. Fix: upload again when Activity shows the job finished.
+
+## `names ending in .part are reserved for unfinished uploads`
+
+Cause: an uploaded file name ends in `.part`. Fix: rename the file before uploading.
+
+## `send the files as multipart/form-data`, `the upload ended early`, `the upload is malformed`
+
+Cause: the upload was not a form, or the connection dropped mid-file. Nothing from the unfinished
+file is kept. Fix: upload again, with `-F files=@<file>` from `curl`.
+
+## `cannot write to <inbox>: ...`
+
+Cause: the inbox is read-only or full. Fix: check the share's permissions and free space.
+
 ## `igir not found and Node.js 22.22+ (with npx) is required to run it`
 
 Cause: neither `igir` nor `npx` is on `PATH`. Fix: install Node.js 22.22 or newer, or put

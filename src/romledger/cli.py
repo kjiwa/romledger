@@ -3,39 +3,34 @@ import dataclasses
 import functools
 import json
 import os
-import re
 import sys
+import webbrowser
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from pathlib import Path
-from urllib.parse import quote_plus
+
+import uvicorn
 
 from romledger import (
     __version__,
     canary,
     config,
+    datindex,
     dats,
     fetch,
     http,
     igir,
     importer,
+    links,
     registry,
     scan,
     state,
 )
+from romledger.context import Context, load_context
+from romledger.web import auth
+from romledger.web.app import create_app
 
-VIMM_URL = "https://vimm.net/vault/?p=list&system={system}&q={query}"
-TAGS = re.compile(r"\s*\([^)]*\)")
-MIN_QUERY = 3
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8730
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
-
-
-@dataclass(frozen=True)
-class Context:
-    path: Path
-    config: config.Config
-    platforms: dict[str, registry.Entry]
-    data_dir: Path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,6 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     update = dats_commands.add_parser("update", help="download the latest DATs")
     update.set_defaults(command="dats update")
     update.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all configured")
+    index = dats_commands.add_parser("index", help="rebuild the DAT hash index")
+    index.set_defaults(command="dats index")
+    index.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all configured")
     scan_parser = commands.add_parser("scan", help="match library and inbox files to DATs")
     scan_parser.add_argument(
         "platforms", nargs="*", metavar="PLATFORM", help="default: all configured"
@@ -84,21 +82,27 @@ def build_parser() -> argparse.ArgumentParser:
     missing = commands.add_parser("missing", help="list the games a platform is missing")
     missing.add_argument("platform", metavar="PLATFORM")
     missing.add_argument("--links", action="store_true", help="append a Vimm's Lair search URL")
+    serve_parser = commands.add_parser("serve", help="run the local dashboard and API")
+    serve_parser.add_argument(
+        "--host", default=DEFAULT_HOST, help=f"address to bind (default: {DEFAULT_HOST})"
+    )
+    serve_parser.add_argument(
+        "--port", type=port_number, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})"
+    )
+    serve_parser.add_argument("--open", action="store_true", help="open the dashboard in a browser")
     return parser
+
+
+def port_number(text: str) -> int:
+    if not text.isdigit() or not 1 <= int(text) <= 65535:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a port between 1 and 65535")
+    return int(text)
 
 
 def positive_int(text: str) -> int:
     if not text.isdigit() or int(text) < 1:
         raise argparse.ArgumentTypeError(f"{text!r} is not a positive integer")
     return int(text)
-
-
-def load_context(config_arg: str | None) -> Context:
-    path = config.resolve_path(config_arg)
-    platforms = registry.load()
-    loaded = config.load(path, platforms)
-    config.check_library(loaded)
-    return Context(path, loaded, platforms, config.data_dir())
 
 
 def selected(context: Context, names: Sequence[str]) -> list[str]:
@@ -149,10 +153,7 @@ def scan_platforms(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     slugs = selected(context, args.platforms)
     scan.require_dats(context.config, slugs, context.data_dir)
-    for slug in slugs:
-        print(f"scanning {slug} ...", file=sys.stderr)
-        scan.scan_platform(context.config, slug, context.data_dir)
-    print(f"scanned {len(slugs)} platform(s)")
+    scan.scan_each(slugs, lambda slug: scan.scan_platform(context.config, slug, context.data_dir))
     return 0
 
 
@@ -162,23 +163,7 @@ def import_games(args: argparse.Namespace) -> int:
 
 def run_import(context: Context, dry_run: bool) -> int:
     result = importer.import_inboxes(context.config, context.data_dir, dry_run)
-    for line in import_lines(result, dry_run=dry_run):
-        print(line)
-    for failure in result.hook_failures:
-        print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
-    return 1 if result.hook_failures else 0
-
-
-def import_lines(result: importer.ImportResult, *, dry_run: bool) -> list[str]:
-    verb, moved_to = ("would move", "would move to") if dry_run else ("moved", "moved to")
-    lines = [f"{verb} {slug} {count}" for slug, count in result.moved.items()]
-    if result.duplicates:
-        lines.append(
-            f"duplicates {len(result.duplicates)} ({moved_to} <inbox>/{igir.DUPLICATES_DIR})"
-        )
-    if result.unmatched:
-        lines.append(f"unmatched {len(result.unmatched)} ({moved_to} <inbox>/{igir.UNMATCHED_DIR})")
-    return lines or ["inbox is empty"]
+    return importer.print_result(result, dry_run=dry_run)
 
 
 def fetch_games(args: argparse.Namespace) -> int:
@@ -243,16 +228,33 @@ def show_missing(args: argparse.Namespace) -> int:
     games = scan.missing_games(context.data_dir, slug)
     vimm = context.platforms[slug].vimm if slug in context.platforms else None
     for game in games:
-        link = vimm_link(vimm, game) if args.links and vimm else None
+        link = links.vimm_search(vimm, game) if args.links and vimm else None
         print(f"{game}\t{link}" if link else game)
     return 0
 
 
-def vimm_link(system: str, game: str) -> str | None:
-    query = TAGS.sub("", game).strip()
-    if len(query) < MIN_QUERY:
-        return None
-    return VIMM_URL.format(system=system, query=quote_plus(query))
+def index_dats(args: argparse.Namespace) -> int:
+    context = load_context(args.config)
+    slugs = selected(context, args.platforms)
+    scan.require_dats(context.config, slugs, context.data_dir)
+    with state.State(context.data_dir / "state.db") as database:
+        for slug in slugs:
+            dat = dats.dat_path(context.data_dir, context.config.platforms[slug].dat)
+            rebuilt = datindex.ensure(database, slug, dat)
+            print(f"{slug} {'indexed' if rebuilt else 'unchanged'}")
+    return 0
+
+
+def serve(args: argparse.Namespace) -> int:
+    context = load_context(args.config)
+    token = auth.load_token(context.data_dir)
+    app = create_app(lambda: load_context(args.config), token)
+    url = f"http://{args.host}:{args.port}/?token={token}"
+    print(f"romledger dashboard: {url}", flush=True)
+    if args.open:
+        webbrowser.open(url)
+    uvicorn.run(app, host=args.host, port=args.port, access_log=False)
+    return 0
 
 
 def run_canary(args: argparse.Namespace) -> int:
@@ -285,12 +287,14 @@ def run_canary(args: argparse.Namespace) -> int:
 HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "config": show_config,
     "dats update": update_dats,
+    "dats index": index_dats,
     "scan": scan_platforms,
     "import": import_games,
     "fetch": fetch_games,
     "status": show_status,
     "missing": show_missing,
     "canary": run_canary,
+    "serve": serve,
 }
 
 
