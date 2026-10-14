@@ -33,7 +33,7 @@ archive_item = "No-Intro_Atari7800"
 dat = "no-intro/Some - Custom System"
 
 [hooks]
-after_import = [["touch", "~/roms/.imported"]]
+after_import = [["touch", "/path/to/roms/.imported"]]
 
 [network]
 proxy = "socks5h://proxy.example:1080"

@@ -25,7 +25,6 @@ architecture, name the target platform. Buildx emulates it when it differs from 
 is slower than a native build:
 
 ```sh
-docker buildx build --platform linux/amd64 -t romledger:latest -o type=docker,dest=romledger.tar .
 docker buildx build --platform linux/arm64 -t romledger:latest -o type=docker,dest=romledger.tar .
 ```
 

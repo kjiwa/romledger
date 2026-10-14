@@ -156,7 +156,7 @@ def _parse_hooks(path: Path, table: dict[str, Any]) -> Hooks:
     ):
         raise ConfigError(
             f"{path}: hooks.after_import must be a list of commands, each a non-empty list of "
-            'non-empty strings, e.g. [["touch", "~/roms/.imported"]].'
+            'non-empty strings, e.g. [["touch", "/path/to/roms/.imported"]].'
         )
     return Hooks(after_import=tuple(tuple(argv) for argv in commands))
 

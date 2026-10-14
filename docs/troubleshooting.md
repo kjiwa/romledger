@@ -124,7 +124,7 @@ one code or remove the key to use the default.
 ## `hooks.after_import must be a list of commands`
 
 Cause: the value is not a list of argument lists, or an argument is empty. Fix: write
-`after_import = [["touch", "~/roms/.imported"]]`.
+`after_import = [["touch", "/path/to/roms/.imported"]]`.
 
 ## `unknown key hooks.X`
 
