@@ -1,0 +1,12 @@
+services:
+  romledger:
+    image: romledger:latest
+    init: true
+    restart: unless-stopped
+    mem_limit: 2g
+    ports:
+      - "${ROMLEDGER_BIND:-127.0.0.1}:8730:8730"
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+      - ${ROMLEDGER_LIBRARY:-./library}:/library
