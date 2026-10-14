@@ -13,6 +13,9 @@ from demo_library import PAGES, TOKEN, build, serve
 from playwright.sync_api import Page, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from romledger import dats
+from romledger.context import load_context
+
 MAX_TABS = 400
 FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])"
 DROP = """(name) => {
@@ -70,12 +73,35 @@ def drop_upload(page: Page, base: str, inbox: Path) -> list[str]:
     return problems
 
 
+def import_form(page: Page, base: str) -> list[str]:
+    page.goto(f"{base}/inbox")
+    page.click("form[action='/import'] button")
+    try:
+        page.wait_for_url("**/activity")
+    except PlaywrightTimeoutError:
+        return ["import: form post did not reach /activity: " + page.inner_text("body")[:200]]
+    return []
+
+
+def touch_dats() -> None:
+    context = load_context(None)
+    for platform in context.config.platforms.values():
+        path = dats.dat_path(context.data_dir, platform.dat)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+
+
 def main() -> int:
     problems = []
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         build(root)
-        server, base = serve()
+        touch_dats()
+        server, base = serve(
+            igir_report=lambda *args, **kwargs: [],
+            igir_move=lambda *args: None,
+            hook=lambda argv: 0,
+        )
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page()
@@ -83,6 +109,7 @@ def main() -> int:
             for path in PAGES.values():
                 problems += tab_through(page, path)
             problems += drop_upload(page, base, root / "inbox")
+            problems += import_form(page, base)
             browser.close()
         server.should_exit = True
         time.sleep(0.5)

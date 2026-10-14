@@ -82,8 +82,8 @@ The container runs as user 1000. That user must be able to write `data/` (hence 
 `roms/` tree and the inbox. `data/` holds the DATs, igir's hash cache and `state.db`; keep it on a local disk, not
 on the network share.
 
-Read the sign-in link from the log, replace `0.0.0.0` with the address you reach the host at, and
-open it once in a browser:
+Read the sign-in link from the log and open it once in a browser. The link names `localhost`; when
+you open it from another machine, replace `localhost` with the address you reach the host at:
 
 ```sh
 docker compose logs romledger

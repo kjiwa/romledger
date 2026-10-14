@@ -73,7 +73,7 @@ def test_security_headers_on_every_response(env: Env) -> None:
         assert "default-src 'self'" in response.headers["content-security-policy"]
         assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
         assert response.headers["x-content-type-options"] == "nosniff"
-        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["referrer-policy"] == "same-origin"
     assert env.client.get("/").headers["cache-control"] == "no-store"
     assert "cache-control" not in env.client.get("/static/app.css").headers
 
