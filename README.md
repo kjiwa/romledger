@@ -52,7 +52,15 @@ pipx install romledger
 
 ## Configure
 
-Create `~/.config/romledger/config.toml`:
+```sh
+romledger init
+```
+
+It asks for a ROM folder and the platforms to track, creates `<roms>/library` and `<roms>/inbox`,
+and writes `~/.config/romledger/config.toml`. `romledger platforms` lists the platform names.
+Without a terminal, pass `romledger init --roms ~/roms --platform nes --platform snes`.
+
+To write the file by hand instead, use this:
 
 ```toml
 [library]

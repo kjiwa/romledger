@@ -22,6 +22,7 @@ from romledger import (
     links,
     registry,
     scan,
+    setup,
     state,
 )
 from romledger.context import Context, load_context
@@ -47,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
         "$XDG_CONFIG_HOME/romledger/config.toml, i.e. ~/.config/romledger/config.toml)",
     )
     commands = parser.add_subparsers(dest="command", required=True, metavar="command")
+    init_parser = commands.add_parser("init", help="create the config file and library folders")
+    init_parser.add_argument("--roms", metavar="DIR", help="ROM folder (default: ~/roms)")
+    init_parser.add_argument(
+        "--platform", action="append", default=[], metavar="SLUG", help="platform to track; repeat"
+    )
+    init_parser.add_argument("--force", action="store_true", help="overwrite an existing config")
+    commands.add_parser("platforms", help="list the platforms romledger knows")
     commands.add_parser("config", help="validate the config file and print a summary")
     dats_parser = commands.add_parser("dats", help="manage platform DATs")
     dats_commands = dats_parser.add_subparsers(dest="dats_command", required=True, metavar="action")
@@ -120,6 +128,25 @@ def selected(context: Context, names: Sequence[str]) -> list[str]:
                 f"{', '.join(configured) or 'none'}."
             )
     return list(dict.fromkeys(names)) or configured
+
+
+def init_config(args: argparse.Namespace) -> int:
+    path = config.config_path(args.config)
+    setup.run_init(path, args.roms, args.platform, args.force, setup.stdin_is_terminal())
+    return 0
+
+
+def show_platforms(args: argparse.Namespace) -> int:
+    entries = registry.load()
+    configured: set[str] = set()
+    path = config.config_path(args.config)
+    if path.is_file():
+        try:
+            configured = set(config.load(path, entries).platforms)
+        except config.ConfigError as error:
+            print(f"romledger: warning: {error}", file=sys.stderr)
+    print("\n".join(setup.platform_lines(entries, configured)))
+    return 0
 
 
 def show_config(args: argparse.Namespace) -> int:
@@ -294,6 +321,8 @@ def run_canary(args: argparse.Namespace) -> int:
 
 
 HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "init": init_config,
+    "platforms": show_platforms,
     "config": show_config,
     "dats update": update_dats,
     "dats index": index_dats,
@@ -314,6 +343,9 @@ def main(argv: list[str] | None = None) -> int:
     except (config.ConfigError, dats.DatError, igir.ToolError) as error:
         print(f"romledger: error: {error}", file=sys.stderr)
         return 2
+    except setup.Interrupted:
+        print("romledger: error: cancelled", file=sys.stderr)
+        return 130
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0

@@ -23,14 +23,6 @@ LANGUAGES = [
 
 SOURCES = ("coolrom", "internet-archive")
 
-EXAMPLE = """\
-[library]
-roms = "~/roms/library"
-inboxes = ["~/roms/inbox"]
-
-[platforms.nes]
-"""
-
 
 class ConfigError(Exception):
     pass
@@ -71,19 +63,22 @@ class Config:
     network: Network = Network()
 
 
-def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
+def config_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
     env = os.environ if env is None else env
     if arg:
-        path = Path(arg).expanduser()
-    elif env.get(CONFIG_ENV):
-        path = Path(env[CONFIG_ENV]).expanduser()
-    else:
-        base = env.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-        path = Path(base) / "romledger" / "config.toml"
+        return Path(arg).expanduser()
+    if env.get(CONFIG_ENV):
+        return Path(env[CONFIG_ENV]).expanduser()
+    base = env.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "romledger" / "config.toml"
+
+
+def resolve_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
+    path = config_path(arg, env)
     if not path.is_file():
         raise ConfigError(
-            f"{path}: config file not found. Pass --config, set {CONFIG_ENV}, "
-            f"or create the file. Minimal example:\n\n{EXAMPLE}"
+            f"{path}: config file not found. Run `romledger init` to create it, "
+            f"or pass --config or set {CONFIG_ENV}."
         )
     return path
 

@@ -204,7 +204,7 @@ def test_resolve_missing_file(tmp_path: Path) -> None:
     message = str(error.value)
     assert str(tmp_path / "romledger" / "config.toml") in message
     assert "not found" in message
-    assert "[library]" in message
+    assert "romledger init" in message
 
 
 def test_check_library_ok(tmp_path: Path) -> None:
