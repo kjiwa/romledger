@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2
+
+- `import` files a game whose name the DAT repeats in separate blocks, such as `(USA)` and its
+  `(Alt)` dump or an NES game and its unheadered `.unh` twin. These were set aside as unwanted
+  because igir saw one game that no single file completed.
+- `fetch` skips a game whose earlier download is set aside in `<inbox>/unmatched`, `unwanted` or
+  `duplicates`, and prints `skipped <game>` and a `skipped` count, instead of downloading it again.
+- The database schema is v4. The DAT index rebuilds on first use; scans are kept.
+
 ## 0.3.1
 
 - `import` extracts ROMs from zips and files them under their DAT names. Zips whose ROM name differs

@@ -18,15 +18,18 @@ def parse(lines: Iterable[str]) -> Iterator[state.DatRom]:
     name: str | None = None
     fields: list[dict[str, str]] = []
     in_game = False
+    block = -1
     for raw in lines:
         line = raw.strip()
         if not in_game:
             in_game = GAME_START.match(line) is not None
             name, fields = None, []
+            if in_game:
+                block += 1
         elif line == ")":
             in_game = False
             if name is not None:
-                yield from _roms(name, fields or [{}])
+                yield from _roms(name, fields or [{}], block)
         elif (rom := ROM_LINE.match(line)) is not None:
             fields.append(_rom_fields(rom[1]))
         elif name is None and (named := NAME_LINE.match(line)) is not None:
@@ -40,7 +43,7 @@ def _rom_fields(text: str) -> dict[str, str]:
     return fields
 
 
-def _roms(game: str, fields: Iterable[dict[str, str]]) -> Iterator[state.DatRom]:
+def _roms(game: str, fields: Iterable[dict[str, str]], block: int) -> Iterator[state.DatRom]:
     for values in fields:
         size = values.get("size", "")
         yield state.DatRom(
@@ -50,6 +53,7 @@ def _roms(game: str, fields: Iterable[dict[str, str]]) -> Iterator[state.DatRom]
             int(size) if size.isdigit() else None,
             game,
             values.get("name"),
+            block,
         )
 
 
@@ -74,13 +78,13 @@ def catalog_games(roms: Iterable[state.DatRom]) -> list[catalog.Game]:
 
 
 def write_subset(path: Path, dat_name: str, roms: Iterable[state.DatRom]) -> None:
-    games: dict[str, list[state.DatRom]] = {}
+    blocks: dict[tuple[str, int], list[state.DatRom]] = {}
     for rom in roms:
-        games.setdefault(rom.game, []).append(rom)
+        blocks.setdefault((rom.game, rom.block), []).append(rom)
     lines = [
         '<?xml version="1.0"?>',
         f"<datafile><header><name>{_text(dat_name)}</name></header>",
-        *(_game_xml(game, game_roms) for game, game_roms in games.items()),
+        *(_game_xml(game, block_roms) for (game, _), block_roms in blocks.items()),
         "</datafile>",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")
