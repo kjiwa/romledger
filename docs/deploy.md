@@ -56,6 +56,7 @@ Copy [compose.yaml](../compose.yaml) to a directory on the host and create the c
 
 ```sh
 mkdir config data
+sudo chown 1000 data
 ```
 
 Write `config/config.toml` with container paths, as in [setup.md](setup.md):
@@ -74,12 +75,15 @@ Point `ROMLEDGER_LIBRARY` at your library directory (default `./library`) and st
 ROMLEDGER_LIBRARY=/mnt/roms docker compose up -d
 ```
 
-The container runs as user 1000. That user must be able to write `data/`, the `roms/` tree and
-the inbox. `data/` holds the DATs, igir's hash cache and `state.db`; keep it on a local disk, not
+The port is published on `127.0.0.1` only. To reach the dashboard from other machines on your
+network, also set `ROMLEDGER_BIND` to the host's address, or `0.0.0.0` for every interface.
+
+The container runs as user 1000. That user must be able to write `data/` (hence the `chown`), the
+`roms/` tree and the inbox. `data/` holds the DATs, igir's hash cache and `state.db`; keep it on a local disk, not
 on the network share.
 
-Read the sign-in link from the log, replace `0.0.0.0` with the host's address, and open it once
-in a browser:
+Read the sign-in link from the log, replace `0.0.0.0` with the address you reach the host at, and
+open it once in a browser:
 
 ```sh
 docker compose logs romledger

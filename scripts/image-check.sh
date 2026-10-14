@@ -5,9 +5,13 @@ set -eu
 readonly IMAGE="romledger:check"
 readonly TOKEN="image-check-token-0123456789"
 
+_main_work=""
+
 _cleanup() {
   docker rm -f romledger-check >/dev/null 2>&1 || true
-  rm -rf "$_main_work"
+  if [ -n "$_main_work" ]; then
+    rm -rf "$_main_work"
+  fi
 }
 
 _wait_for_api() {
@@ -43,6 +47,7 @@ main() {
 
   docker build -t "$IMAGE" "$_main_root"
   docker run --rm "$IMAGE" --version
+  docker run --rm --entrypoint igir "$IMAGE" --help >/dev/null
   docker run -d --name romledger-check -e "ROMLEDGER_TOKEN=$TOKEN" \
     -v "$_main_work/config:/config:ro" -v "$_main_work/library:/library" \
     -p 127.0.0.1::8730 "$IMAGE" >/dev/null
