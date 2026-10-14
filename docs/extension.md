@@ -2,7 +2,8 @@
 
 The extension marks games on Vimm's Lair, CoolROM and the Internet Archive as in your library, in
 your inbox, missing or not wanted, so you can browse and pick what to download. It never clicks or
-downloads anything.
+downloads anything; the one option that touches downloads is off until you turn it on (see
+[Save Vimm's Lair downloads](#save-vimms-lair-downloads-to-a-folder)).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/extension-popup-dark.png">
@@ -32,6 +33,18 @@ checkout works too: use its `extension` folder.
 
 The URL and token stay in this browser. The extension sends the SHA-1 hashes and titles it finds
 on a page only to that address.
+
+## Save Vimm's Lair downloads to a folder
+
+Optional, off by default, and Chromium-only. In the options, tick "Save Vimm's Lair downloads to
+Downloads/romledger". The browser asks for the `downloads` permission. From then on the extension
+saves downloads that come from Vimm's Lair (a `*.vimm.net` host) into `Downloads/romledger`, under
+the file name the site gave. Every other download is left alone.
+
+Add `~/Downloads/romledger` as an inbox (`romledger init` offers to) and `romledger serve` imports
+the files by itself; see [serve](setup.md#serve). To turn it off, untick the option; the extension
+gives the permission back. Firefox does not offer the event this needs, so the option is hidden
+there.
 
 ## What it shows
 

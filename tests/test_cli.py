@@ -1,13 +1,17 @@
 import json
 import os
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
 import pytest
 import uvicorn
+from fastapi import FastAPI
 
 from romledger import __version__, canary, cli, config, dats, fetch, http, importer, scan, state
+from romledger.context import Context
+from romledger.web import app as web_app
 
 
 @pytest.fixture(autouse=True)
@@ -646,6 +650,24 @@ def test_serve_prints_the_link_and_runs_uvicorn(
     assert opened == [f"http://192.0.2.10:9000/?token={token}"]
     assert calls[1]["host"] == "192.0.2.10"
     assert calls[1]["port"] == 9000
+
+
+def test_serve_imports_automatically_unless_told_not_to(
+    tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    flags: list[bool] = []
+    create = web_app.create_app
+
+    def record(factory: Callable[[], Context], token: str, *, auto_import: bool) -> FastAPI:
+        flags.append(auto_import)
+        return create(factory, token, auto_import=auto_import)
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: None)
+    monkeypatch.setattr("romledger.cli.create_app", record)
+    path = make_config(tmp_path)
+    assert run(path, "serve") == 0
+    assert run(path, "serve", "--no-auto-import") == 0
+    assert flags == [True, False]
 
 
 @pytest.mark.parametrize("host", cli.WILDCARD_HOSTS)

@@ -29,6 +29,11 @@
     </div>
   </form>
   <p id="result" role="status"></p>
+  <div class="field" id="route-field" hidden>
+    <label><input id="route" type="checkbox"> Save Vimm's Lair downloads to Downloads/romledger</label>
+    <p class="muted">Asks the browser for the downloads permission. Only downloads from Vimm's Lair are moved; point an inbox at that folder and <code>romledger serve</code> imports them.</p>
+  </div>
+  <p id="route-result" role="status"></p>
 </main>
 </body>
 </html>

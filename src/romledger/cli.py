@@ -104,6 +104,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--port", type=port_number, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})"
     )
     serve_parser.add_argument("--open", action="store_true", help="open the dashboard in a browser")
+    serve_parser.add_argument(
+        "--no-auto-import",
+        action="store_true",
+        help="do not import inbox files automatically once they stop changing",
+    )
     return parser
 
 
@@ -283,7 +288,7 @@ def index_dats(args: argparse.Namespace) -> int:
 def serve(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     token = auth.load_token(context.data_dir)
-    app = create_app(lambda: load_context(args.config), token)
+    app = create_app(lambda: load_context(args.config), token, auto_import=not args.no_auto_import)
     link_host = "localhost" if args.host in WILDCARD_HOSTS else args.host
     url = f"http://{link_host}:{args.port}/?token={token}"
     print(f"romledger dashboard: {url}", flush=True)

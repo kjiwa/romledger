@@ -1,4 +1,4 @@
-"""Check keyboard navigation and drag-and-drop upload against the demo dashboard.
+"""Check keyboard navigation, drag-and-drop upload and auto-import against the demo dashboard.
 
 Run through scripts/browser-check.sh, which supplies Playwright and romledger.
 """
@@ -13,10 +13,11 @@ from demo_library import PAGES, TOKEN, build, serve
 from playwright.sync_api import Page, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
-from romledger import dats
+from romledger import dats, igir
 from romledger.context import load_context
 
 MAX_TABS = 400
+AUTO_IMPORT_SECONDS = 15
 FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])"
 DROP = """(name) => {
     const data = new DataTransfer();
@@ -83,6 +84,59 @@ def import_form(page: Page, base: str) -> list[str]:
     return []
 
 
+def fake_report(
+    dat_files: object, inputs: list[Path], cache: object, excludes: object = ()
+) -> list[igir.ReportRow]:
+    return [
+        igir.ReportRow("demo", "FOUND", "game", str(path))
+        for inbox in inputs
+        for path in inbox.glob("*")
+        if path.is_file()
+    ]
+
+
+def fake_move(subsets: object, inputs: list[Path], *rest: object) -> None:
+    for inbox in inputs:
+        for path in inbox.glob("*"):
+            if path.is_file():
+                path.unlink()
+
+
+def auto_import(inbox: Path) -> list[str]:
+    for path in inbox.glob("*"):
+        if path.is_file():
+            path.unlink()
+    server, base = serve(
+        igir_report=fake_report,
+        igir_move=fake_move,
+        hook=lambda argv: 0,
+        auto_import=True,
+        poll_seconds=0.2,
+    )
+    problems = []
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        page.goto(f"{base}/?token={TOKEN}")
+        (inbox / "Auto Game (USA).nes").write_bytes(b"auto")
+        finished = False
+        deadline = time.monotonic() + AUTO_IMPORT_SECONDS
+        while not finished and time.monotonic() < deadline:
+            time.sleep(0.2)
+            page.goto(f"{base}/activity")
+            finished = page.locator(".record-title", has_text="Import").count() > 0
+        if not finished:
+            problems.append("auto-import: no import on /activity without pressing Import")
+        page.goto(f"{base}/inbox")
+        if "The inbox is empty" not in page.inner_text("main"):
+            problems.append("auto-import: the inbox page still lists the dropped file")
+        if "automatically" not in page.inner_text("main"):
+            problems.append("auto-import: the inbox page does not say auto-import is on")
+        browser.close()
+    server.should_exit = True
+    return problems
+
+
 def touch_dats() -> None:
     context = load_context(None)
     for platform in context.config.platforms.values():
@@ -112,6 +166,7 @@ def main() -> int:
             problems += import_form(page, base)
             browser.close()
         server.should_exit = True
+        problems += auto_import(root / "inbox")
         time.sleep(0.5)
     for problem in problems:
         print(problem)

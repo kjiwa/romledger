@@ -113,7 +113,34 @@ const romledger = (() => {
     return `${platform.have} of ${platform.wanted} wanted games (${platform.percent}%)`;
   }
 
+  const DOWNLOAD_FOLDER = "romledger";
+  const VIMM_DOWNLOAD_HOST = /^([a-z0-9-]+\.)+vimm\.net$/;
+
+  function hostOf(url) {
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
+  function isVimmDownload(item) {
+    return [item.finalUrl, item.url].some((url) => VIMM_DOWNLOAD_HOST.test(hostOf(url)));
+  }
+
+  function safeFilename(path) {
+    const name = String(path || "").split(/[\\/]/).pop();
+    return name.replace(/[\u0000-\u001f]/g, "").replace(/^\.+/, "").trim();
+  }
+
+  function downloadTarget(item) {
+    const name = safeFilename(item.filename);
+    return name === "" ? null : `${DOWNLOAD_FOLDER}/${name}`;
+  }
+
   const api = {
+    isVimmDownload,
+    downloadTarget,
     describe,
     best,
     regionsOf,

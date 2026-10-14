@@ -3,6 +3,10 @@
 const api = globalThis.browser ?? globalThis.chrome;
 const form = document.getElementById("form");
 const result = document.getElementById("result");
+const route = document.getElementById("route");
+const routeResult = document.getElementById("route-result");
+const ROUTE_KEY = "routeDownloads";
+const DOWNLOADS = { permissions: ["downloads"] };
 const DEFAULT_URL = "http://127.0.0.1:8730";
 
 function show(text, kind) {
@@ -11,7 +15,11 @@ function show(text, kind) {
 }
 
 async function load() {
-  const stored = await api.storage.local.get(["url", "token"]);
+  const stored = await api.storage.local.get(["url", "token", ROUTE_KEY]);
+  if (typeof api.runtime.getBrowserInfo !== "function") {
+    document.getElementById("route-field").hidden = false;
+    route.checked = stored[ROUTE_KEY] === true && (await api.permissions.contains(DOWNLOADS));
+  }
   form.url.value = stored.url || DEFAULT_URL;
   form.token.value = stored.token || "";
 }
@@ -43,5 +51,34 @@ async function save(event) {
   }
 }
 
+async function applyRoute(enabled) {
+  if (enabled) {
+    if (!(await api.permissions.request(DOWNLOADS))) {
+      throw new Error("The browser did not allow access to downloads.");
+    }
+  } else if (!(await api.permissions.remove(DOWNLOADS))) {
+    throw new Error("The browser did not give the downloads permission back.");
+  }
+  await api.storage.local.set({ [ROUTE_KEY]: enabled });
+}
+
+async function toggleRoute() {
+  const enabled = route.checked;
+  try {
+    await applyRoute(enabled);
+  } catch (error) {
+    const saved = await api.storage.local.get(ROUTE_KEY);
+    route.checked = saved[ROUTE_KEY] === true;
+    routeResult.textContent = error.message;
+    routeResult.dataset.kind = "error";
+    return;
+  }
+  routeResult.textContent = enabled
+    ? "Vimm's Lair downloads go to Downloads/romledger."
+    : "Downloads are left where the browser puts them.";
+  routeResult.dataset.kind = "ok";
+}
+
 form.addEventListener("submit", save);
+route.addEventListener("change", toggleRoute);
 load();
