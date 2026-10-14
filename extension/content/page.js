@@ -78,5 +78,13 @@ const page = (() => {
     panel("romledger").append(row(reply.error, failure(reply)));
   }
 
-  return { ask, setStatus, badge, matchBadge, panel, row, forEachLimited, failure, failurePanel };
+  async function run(work) {
+    try {
+      await work();
+    } catch (error) {
+      setStatus(false, `romledger could not annotate this page: ${error.message}`);
+    }
+  }
+
+  return { run, ask, setStatus, badge, matchBadge, panel, row, forEachLimited, failure, failurePanel };
 })();

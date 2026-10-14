@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
 
-const romledger = require("../lib/romledger.js");
+const romledger = require("../../extension/lib/romledger.js");
 
 function fixture(name) {
   return fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
@@ -31,6 +31,7 @@ test("parseAllMedia reads a single cartridge entry", () => {
 test("parseAllMedia returns null for a changed layout", () => {
   assert.equal(romledger.parseAllMedia("var other = 1;"), null);
   assert.equal(romledger.parseAllMedia("allMedia=[not json];"), null);
+  assert.equal(romledger.parseAllMedia('allMedia=[{"GoodTitle":"%%%","GoodSha1":"x"}];'), null);
   assert.equal(romledger.parseAllMedia('allMedia=[{"GoodTitle":"","GoodSha1":"x"}];'), null);
 });
 
@@ -43,6 +44,7 @@ test("site codes come from titles and paths", () => {
     romledger.coolromNameFromPath("/roms/genesis/47761/Saint_Sword_(Japan).php"),
     "Saint Sword (Japan)",
   );
+  assert.equal(romledger.coolromNameFromPath("/roms/genesis/1/100%_Fun.php"), "100% Fun");
   assert.equal(romledger.archiveItemFromPath("/details/No-Intro_NES"), "No-Intro_NES");
   assert.equal(romledger.archiveItemFromPath("/search"), null);
 });

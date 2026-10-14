@@ -24,9 +24,9 @@ function showError(text) {
 }
 
 async function showPageStatus() {
-  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   let reply;
   try {
+    const [tab] = await api.tabs.query({ active: true, currentWindow: true });
     reply = await api.tabs.sendMessage(tab.id, { type: "page-status" });
   } catch {
     return;
@@ -40,7 +40,9 @@ async function showPageStatus() {
 }
 
 async function main() {
-  const reply = await api.runtime.sendMessage({ type: "platforms" });
+  const reply = await api.runtime
+    .sendMessage({ type: "platforms" })
+    .catch(() => ({ ok: false, error: "The extension could not reach its background worker." }));
   if (reply.ok) {
     document.getElementById("platforms").replaceChildren(...reply.data.map(platformItem));
   } else {

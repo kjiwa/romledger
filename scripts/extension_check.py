@@ -98,7 +98,7 @@ def serve_fixture(route: Route) -> None:
 
 def patched_copy(directory: Path, base: str) -> Path:
     target = directory / "extension"
-    shutil.copytree(EXTENSION, target, ignore=shutil.ignore_patterns("test"))
+    shutil.copytree(EXTENSION, target)
     manifest = json.loads((target / "manifest.json").read_text())
     manifest["host_permissions"] = [f"{base}/*"]
     (target / "manifest.json").write_text(json.dumps(manifest))
@@ -148,13 +148,16 @@ def check_coolrom(context: BrowserContext) -> list[str]:
 
 def check_archive(context: BrowserContext) -> list[str]:
     problems = []
-    for item, expected in ((ITEM, "of 3 wanted games"), ("other", "Not configured")):
-        page = context.new_page()
-        page.goto(f"https://archive.org/details/{item}")
-        found = badges(page, 1)
-        page.close()
-        if expected not in found[0]:
-            problems.append(f"archive {item}: {found}")
+    page = context.new_page()
+    page.goto(f"https://archive.org/details/{ITEM}")
+    found = badges(page, 1)
+    if "of 3 wanted games" not in found[0]:
+        problems.append(f"archive {ITEM}: {found}")
+    page.goto("https://archive.org/details/other")
+    page.wait_for_timeout(1500)
+    if page.locator(".romledger-panel").count():
+        problems.append("archive other: a panel appeared on an unrelated item")
+    page.close()
     return problems
 
 

@@ -18,7 +18,17 @@ async function load() {
 async function save(event) {
   event.preventDefault();
   const url = form.url.value.trim().replace(/\/+$/, "");
-  const granted = await api.permissions.request({ origins: [`${new URL(url).origin}/*`] });
+  let origin;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    origin = "null";
+  }
+  if (!/^https?:\/\//.test(origin)) {
+    show("Enter the address with http:// or https://, such as http://127.0.0.1:8730.", "error");
+    return;
+  }
+  const granted = await api.permissions.request({ origins: [`${origin}/*`] });
   if (!granted) {
     show("The browser did not allow access to that address.", "error");
     return;

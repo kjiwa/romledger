@@ -1,4 +1,4 @@
-(async () => {
+page.run(async () => {
   "use strict";
 
   const GAME_PATH = /^\/vault\/\d+\/?$/;
@@ -8,7 +8,7 @@
     if (!byHash.ok) {
       return byHash;
     }
-    const first = byHash.data.matches[0];
+    const first = byHash.data.matches[0] || { state: "unknown" };
     if (first.state !== "unknown" || !slug) {
       return { ok: true, match: first };
     }
@@ -72,4 +72,4 @@
   } else if (new URLSearchParams(location.search).get("p") === "list") {
     await annotateList();
   }
-})();
+});

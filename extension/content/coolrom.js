@@ -1,4 +1,4 @@
-(async () => {
+page.run(async () => {
   "use strict";
 
   const GAME_LINK = /^\/roms\/([^/]+)\/\d+\/[^/]+\.php$/;
@@ -43,4 +43,4 @@
     seen.add(key);
     link.after(" ", await lookup(link.textContent.trim(), slug));
   });
-})();
+});

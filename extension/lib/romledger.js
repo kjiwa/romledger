@@ -38,11 +38,16 @@ const romledger = (() => {
     } catch {
       return null;
     }
-    const discs = media.map((entry) => ({
-      name: stripExtension(decodeBase64(entry.GoodTitle || "")),
-      sha1: String(entry.GoodSha1 || "").toLowerCase(),
-      serial: entry.Serial || "",
-    }));
+    let discs;
+    try {
+      discs = media.map((entry) => ({
+        name: stripExtension(decodeBase64(entry.GoodTitle || "")),
+        sha1: String(entry.GoodSha1 || "").toLowerCase(),
+        serial: entry.Serial || "",
+      }));
+    } catch {
+      return null;
+    }
     return discs.every((disc) => disc.sha1.length === HASH_LENGTH && disc.name) ? discs : null;
   }
 
@@ -58,7 +63,16 @@ const romledger = (() => {
 
   function coolromNameFromPath(path) {
     const found = /\/([^/]+)\.php$/.exec(path);
-    return found ? decodeURIComponent(found[1]).replaceAll("_", " ") : null;
+    if (!found) {
+      return null;
+    }
+    let name = found[1];
+    try {
+      name = decodeURIComponent(name);
+    } catch {
+      // keep the raw segment
+    }
+    return name.replaceAll("_", " ");
   }
 
   function archiveItemFromPath(path) {

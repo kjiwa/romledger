@@ -1,20 +1,19 @@
-(async () => {
+page.run(async () => {
   "use strict";
 
   const item = romledger.archiveItemFromPath(location.pathname);
-  const reply = await page.ask({ type: "platforms" });
   if (!item) {
     return;
   }
-  const panel = page.panel("romledger");
+  const reply = await page.ask({ type: "platforms" });
   if (!reply.ok) {
-    panel.append(page.failure(reply));
+    page.setStatus(false, reply.error);
     return;
   }
   const platform = reply.data.find((entry) => entry.sites.archive_item === item);
   if (!platform) {
-    panel.append(page.row("This item", page.badge("Not configured", "unknown", "No platform lists this item as archive_item.")));
+    page.setStatus(true, "This item is not any platform's archive_item.");
     return;
   }
-  panel.append(page.row(platform.name, page.badge(romledger.progress(platform), "have")));
-})();
+  page.panel("romledger").append(page.row(platform.name, page.badge(romledger.progress(platform), "have")));
+});

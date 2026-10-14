@@ -25,7 +25,11 @@ async function call(path) {
   if (!response.ok) {
     return { ok: false, error: `The service answered HTTP ${response.status}.` };
   }
-  return { ok: true, data: await response.json() };
+  try {
+    return { ok: true, data: await response.json() };
+  } catch {
+    return { ok: false, error: `The service at ${url} did not answer with JSON.` };
+  }
 }
 
 function route(message) {
@@ -44,4 +48,7 @@ function route(message) {
   return call(`/api/lookup?${query}`);
 }
 
-api.runtime.onMessage.addListener((message) => route(message));
+api.runtime.onMessage.addListener((message, _sender, respond) => {
+  route(message).then(respond);
+  return true;
+});

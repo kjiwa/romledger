@@ -61,7 +61,7 @@ the site changed; see [troubleshooting.md](troubleshooting.md).
 ## Check it
 
 ```sh
-node --test "extension/test/*.test.js"
+node --test "tests/extension/*.test.js"
 npx --yes addons-linter@10.14.0 extension
 sh scripts/extension-check.sh
 ```

@@ -70,7 +70,7 @@ jobs:
         with:
           node-version: 24
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      - run: node --test "extension/test/*.test.js"
+      - run: node --test "tests/extension/*.test.js"
       - run: npx --yes addons-linter@10.14.0 extension
       - run: sh scripts/extension-check.sh
 
