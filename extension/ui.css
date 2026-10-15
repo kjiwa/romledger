@@ -40,7 +40,13 @@ h1 {
   font-weight: 600;
 }
 
-input {
+.field label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--rl-space-2);
+}
+
+input:not([type="checkbox"]) {
   min-height: 44px;
   padding: var(--rl-space-2) var(--rl-space-3);
   border: 1px solid var(--rl-border);

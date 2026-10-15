@@ -163,6 +163,49 @@ const romledger = (() => {
     return name === "" ? null : `${DOWNLOAD_FOLDER}/${name}`;
   }
 
+  const VIMM_SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/[^/]+\/?$/;
+
+  function vimmListSystem(url) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+    if (parsed.searchParams.get("p") === "list") {
+      return parsed.searchParams.get("system") || null;
+    }
+    const section = VIMM_SECTION_PATH.exec(parsed.pathname);
+    return section ? decodeURIComponent(section[1]) : null;
+  }
+
+  function vimmDownloadUrl(doc, pageUrl) {
+    const form = doc.querySelector("#dl-form");
+    if (!form) {
+      return null;
+    }
+    let target;
+    try {
+      target = new URL(form.getAttribute("action") || "", pageUrl);
+    } catch {
+      return null;
+    }
+    target.protocol = "https:";
+    target.search = "";
+    const fields = [...form.querySelectorAll("input[name]")].filter((input) => !input.disabled);
+    for (const input of fields) {
+      target.searchParams.append(input.getAttribute("name"), input.getAttribute("value") || "");
+    }
+    const complete = target.searchParams.has("mediaId") && target.searchParams.has("token");
+    return complete && isVimmDownload({ url: target.href }) ? target.href : null;
+  }
+
+  function queueable(entries) {
+    const ready = entries.filter((entry) => entry.match.state === "missing");
+    const approximate = ready.filter((entry) => describe(entry.match).approximate).length;
+    return { ready, approximate };
+  }
+
   const api = {
     isVimmDownload,
     downloadTarget,
@@ -172,6 +215,9 @@ const romledger = (() => {
     parseAllMedia,
     stripExtension,
     vimmSystemFromTitle,
+    vimmListSystem,
+    vimmDownloadUrl,
+    queueable,
     coolromSystemFromPath,
     coolromNameFromPath,
     consoleromsSystemFromPath,

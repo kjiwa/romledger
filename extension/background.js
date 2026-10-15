@@ -7,6 +7,7 @@ if (typeof importScripts === "function") {
 const api = globalThis.browser ?? globalThis.chrome;
 const ROUTE_KEY = "routeDownloads";
 const NOT_CONFIGURED = "Open the romledger options and enter the service URL and token.";
+const DOWNLOADS_OFF = "Turn on the Vimm's Lair download option in the romledger options.";
 
 async function settings() {
   const stored = await api.storage.local.get(["url", "token"]);
@@ -37,8 +38,42 @@ async function call(path) {
   }
 }
 
+async function startDownload(url) {
+  const downloads = globalThis.chrome?.downloads;
+  const stored = await api.storage.local.get(ROUTE_KEY);
+  if (!downloads?.download || stored[ROUTE_KEY] !== true) {
+    return { ok: false, error: DOWNLOADS_OFF };
+  }
+  if (!romledger.isVimmDownload({ url })) {
+    return { ok: false, error: "Refused a download that is not from Vimm's Lair." };
+  }
+  try {
+    return { ok: true, id: await downloads.download({ url }) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+async function downloadState(id) {
+  const downloads = globalThis.chrome?.downloads;
+  if (!downloads?.search) {
+    return { ok: false, error: DOWNLOADS_OFF };
+  }
+  const [item] = await downloads.search({ id });
+  if (!item) {
+    return { ok: false, error: "The browser no longer lists this download." };
+  }
+  return { ok: true, state: item.state, filename: item.filename, reason: item.error || "" };
+}
+
 function route(message) {
   const query = new URLSearchParams();
+  if (message.type === "download") {
+    return startDownload(message.url);
+  }
+  if (message.type === "download-state") {
+    return downloadState(message.id);
+  }
   if (message.type === "platforms") {
     return call("/api/platforms");
   }

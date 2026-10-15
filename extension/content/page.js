@@ -60,6 +60,15 @@ const page = (() => {
     return element;
   }
 
+  function button(label, onClick) {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = "romledger-button";
+    element.textContent = label;
+    element.addEventListener("click", onClick);
+    return element;
+  }
+
   async function forEachLimited(items, work) {
     const queue = [...items];
     const workers = Array.from({ length: CONCURRENCY }, async () => {
@@ -86,5 +95,5 @@ const page = (() => {
     }
   }
 
-  return { run, ask, setStatus, badge, matchBadge, panel, row, forEachLimited, failure, failurePanel };
+  return { run, ask, setStatus, badge, matchBadge, panel, row, button, forEachLimited, failure, failurePanel };
 })();
