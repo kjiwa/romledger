@@ -14,7 +14,8 @@ can also download the missing games of a list page for you; that is off until yo
 
 The extension is not in any browser store. Download `romledger-extension-<version>.zip` from the
 [latest release](https://github.com/kjiwa/romledger/releases/latest) and unzip it. A source
-checkout works too: use its `extension` folder.
+checkout works too: use its `extension` folder. After unzipping over an older copy, press Reload on
+the extension's card in `chrome://extensions`; until then the browser keeps running the old version.
 
 - Chrome and other Chromium browsers: open `chrome://extensions`, turn on Developer mode, choose
   Load unpacked, and select the unzipped folder.
@@ -45,6 +46,11 @@ With it on, every download that comes from Vimm's Lair (a `*.vimm.net` host) is 
 missing" box. The button downloads each game marked Missing, one at a time, in the order of the
 page, and shows the saved path of each. Keep the tab open until it says Finished. Games matched by
 title (approximate) are included, so check their region and version first.
+
+Each download starts from the Vimm's Lair page the way a click on its Download button does. Games
+start at least 15 seconds apart. The queue stops at the first failed download, or when Vimm's Lair
+answers that you are going too fast; wait a while before starting it again. Chrome may ask once to
+allow Vimm's Lair to download multiple files.
 
 Vimm's Lair asks for a Turnstile check before it offers a download. The extension never solves it.
 When a game page comes back without a download form, the queue pauses; open any game page, pass
