@@ -173,6 +173,8 @@ test("vimmListSystem reads the system from query and section list pages", () => 
   assert.equal(system("https://vimm.net/vault/NES/number"), "NES");
   assert.equal(system("https://vimm.net/vault/77"), null);
   assert.equal(system("https://vimm.net/vault/"), null);
+  assert.equal(system("https://vimm.net/vault/search/foo"), null);
+  assert.equal(system("https://vimm.net/vault/N%E0%A4%A/A"), "N%E0%A4%A");
 });
 
 function formDocument(action, inputs) {

@@ -163,7 +163,15 @@ const romledger = (() => {
     return name === "" ? null : `${DOWNLOAD_FOLDER}/${name}`;
   }
 
-  const VIMM_SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/[^/]+\/?$/;
+  function safeDecode(text) {
+    try {
+      return decodeURIComponent(text);
+    } catch {
+      return text;
+    }
+  }
+
+  const VIMM_SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/(?:[A-Za-z]|number)\/?$/;
 
   function vimmListSystem(url) {
     let parsed;
@@ -176,7 +184,7 @@ const romledger = (() => {
       return parsed.searchParams.get("system") || null;
     }
     const section = VIMM_SECTION_PATH.exec(parsed.pathname);
-    return section ? decodeURIComponent(section[1]) : null;
+    return section ? safeDecode(section[1]) : null;
   }
 
   function vimmDownloadUrl(doc, pageUrl) {
@@ -192,9 +200,12 @@ const romledger = (() => {
     }
     target.protocol = "https:";
     target.search = "";
-    const fields = [...form.querySelectorAll("input[name]")].filter((input) => !input.disabled);
-    for (const input of fields) {
-      target.searchParams.append(input.getAttribute("name"), input.getAttribute("value") || "");
+    const fields = [...form.querySelectorAll("input[name], select[name]")].filter(
+      (field) => !field.disabled,
+    );
+    for (const field of fields) {
+      const value = field.tagName === "SELECT" ? field.value : field.getAttribute("value");
+      target.searchParams.append(field.getAttribute("name"), value || "");
     }
     const complete = target.searchParams.has("mediaId") && target.searchParams.has("token");
     return complete && isVimmDownload({ url: target.href }) ? target.href : null;

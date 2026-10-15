@@ -94,6 +94,7 @@ test("download refuses when the option is off, the permission is missing or the 
   const downloads = { download: async () => 1 };
   const off = await loadMessages({}, downloads)({ type: "download", url: GAME_URL });
   assert.equal(off.ok, false);
+  assert.equal(off.fatal, true);
   const missing = await loadMessages({ routeDownloads: true }, undefined)({ type: "download", url: GAME_URL });
   assert.equal(missing.ok, false);
   const foreign = await loadMessages({ routeDownloads: true }, downloads)({
@@ -115,4 +116,11 @@ test("download-state reports the state and the saved path", async () => {
     reason: "",
   });
   assert.equal((await ask({ type: "download-state", id: 8 })).ok, false);
+});
+
+test("download-cancel cancels the download", async () => {
+  const cancelled = [];
+  const ask = loadMessages({}, { cancel: async (id) => cancelled.push(id) });
+  assert.deepEqual(await ask({ type: "download-cancel", id: 7 }), { ok: true });
+  assert.deepEqual(cancelled, [7]);
 });

@@ -42,13 +42,26 @@ async function startDownload(url) {
   const downloads = globalThis.chrome?.downloads;
   const stored = await api.storage.local.get(ROUTE_KEY);
   if (!downloads?.download || stored[ROUTE_KEY] !== true) {
-    return { ok: false, error: DOWNLOADS_OFF };
+    return { ok: false, fatal: true, error: DOWNLOADS_OFF };
   }
   if (!romledger.isVimmDownload({ url })) {
     return { ok: false, error: "Refused a download that is not from Vimm's Lair." };
   }
   try {
     return { ok: true, id: await downloads.download({ url }) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+async function cancelDownload(id) {
+  const downloads = globalThis.chrome?.downloads;
+  if (!downloads?.cancel) {
+    return { ok: false, error: DOWNLOADS_OFF };
+  }
+  try {
+    await downloads.cancel(id);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -70,6 +83,9 @@ function route(message) {
   const query = new URLSearchParams();
   if (message.type === "download") {
     return startDownload(message.url);
+  }
+  if (message.type === "download-cancel") {
+    return cancelDownload(message.id);
   }
   if (message.type === "download-state") {
     return downloadState(message.id);

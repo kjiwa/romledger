@@ -2,6 +2,7 @@ page.run(async () => {
   "use strict";
 
   const GAME_PATH = /^\/vault\/\d+\/?$/;
+  const STOPPED = { ok: false, stopped: true, error: "Stopped." };
   const POLL_MS = 3000;
   const PAUSED =
     "Vimm's Lair did not offer a download. Open a game page, pass the check, then press Resume.";
@@ -72,7 +73,8 @@ page.run(async () => {
       }
       await sleep(POLL_MS);
     }
-    return { ok: false, error: "Stopped." };
+    await page.ask({ type: "download-cancel", id });
+    return STOPPED;
   }
 
   async function startDownload(entry, queue, controls) {
@@ -83,7 +85,7 @@ page.run(async () => {
       }
       await controls.pause(queue);
     }
-    return { ok: false, error: "Stopped." };
+    return STOPPED;
   }
 
   async function download(entry, queue, controls) {
@@ -109,7 +111,14 @@ page.run(async () => {
         break;
       }
       controls.progress(`Downloading ${index + 1} of ${ready.length}: ${entry.title}`);
-      controls.append(outcomeRow(entry, await download(entry, queue, controls)));
+      const outcome = await download(entry, queue, controls);
+      if (outcome.stopped) {
+        break;
+      }
+      controls.append(outcomeRow(entry, outcome));
+      if (outcome.fatal) {
+        queue.stopped = true;
+      }
     }
     controls.progress(queue.stopped ? "Stopped." : "Finished.");
   }
