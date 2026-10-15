@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+- The extension marks games on every Vimm's Lair letter page (`/vault/<system>/<letter>`), not only
+  the `number` page.
+- A Vimm's Lair list page gets a "Download N missing" box. With the download option on, it
+  downloads each missing game one at a time into `Downloads/romledger` and pauses when Vimm's Lair
+  withholds the download until you pass its check. The option is now worded "Download from Vimm's
+  Lair into Downloads/romledger".
+- The options checkbox lines up with its label.
+
 ## 0.4.1
 
 - `import` no longer fails partway when igir removes the emptied inbox the command was run from.
