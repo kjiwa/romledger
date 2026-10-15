@@ -315,6 +315,7 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
             f"--load-extension={extension}",
             "--disable-features=DisableLoadExtensionCommandLineSwitch",
             "--host-resolver-rules=MAP dl3.vimm.net 127.0.0.1",
+            "--no-sandbox",
             "--no-first-run",
             "about:blank",
         ],
