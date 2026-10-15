@@ -316,6 +316,8 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
             "--disable-features=DisableLoadExtensionCommandLineSwitch",
             "--host-resolver-rules=MAP dl3.vimm.net 127.0.0.1",
             "--no-sandbox",
+            "--use-mock-keychain",
+            "--password-store=basic",
             "--no-first-run",
             "about:blank",
         ],
