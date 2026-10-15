@@ -47,8 +47,12 @@ async function findDownload(url) {
   if (!romledger.isVimmDownload({ url })) {
     return { ok: false, error: "Refused a download that is not from Vimm's Lair." };
   }
-  const [item] = await downloads.search({ url });
-  return { ok: true, id: item ? item.id : null };
+  try {
+    const [item] = await downloads.search({ url });
+    return { ok: true, id: item ? item.id : null };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 async function cancelDownload(id) {

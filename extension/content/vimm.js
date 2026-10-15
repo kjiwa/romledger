@@ -137,7 +137,7 @@ page.run(async () => {
 
   async function waitForGap(startedAt, queue) {
     while (!queue.stopped && Date.now() - startedAt < GAP_MS) {
-      await sleep(Math.min(FIND_MS, GAP_MS));
+      await sleep(FIND_MS);
     }
   }
 
