@@ -81,24 +81,31 @@ function loadMessages(stored, downloads) {
 
 const GAME_URL = "https://dl3.vimm.net/?mediaId=9&token=t";
 
-test("download starts a Vimm download and answers with its id", async () => {
-  const started = [];
+test("download-find answers with the id of the download the page started", async () => {
+  const queries = [];
   const ask = loadMessages({ routeDownloads: true }, {
-    download: async (options) => (started.push(options.url), 7),
+    search: async (query) => (queries.push(query), [{ id: 7 }]),
   });
-  assert.deepEqual(await ask({ type: "download", url: GAME_URL }), { ok: true, id: 7 });
-  assert.deepEqual(started, [GAME_URL]);
+  assert.deepEqual(await ask({ type: "download-find", url: GAME_URL }), { ok: true, id: 7 });
+  assert.deepEqual(queries.map((query) => query.url), [GAME_URL]);
 });
 
-test("download refuses when the option is off, the permission is missing or the host is foreign", async () => {
-  const downloads = { download: async () => 1 };
-  const off = await loadMessages({}, downloads)({ type: "download", url: GAME_URL });
+test("download-find answers with no id while the browser lists nothing", async () => {
+  const ask = loadMessages({ routeDownloads: true }, { search: async () => [] });
+  assert.deepEqual(await ask({ type: "download-find", url: GAME_URL }), { ok: true, id: null });
+});
+
+test("download-find refuses when the option is off, the permission is missing or the host is foreign", async () => {
+  const downloads = { search: async () => [{ id: 1 }] };
+  const off = await loadMessages({}, downloads)({ type: "download-find", url: GAME_URL });
   assert.equal(off.ok, false);
-  assert.equal(off.fatal, true);
-  const missing = await loadMessages({ routeDownloads: true }, undefined)({ type: "download", url: GAME_URL });
+  const missing = await loadMessages({ routeDownloads: true }, undefined)({
+    type: "download-find",
+    url: GAME_URL,
+  });
   assert.equal(missing.ok, false);
   const foreign = await loadMessages({ routeDownloads: true }, downloads)({
-    type: "download",
+    type: "download-find",
     url: "https://example.com/?mediaId=9&token=t",
   });
   assert.equal(foreign.ok, false);

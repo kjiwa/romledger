@@ -160,6 +160,12 @@ def patched_copy(directory: Path, base: str) -> Path:
     manifest["host_permissions"] = [f"{base}/*"]
     manifest["permissions"] = [*manifest["permissions"], "downloads"]
     (target / "manifest.json").write_text(json.dumps(manifest))
+    script = target / "content" / "vimm.js"
+    source = script.read_text()
+    patched = source.replace("const GAP_MS = 15000;", "const GAP_MS = 100;")
+    if patched == source:
+        raise SystemExit("GAP_MS not found in content/vimm.js")
+    script.write_text(patched)
     return target
 
 
@@ -201,22 +207,40 @@ def check_vimm_list(context: BrowserContext) -> list[str]:
 
 
 STUB_DOWNLOADS = """() => {
-  globalThis.started = [];
-  chrome.downloads.download = async ({ url }) => {
-    globalThis.started.push(url);
-    return globalThis.started.length;
+  chrome.downloads.search = async ({ id, url }) => {
+    const number = id ?? Number(new URL(url).searchParams.get("mediaId")) - 30;
+    return [
+      {
+        id: number,
+        state: globalThis.stubState ?? "complete",
+        filename: `/saved/romledger/Game ${number}.zip`,
+      },
+    ];
   };
-  chrome.downloads.search = async ({ id }) => [
-    { state: "complete", filename: `/saved/romledger/Game ${id}.zip` },
-  ];
 }"""
 
 
 def check_vimm_queue(context: BrowserContext, worker: Worker) -> list[str]:
-    """Stubs the downloads API: file routing is covered by check_vimm_download."""
+    """Stubs the downloads search: file routing is covered by check_vimm_download."""
     worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
     worker.evaluate(STUB_DOWNLOADS)
     passed = {"check": False}
+    requests: list[tuple[str, str]] = []
+
+    def serve_download(route: Route) -> None:
+        referer = route.request.headers.get("referer", "")
+        requests.append((route.request.url, referer))
+        if referer.startswith("https://vimm.net/"):
+            route.fulfill(
+                status=200,
+                headers={
+                    "Content-Type": "application/zip",
+                    "Content-Disposition": 'attachment; filename="Game.zip"',
+                },
+                body="PK",
+            )
+        else:
+            route.fulfill(status=500, body="no referer")
 
     def withhold_form(route: Route) -> None:
         if passed["check"]:
@@ -225,6 +249,7 @@ def check_vimm_queue(context: BrowserContext, worker: Worker) -> list[str]:
             route.fulfill(status=200, content_type="text/html", body="<body>Checking</body>")
 
     context.route("https://vimm.net/vault/32", withhold_form)
+    context.route("https://dl3.vimm.net/**", serve_download)
     page = context.new_page()
     page.goto("https://vimm.net/vault/Genesis/F")
     panel = page.locator(".romledger-panel")
@@ -236,7 +261,7 @@ def check_vimm_queue(context: BrowserContext, worker: Worker) -> list[str]:
     start.click()
     resume = panel.get_by_role("button", name="Resume")
     resume.wait_for(timeout=10000)
-    if worker.evaluate("globalThis.started") != ["https://dl3.vimm.net/?mediaId=31&token=token31"]:
+    if [url for url, _ in requests] != ["https://dl3.vimm.net/?mediaId=31&token=token31"]:
         problems.append("vimm queue: the first download did not run alone before the pause")
     passed["check"] = True
     resume.click()
@@ -247,11 +272,72 @@ def check_vimm_queue(context: BrowserContext, worker: Worker) -> list[str]:
     expected = [f"/saved/romledger/Game {n}.zip" for n in (1, 2, 3)]
     if any(path not in text for path in expected):
         problems.append(f"vimm queue saved paths: {text!r}")
-    started = worker.evaluate("globalThis.started")
-    if started != [f"https://dl3.vimm.net/?mediaId={n}&token=token{n}" for n in (31, 32, 33)]:
-        problems.append(f"vimm queue downloads: {started}")
+    expected = [f"https://dl3.vimm.net/?mediaId={n}&token=token{n}" for n in (31, 32, 33)]
+    if [url for url, _ in requests] != expected:
+        problems.append(f"vimm queue downloads: {requests}")
+    if any(not referer.startswith("https://vimm.net/") for _, referer in requests):
+        problems.append(f"vimm queue referers: {requests}")
     page.close()
+    context.unroute("https://dl3.vimm.net/**", serve_download)
     context.unroute("https://vimm.net/vault/32", withhold_form)
+    return problems
+
+
+HTTP_TOO_MANY = 429
+LATER_GAMES = re.compile(r"https://vimm\.net/vault/3[23]$")
+
+
+def run_stopped_queue(
+    context: BrowserContext, worker: Worker, game_status: int, download_state: str
+) -> tuple[str, list[str], list[str]]:
+    seen: list[str] = []
+    worker.evaluate(f'globalThis.stubState = "{download_state}"')
+
+    def record(route: Route) -> None:
+        seen.append(route.request.url)
+        route.fulfill(status=200, headers={"Content-Disposition": "attachment"}, body="PK")
+
+    def answer(route: Route) -> None:
+        seen.append(route.request.url)
+        if game_status == HTTP_TOO_MANY:
+            route.fulfill(status=game_status, body="Too many requests")
+        else:
+            route.fallback()
+
+    context.route("https://dl3.vimm.net/**", record)
+    context.route(LATER_GAMES, answer)
+    page = context.new_page()
+    page.goto("https://vimm.net/vault/Genesis/F")
+    panel = page.locator(".romledger-panel")
+    panel.get_by_role("button", name="Download 3 missing").click()
+    page.wait_for_function(
+        "document.querySelector('.romledger-panel').innerText.includes('Stopped')", timeout=10000
+    )
+    page.wait_for_timeout(500)
+    text = panel.inner_text()
+    titles = panel.locator(".romledger-badge").evaluate_all("(nodes) => nodes.map((n) => n.title)")
+    page.close()
+    context.unroute("https://dl3.vimm.net/**", record)
+    context.unroute(LATER_GAMES, answer)
+    worker.evaluate("delete globalThis.stubState")
+    return text, titles, seen
+
+
+def check_vimm_queue_stops(context: BrowserContext, worker: Worker) -> list[str]:
+    """A 429 on a game page and a failed download each stop the queue before the later games."""
+    first = "https://dl3.vimm.net/?mediaId=31&token=token31"
+    cases = (
+        ("slow down", HTTP_TOO_MANY, "complete", "Vimm's Lair says to slow down.", 2),
+        ("failed download", 200, "interrupted", "interrupted", 1),
+    )
+    problems = []
+    for name, game_status, download_state, title, requests in cases:
+        text, titles, seen = run_stopped_queue(context, worker, game_status, download_state)
+        stopped = "Stopped after a failed download." in text
+        if not stopped or not any(title in found for found in titles) or len(seen) != requests:
+            problems.append(f"vimm queue {name}: {text!r} {titles} {seen}")
+        if seen[0] != first:
+            problems.append(f"vimm queue {name}: first request {seen}")
     return problems
 
 
@@ -457,6 +543,7 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
             + check_archive(context)
             + check_popup(context, extension_id, output)
             + check_vimm_queue(context, worker)
+            + check_vimm_queue_stops(context, worker)
             + check_unreachable(context, extension_id, worker)
             + check_vimm_download(playwright, directory, extension)
         )

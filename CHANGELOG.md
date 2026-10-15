@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- The "Download N missing" queue starts each download from the Vimm's Lair page, as the Download
+  button does. Downloads started from the extension's background were rejected with a server error.
+- The queue starts games at least 15 seconds apart and stops at the first failed download or when
+  Vimm's Lair says to slow down.
+
 ## 0.5.0
 
 - The extension marks games on every Vimm's Lair letter page (`/vault/<system>/<letter>`), not only

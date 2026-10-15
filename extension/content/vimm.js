@@ -4,6 +4,10 @@ page.run(async () => {
   const GAME_PATH = /^\/vault\/\d+\/?$/;
   const STOPPED = { ok: false, stopped: true, error: "Stopped." };
   const POLL_MS = 3000;
+  const FIND_MS = 1000;
+  const FIND_TRIES = 30;
+  const GAP_MS = 15000;
+  const SLOW_DOWN = "Vimm's Lair says to slow down. Try again later.";
   const PAUSED =
     "Vimm's Lair did not offer a download. Open a game page, pass the check, then press Resume.";
 
@@ -58,6 +62,9 @@ page.run(async () => {
 
   async function downloadUrlFor(gameUrl) {
     const response = await fetch(gameUrl, { credentials: "same-origin" });
+    if (response.status === 429) {
+      throw new Error(SLOW_DOWN);
+    }
     if (!response.ok) {
       return null;
     }
@@ -77,11 +84,34 @@ page.run(async () => {
     return STOPPED;
   }
 
+  async function findDownload(url, queue) {
+    for (let tries = 0; tries < FIND_TRIES && !queue.stopped; tries += 1) {
+      const reply = await page.ask({ type: "download-find", url });
+      if (!reply.ok || reply.id !== null) {
+        return reply;
+      }
+      await sleep(FIND_MS);
+    }
+    return queue.stopped ? STOPPED : { ok: false, error: "Vimm's Lair did not start the download." };
+  }
+
+  async function startFrom(url, queue) {
+    const frame = document.createElement("iframe");
+    frame.hidden = true;
+    frame.src = url;
+    document.body.append(frame);
+    try {
+      return await findDownload(url, queue);
+    } finally {
+      frame.remove();
+    }
+  }
+
   async function startDownload(entry, queue, controls) {
     while (!queue.stopped) {
       const url = await downloadUrlFor(entry.url);
       if (url) {
-        return page.ask({ type: "download", url });
+        return startFrom(url, queue);
       }
       await controls.pause(queue);
     }
@@ -105,22 +135,37 @@ page.run(async () => {
     return page.row(entry.title, page.badge("Failed", "error", error));
   }
 
+  async function waitForGap(startedAt, queue) {
+    while (!queue.stopped && Date.now() - startedAt < GAP_MS) {
+      await sleep(FIND_MS);
+    }
+  }
+
   async function downloadQueue(ready, queue, controls) {
+    let failed = false;
+    let startedAt = 0;
     for (const [index, entry] of ready.entries()) {
+      await waitForGap(startedAt, queue);
       if (queue.stopped) {
         break;
       }
+      startedAt = Date.now();
       controls.progress(`Downloading ${index + 1} of ${ready.length}: ${entry.title}`);
       const outcome = await download(entry, queue, controls);
       if (outcome.stopped) {
         break;
       }
       controls.append(outcomeRow(entry, outcome));
-      if (outcome.fatal) {
+      if (!(outcome.ok && outcome.state === "complete")) {
+        failed = true;
         queue.stopped = true;
       }
     }
-    controls.progress(queue.stopped ? "Stopped." : "Finished.");
+    if (failed) {
+      controls.progress("Stopped after a failed download.");
+    } else {
+      controls.progress(queue.stopped ? "Stopped." : "Finished.");
+    }
   }
 
   function queueControls(panel, queue) {
