@@ -85,6 +85,8 @@
   flex-direction: column;
   gap: var(--rl-space-2);
   max-width: min(24rem, calc(100vw - 2 * var(--rl-space-4)));
+  max-height: calc(100vh - 2 * var(--rl-space-4));
+  overflow-y: auto;
   padding: var(--rl-space-3);
   border: 1px solid var(--rl-border);
   border-radius: var(--rl-radius);
@@ -103,4 +105,23 @@
 
 .romledger-name {
   overflow-wrap: anywhere;
+}
+
+.romledger-button {
+  padding: var(--rl-space-1) var(--rl-space-3);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius);
+  background: var(--rl-surface);
+  color: var(--rl-text);
+  font: 600 var(--rl-text-sm) / 1.5 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.romledger-button:focus-visible {
+  outline: 2px solid var(--rl-focus);
+  outline-offset: 2px;
+}
+
+.romledger-button[hidden] {
+  display: none;
 }

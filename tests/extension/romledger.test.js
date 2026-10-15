@@ -165,3 +165,61 @@ test("downloadTarget keeps the file name and drops anything that could escape th
   assert.equal(target("dir/"), null);
   assert.equal(romledger.downloadTarget({}), null);
 });
+
+test("vimmListSystem reads the system from query and section list pages", () => {
+  const system = (url) => romledger.vimmListSystem(url);
+  assert.equal(system("https://vimm.net/vault/?p=list&system=GB&q="), "GB");
+  assert.equal(system("https://vimm.net/vault/NES/A"), "NES");
+  assert.equal(system("https://vimm.net/vault/NES/number"), "NES");
+  assert.equal(system("https://vimm.net/vault/77"), null);
+  assert.equal(system("https://vimm.net/vault/"), null);
+  assert.equal(system("https://vimm.net/vault/search/foo"), null);
+  assert.equal(system("https://vimm.net/vault/N%E0%A4%A/A"), "N%E0%A4%A");
+});
+
+function formDocument(action, inputs) {
+  const attributes = (input) => ({ getAttribute: (name) => input[name], disabled: Boolean(input.disabled) });
+  const form = {
+    getAttribute: () => action,
+    querySelectorAll: () => inputs.map(attributes),
+  };
+  return { querySelector: (selector) => (selector === "#dl-form" ? form : null) };
+}
+
+const VIMM_INPUTS = [
+  { name: "mediaId", value: "9" },
+  { name: "alt", value: "0", disabled: true },
+  { name: "token", value: "abc" },
+];
+
+test("vimmDownloadUrl turns the Vimm form into a GET URL and leaves disabled inputs out", () => {
+  const url = (action, inputs = VIMM_INPUTS) =>
+    romledger.vimmDownloadUrl(formDocument(action, inputs), "https://vimm.net/vault/77");
+  assert.equal(url("//dl3.vimm.net/"), "https://dl3.vimm.net/?mediaId=9&token=abc");
+  assert.equal(url("http://dl3.vimm.net/"), "https://dl3.vimm.net/?mediaId=9&token=abc");
+  assert.equal(url("//dl3.vimm.net/", VIMM_INPUTS.map((input) => ({ ...input, disabled: false }))),
+    "https://dl3.vimm.net/?mediaId=9&alt=0&token=abc");
+});
+
+test("vimmDownloadUrl refuses other hosts, missing fields and a missing form", () => {
+  const url = (action, inputs = VIMM_INPUTS) =>
+    romledger.vimmDownloadUrl(formDocument(action, inputs), "https://vimm.net/vault/77");
+  assert.equal(url("//evil.example/"), null);
+  assert.equal(url("//vimm.net.evil.example/"), null);
+  assert.equal(url(""), null);
+  assert.equal(url("//dl3.vimm.net/", VIMM_INPUTS.slice(0, 2)), null);
+  assert.equal(romledger.vimmDownloadUrl({ querySelector: () => null }, "https://vimm.net/vault/77"), null);
+});
+
+test("queueable keeps every missing game and counts the approximate ones", () => {
+  const entry = (title, match) => ({ title, match });
+  const { ready, approximate } = romledger.queueable([
+    entry("A", { state: "missing", exact: true }),
+    entry("B", { state: "missing", exact: false }),
+    entry("C", { state: "have", exact: true }),
+    entry("D", { state: "unknown" }),
+    entry("E", { state: "missing" }),
+  ]);
+  assert.deepEqual(ready.map((item) => item.title), ["A", "B", "E"]);
+  assert.equal(approximate, 1);
+});

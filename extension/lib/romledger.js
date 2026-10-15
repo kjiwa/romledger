@@ -163,6 +163,60 @@ const romledger = (() => {
     return name === "" ? null : `${DOWNLOAD_FOLDER}/${name}`;
   }
 
+  function safeDecode(text) {
+    try {
+      return decodeURIComponent(text);
+    } catch {
+      return text;
+    }
+  }
+
+  const VIMM_SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/(?:[A-Za-z]|number)\/?$/;
+
+  function vimmListSystem(url) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+    if (parsed.searchParams.get("p") === "list") {
+      return parsed.searchParams.get("system") || null;
+    }
+    const section = VIMM_SECTION_PATH.exec(parsed.pathname);
+    return section ? safeDecode(section[1]) : null;
+  }
+
+  function vimmDownloadUrl(doc, pageUrl) {
+    const form = doc.querySelector("#dl-form");
+    if (!form) {
+      return null;
+    }
+    let target;
+    try {
+      target = new URL(form.getAttribute("action") || "", pageUrl);
+    } catch {
+      return null;
+    }
+    target.protocol = "https:";
+    target.search = "";
+    const fields = [...form.querySelectorAll("input[name], select[name]")].filter(
+      (field) => !field.disabled,
+    );
+    for (const field of fields) {
+      const value = field.tagName === "SELECT" ? field.value : field.getAttribute("value");
+      target.searchParams.append(field.getAttribute("name"), value || "");
+    }
+    const complete = target.searchParams.has("mediaId") && target.searchParams.has("token");
+    return complete && isVimmDownload({ url: target.href }) ? target.href : null;
+  }
+
+  function queueable(entries) {
+    const ready = entries.filter((entry) => entry.match.state === "missing");
+    const approximate = ready.filter((entry) => describe(entry.match).approximate).length;
+    return { ready, approximate };
+  }
+
   const api = {
     isVimmDownload,
     downloadTarget,
@@ -172,6 +226,9 @@ const romledger = (() => {
     parseAllMedia,
     stripExtension,
     vimmSystemFromTitle,
+    vimmListSystem,
+    vimmDownloadUrl,
+    queueable,
     coolromSystemFromPath,
     coolromNameFromPath,
     consoleromsSystemFromPath,

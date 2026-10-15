@@ -65,3 +65,62 @@ test("the listener attaches when the permission arrives later", () => {
   assert.equal(listeners.length, 0);
   assert.equal(added.length, 1);
 });
+
+function loadMessages(stored, downloads) {
+  const handlers = [];
+  const chrome = {
+    storage: { local: { get: async () => stored } },
+    runtime: { onMessage: { addListener: (handler) => handlers.push(handler) } },
+    permissions: { onAdded: { addListener() {} } },
+    downloads,
+  };
+  vm.runInNewContext(SOURCE, { chrome, romledger, fetch() {}, URLSearchParams });
+  return (message) =>
+    new Promise((resolve) => handlers[0](message, null, (reply) => resolve({ ...reply })));
+}
+
+const GAME_URL = "https://dl3.vimm.net/?mediaId=9&token=t";
+
+test("download starts a Vimm download and answers with its id", async () => {
+  const started = [];
+  const ask = loadMessages({ routeDownloads: true }, {
+    download: async (options) => (started.push(options.url), 7),
+  });
+  assert.deepEqual(await ask({ type: "download", url: GAME_URL }), { ok: true, id: 7 });
+  assert.deepEqual(started, [GAME_URL]);
+});
+
+test("download refuses when the option is off, the permission is missing or the host is foreign", async () => {
+  const downloads = { download: async () => 1 };
+  const off = await loadMessages({}, downloads)({ type: "download", url: GAME_URL });
+  assert.equal(off.ok, false);
+  assert.equal(off.fatal, true);
+  const missing = await loadMessages({ routeDownloads: true }, undefined)({ type: "download", url: GAME_URL });
+  assert.equal(missing.ok, false);
+  const foreign = await loadMessages({ routeDownloads: true }, downloads)({
+    type: "download",
+    url: "https://example.com/?mediaId=9&token=t",
+  });
+  assert.equal(foreign.ok, false);
+});
+
+test("download-state reports the state and the saved path", async () => {
+  const ask = loadMessages({}, {
+    search: async ({ id }) =>
+      id === 7 ? [{ state: "complete", filename: "/home/user/Downloads/romledger/Game.zip" }] : [],
+  });
+  assert.deepEqual(await ask({ type: "download-state", id: 7 }), {
+    ok: true,
+    state: "complete",
+    filename: "/home/user/Downloads/romledger/Game.zip",
+    reason: "",
+  });
+  assert.equal((await ask({ type: "download-state", id: 8 })).ok, false);
+});
+
+test("download-cancel cancels the download", async () => {
+  const cancelled = [];
+  const ask = loadMessages({}, { cancel: async (id) => cancelled.push(id) });
+  assert.deepEqual(await ask({ type: "download-cancel", id: 7 }), { ok: true });
+  assert.deepEqual(cancelled, [7]);
+});

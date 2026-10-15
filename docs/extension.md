@@ -1,9 +1,9 @@
 # Browser extension
 
 The extension marks games on Vimm's Lair, CoolROM, ConsoleRoms, emu-land and the Internet Archive as in your library, in
-your inbox, missing or not wanted, so you can browse and pick what to download. It never clicks or
-downloads anything; the one option that touches downloads is off until you turn it on (see
-[Save Vimm's Lair downloads](#save-vimms-lair-downloads-to-a-folder)).
+your inbox, missing or not wanted, so you can browse and pick what to download. On Vimm's Lair it
+can also download the missing games of a list page for you; that is off until you turn it on (see
+[Download from Vimm's Lair](#download-from-vimms-lair)). Nothing else clicks or downloads.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/extension-popup-dark.png">
@@ -34,24 +34,31 @@ checkout works too: use its `extension` folder.
 The URL and token stay in this browser. The extension sends the SHA-1 hashes and titles it finds
 on a page only to that address.
 
-## Save Vimm's Lair downloads to a folder
+## Download from Vimm's Lair
 
-Optional, off by default, and Chromium-only. In the options, tick "Save Vimm's Lair downloads to
-Downloads/romledger". The browser asks for the `downloads` permission. From then on the extension
-saves downloads that come from Vimm's Lair (a `*.vimm.net` host) into `Downloads/romledger`, under
-the file name the site gave. Every other download is left alone.
+Optional, off by default, and Chromium-only. In the options, tick "Download from Vimm's Lair into
+Downloads/romledger". The browser asks for the `downloads` permission. Untick it to give the
+permission back. Firefox does not offer the event this needs, so the option is hidden there.
+
+With it on, every download that comes from Vimm's Lair (a `*.vimm.net` host) is saved into
+`Downloads/romledger` under the file name the site gave, and a list page gets a "Download N
+missing" box. The button downloads each game marked Missing, one at a time, in the order of the
+page, and shows the saved path of each. Keep the tab open until it says Finished. Games matched by
+title (approximate) are included, so check their region and version first.
+
+Vimm's Lair asks for a Turnstile check before it offers a download. The extension never solves it.
+When a game page comes back without a download form, the queue pauses; open any game page, pass
+the check, and press Resume.
 
 Add `~/Downloads/romledger` as an inbox (`romledger init` offers to) and `romledger serve` imports
-the files by itself; see [serve](setup.md#serve). To turn it off, untick the option; the extension
-gives the permission back. Firefox does not offer the event this needs, so the option is hidden
-there.
+the files by itself; see [serve](setup.md#serve).
 
 ## What it shows
 
 | Site | Page | What you see |
 | --- | --- | --- |
 | Vimm's Lair | A game (`/vault/<id>`) | A box with the state of each disc or file, matched by SHA-1 and then by title. |
-| Vimm's Lair | A platform list | A badge after every game, matched by title. |
+| Vimm's Lair | A platform list, including each letter page | A badge after every game, matched by title. |
 | CoolROM | A game or a platform listing | A badge by title. |
 | ConsoleRoms | A game or a platform listing | A badge by title. |
 | emu-land | A game or a platform listing | A badge by title. |
