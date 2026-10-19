@@ -9,18 +9,20 @@ function platformItem(platform) {
   const meter = document.createElement("progress");
   meter.max = 100;
   meter.value = platform.percent ?? 0;
-  meter.setAttribute("aria-label", `${platform.name} progress`);
   const text = document.createElement("span");
   text.className = "muted";
   text.textContent = romledger.progress(platform);
+  meter.setAttribute("aria-label", `${platform.name} progress`);
+  meter.setAttribute("aria-valuetext", text.textContent);
   item.append(name, meter, text);
   return item;
 }
 
-function showError(text) {
-  const error = document.getElementById("error");
-  error.textContent = text;
-  error.hidden = false;
+function showNotice(id, text, kind) {
+  const note = document.getElementById(id);
+  note.textContent = text;
+  note.dataset.kind = kind;
+  note.hidden = false;
 }
 
 async function showPageStatus() {
@@ -32,10 +34,11 @@ async function showPageStatus() {
     return;
   }
   if (reply && (!reply.recognized || reply.detail)) {
-    const note = document.getElementById("page");
-    note.textContent = reply.detail || "Page layout not recognized.";
-    note.dataset.kind = reply.recognized ? "info" : "error";
-    note.hidden = false;
+    showNotice(
+      "page",
+      reply.detail || "Page layout not recognized.",
+      reply.recognized ? "info" : "error",
+    );
   }
 }
 
@@ -45,13 +48,15 @@ async function showLastImport() {
   if (!last) {
     return;
   }
-  const note = document.getElementById("import");
   const failed = Boolean(last.error) || (last.failures || []).length > 0;
-  note.textContent = failed
-    ? `Last import failed: ${last.error || last.failures.join("; ")}`
-    : `Last import: ${last.lines.join("; ")}`;
-  note.dataset.kind = failed ? "error" : "info";
-  note.hidden = false;
+  const when = last.at ? ` ${romledger.ago(last.at, Date.now())}` : "";
+  showNotice(
+    "import",
+    failed
+      ? `Last import failed${when}: ${last.error || last.failures.join("; ")}`
+      : `Last import${when}: ${last.lines.join("; ")}`,
+    failed ? "error" : "ok",
+  );
 }
 
 async function main() {
@@ -62,13 +67,18 @@ async function main() {
     const tracked = reply.data.filter((platform) => platform.tracked);
     document.getElementById("platforms").replaceChildren(...tracked.map(platformItem));
     if (!tracked.length) {
-      showError("No games yet. Put ROMs in an inbox and run romledger import.");
+      showNotice("empty", "No games yet. Put ROMs in an inbox and run romledger import.", "info");
     }
   } else {
-    showError(reply.error);
+    showNotice("error", reply.error, "error");
   }
   await showPageStatus();
   await showLastImport();
 }
+
+document.getElementById("options").addEventListener("click", () => {
+  api.runtime.openOptionsPage();
+  window.close();
+});
 
 main();

@@ -35,6 +35,7 @@ function load(stored, downloads = true, extra = {}) {
   const local = { ...stored };
   const ports = [];
   const handlers = [];
+  const opened = [];
   const chrome = {
     storage: {
       local: {
@@ -45,6 +46,7 @@ function load(stored, downloads = true, extra = {}) {
     },
     runtime: {
       onMessage: { addListener: (handler) => handlers.push(handler) },
+      openOptionsPage: async () => opened.push(true),
       connectNative: (name) => {
         const port = fakePort();
         port.name = name;
@@ -66,7 +68,7 @@ function load(stored, downloads = true, extra = {}) {
   vm.runInNewContext(SOURCE, { chrome, romledger, URLSearchParams });
   const ask = (message) =>
     new Promise((resolve) => handlers[0](message, null, (reply) => resolve({ ...reply })));
-  return { listeners, added, changed, local, ports, ask };
+  return { listeners, added, changed, local, ports, ask, opened };
 }
 
 function decide(listener, item) {
@@ -292,4 +294,10 @@ test("the url and token of the old HTTP setup are forgotten", async () => {
   const { local } = load({ url: "http://127.0.0.1:8730", token: "t", routeDownloads: true });
   await settle();
   assert.deepEqual(local, { routeDownloads: true });
+});
+
+test("open-options opens the options page", async () => {
+  const { ask, opened } = load({});
+  assert.deepEqual(await ask({ type: "open-options" }), { ok: true });
+  assert.equal(opened.length, 1);
 });

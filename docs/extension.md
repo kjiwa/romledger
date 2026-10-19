@@ -11,7 +11,7 @@ game, the state of each disc on a game page, and the download queue.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/extension-popup-dark.png">
-  <img alt="The extension popup: a progress bar and a count of wanted games had for each platform that has games." src="images/extension-popup-light.png">
+  <img alt="The extension popup: the last import, then a progress bar and a count of wanted games had for each platform that has games." src="images/extension-popup-light.png">
 </picture>
 
 ## Install
@@ -44,7 +44,9 @@ the same machine. `romledger extension status` shows which browsers are connecte
 
 Optional, off by default, and Chromium-only. In the options, tick "Download from Vimm's Lair into
 Downloads/romledger". The browser asks for the `downloads` permission. Untick it to give the
-permission back. Firefox does not offer the event this needs, so the option is hidden there.
+permission back. Firefox does not offer the event this needs, so the options say so and offer
+nothing there. While the option is off, a list page's box says so and has an Open options button
+instead of the download button.
 
 With it on, every download that comes from Vimm's Lair (a `*.vimm.net` host) is saved into
 `Downloads/romledger` under the file name the site gave, and a list page gets a "Download N
@@ -53,9 +55,9 @@ page, and shows the saved path of each. Keep the tab open until it says Finished
 title (approximate) are included, so check their region and version first.
 
 Each download starts from the Vimm's Lair page the way a click on its Download button does. Games
-start at least the "Seconds between downloads" set in the options apart: 15 by default, and from
-15 to 600. A longer wait is gentler on the site. The queue stops at the first failed download, or when Vimm's Lair
-answers that you are going too fast; wait a while before starting it again. Chrome may ask once to
+start at least the "Wait between downloads" set in the options apart: 15 seconds by default, and
+from 15 to 600. A longer wait is gentler on the site. The queue stops at the first failed
+download, and says why beside the game, or when Vimm's Lair answers that you are going too fast; wait a while before starting it again. Chrome may ask once to
 allow Vimm's Lair to download multiple files.
 
 Vimm's Lair asks for a Turnstile check before it offers a download. The extension never solves it.
@@ -90,5 +92,8 @@ Check the region and version before you rely on it.
 Vimm's Lair offers some GameCube games in extra formats (`ciso`, `nkit`, `rvz`). Only the
 default ISO matches a Redump DAT, so download that one.
 
-The toolbar popup lists the progress of each platform that has games. If it says the page layout was not recognized,
-the site changed; see [troubleshooting.md](troubleshooting.md).
+Each box on a page has a Close button; reload the page to bring it back.
+
+The toolbar popup lists the progress of each platform that has games and when the last import ran.
+If it says the page layout was not recognized, the site changed; see
+[troubleshooting.md](troubleshooting.md).

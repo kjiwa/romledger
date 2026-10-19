@@ -13,11 +13,16 @@
 <body class="popup">
 <main class="ui">
   <h1>romledger</h1>
-  <p id="page" class="notice" role="status" hidden></p>
-  <ul id="platforms" class="platforms"></ul>
-  <p id="error" class="notice" data-kind="error" role="alert" hidden></p>
-  <p id="import" class="notice" role="status" hidden></p>
-  <p><a id="options" href="options.html" target="_blank">Options</a></p>
+  <div class="notices">
+    <p id="error" class="romledger-notice" data-kind="error" role="alert" hidden></p>
+    <p id="empty" class="romledger-notice" role="status" hidden></p>
+    <p id="page" class="romledger-notice" role="status" hidden></p>
+    <p id="import" class="romledger-notice" role="status" hidden></p>
+  </div>
+  <ul id="platforms" class="platforms" aria-label="Platforms"></ul>
+  <div class="actions">
+    <button id="options" class="romledger-button" type="button">Options</button>
+  </div>
 </main>
 </body>
 </html>

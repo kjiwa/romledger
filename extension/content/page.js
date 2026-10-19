@@ -4,6 +4,8 @@ const page = (() => {
   const api = globalThis.browser ?? globalThis.chrome;
   const CONCURRENCY = 6;
   const status = { recognized: true, detail: "" };
+  let panels = 0;
+  let reported = false;
 
   function ask(message) {
     return api.runtime.sendMessage(message);
@@ -39,33 +41,56 @@ const page = (() => {
     return badge(text, kind, title);
   }
 
+  function button(label, onClick, variant) {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = "romledger-button";
+    if (variant) {
+      element.dataset.variant = variant;
+    }
+    element.textContent = label;
+    element.addEventListener("click", onClick);
+    return element;
+  }
+
   function panel(heading) {
     const element = document.createElement("aside");
     element.className = "romledger-panel";
-    element.setAttribute("aria-label", "romledger");
+    const head = document.createElement("div");
+    head.className = "romledger-panel-head";
     const title = document.createElement("strong");
+    title.id = `romledger-panel-${panels}`;
+    panels += 1;
+    title.setAttribute("role", "heading");
+    title.setAttribute("aria-level", "2");
     title.textContent = heading;
-    element.append(title);
+    element.setAttribute("aria-labelledby", title.id);
+    const close = button("Close", () => element.remove());
+    close.setAttribute("aria-label", `Close ${heading}`);
+    head.append(title, close);
+    element.append(head);
     document.body.append(element);
     return element;
   }
 
-  function row(label, node) {
+  function notice(text, kind) {
+    const element = document.createElement("p");
+    element.className = "romledger-notice";
+    element.setAttribute("role", kind === "error" ? "alert" : "status");
+    if (kind) {
+      element.dataset.kind = kind;
+    }
+    element.textContent = text;
+    return element;
+  }
+
+  function row(label, ...nodes) {
     const element = document.createElement("div");
     element.className = "romledger-row";
     const name = document.createElement("span");
     name.className = "romledger-name";
     name.textContent = label;
-    element.append(name, node);
-    return element;
-  }
-
-  function button(label, onClick) {
-    const element = document.createElement("button");
-    element.type = "button";
-    element.className = "romledger-button";
-    element.textContent = label;
-    element.addEventListener("click", onClick);
+    element.append(name, ...nodes);
     return element;
   }
 
@@ -84,7 +109,14 @@ const page = (() => {
   }
 
   function failurePanel(reply) {
-    panel("romledger").append(row(reply.error, failure(reply)));
+    panel("romledger").append(notice(reply.error, "error"));
+  }
+
+  function reportOnce(reply) {
+    if (!reported) {
+      reported = true;
+      failurePanel(reply);
+    }
   }
 
   async function run(work) {
@@ -95,5 +127,19 @@ const page = (() => {
     }
   }
 
-  return { run, ask, setStatus, badge, matchBadge, panel, row, button, forEachLimited, failure, failurePanel };
+  return {
+    run,
+    ask,
+    setStatus,
+    badge,
+    matchBadge,
+    panel,
+    notice,
+    row,
+    button,
+    forEachLimited,
+    failure,
+    failurePanel,
+    reportOnce,
+  };
 })();

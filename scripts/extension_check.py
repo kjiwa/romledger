@@ -35,6 +35,7 @@ from romledger.context import load_context
 
 EXTENSION = Path(__file__).resolve().parent.parent / "extension"
 SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
+WIDTHS = {"phone": 393, "desktop": 1280}
 WORKER_TRIES = 300
 WORKER_NUDGE = 30
 SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Quest (USA)": "c" * 40}
@@ -450,6 +451,28 @@ def check_vimm_download(playwright: Playwright, directory: Path, unpacked: Path)
     return []
 
 
+def capture(context: BrowserContext, url: str, output: Path | None, name: str) -> None:
+    """Writes <name>-<phone|desktop>-<light|dark>.png for a page, once it has settled."""
+    if output is None:
+        return
+    page = context.new_page()
+    for width_name, width in WIDTHS.items():
+        page.set_viewport_size({"width": width, "height": 800})
+        for scheme in SCHEMES:
+            page.emulate_media(color_scheme=scheme)
+            page.goto(url)
+            page.wait_for_function("document.readyState === 'complete'")
+            page.wait_for_timeout(1500)
+            page.screenshot(path=output / f"{name}-{width_name}-{scheme}.png", full_page=True)
+    page.close()
+
+
+def capture_pages(context: BrowserContext, extension_id: str, output: Path | None) -> None:
+    capture(context, f"chrome-extension://{extension_id}/options.html", output, "options")
+    capture(context, "https://vimm.net/vault/77", output, "vimm-game")
+    capture(context, "https://vimm.net/vault/GB/A", output, "vimm-list")
+
+
 def check_popup(context: BrowserContext, extension_id: str, output: Path | None) -> list[str]:
     problems = []
     page = context.new_page()
@@ -461,7 +484,7 @@ def check_popup(context: BrowserContext, extension_id: str, output: Path | None)
         if page.locator("#platforms li").count() != 4:
             problems.append("popup: expected 4 platforms")
         if output:
-            page.screenshot(path=output / f"extension-popup-{scheme}.png")
+            page.screenshot(path=output / f"extension-popup-{scheme}.png", full_page=True)
     page.close()
     return problems
 
@@ -486,11 +509,20 @@ def run(directory: Path, output: Path | None) -> list[str]:
             re.compile(r"https://vimm\.net/.*"),
             serve_fixture,
         )
+        worker.evaluate(
+            "chrome.storage.local.set({ lastImport: { at: Date.now() - 300000,"
+            " lines: ['moved 2'], failures: [] } })"
+        )
         problems = (
             check_vimm_game(context)
             + check_vimm_list(context)
             + check_popup(context, extension_id, output)
-            + check_vimm_queue(context, worker)
+        )
+        capture_pages(context, extension_id, output)
+        worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
+        capture(context, "https://vimm.net/vault/GB/A", output, "vimm-list-downloads")
+        problems += (
+            check_vimm_queue(context, worker)
             + check_vimm_queue_stops(context, worker)
             + check_vimm_download(playwright, directory, unpacked)
         )

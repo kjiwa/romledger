@@ -11,9 +11,9 @@ const ROUTE_KEY = "routeDownloads";
 const GAP_KEY = "gapSeconds";
 const DOWNLOADS = { permissions: ["downloads"] };
 
-function show(text, kind) {
-  result.textContent = text;
-  result.dataset.kind = kind;
+function report(element, text, kind) {
+  element.textContent = text;
+  element.dataset.kind = kind;
 }
 
 function range() {
@@ -31,17 +31,26 @@ async function load() {
     document.getElementById("route-field").hidden = false;
     document.getElementById("gap-field").hidden = false;
     route.checked = stored[ROUTE_KEY] === true && (await api.permissions.contains(DOWNLOADS));
+    gap.disabled = !route.checked;
+  } else {
+    document.getElementById("downloads-unsupported").hidden = false;
   }
   await test();
 }
 
 async function test() {
-  const reply = await api.runtime.sendMessage({ type: "platforms" });
+  check.disabled = true;
+  check.textContent = "Checking...";
+  const reply = await api.runtime
+    .sendMessage({ type: "platforms" })
+    .catch(() => ({ ok: false, error: "The extension could not reach its background worker." }));
+  check.disabled = false;
+  check.textContent = "Check connection";
   if (reply.ok) {
     const count = reply.data.filter((platform) => platform.tracked).length;
-    show(`Connected. ${count} platform(s) with games.`, "ok");
+    report(result, `Connected. ${count} ${count === 1 ? "platform has" : "platforms have"} games.`, "ok");
   } else {
-    show(reply.error, "error");
+    report(result, reply.error, "error");
   }
 }
 
@@ -63,14 +72,25 @@ async function toggleRoute() {
   } catch (error) {
     const saved = await api.storage.local.get(ROUTE_KEY);
     route.checked = saved[ROUTE_KEY] === true;
-    routeResult.textContent = error.message;
-    routeResult.dataset.kind = "error";
+    report(routeResult, error.message, "error");
+    gap.disabled = !route.checked;
     return;
   }
-  routeResult.textContent = enabled
-    ? "Vimm's Lair downloads go to Downloads/romledger."
-    : "Downloads are left where the browser puts them.";
-  routeResult.dataset.kind = "ok";
+  gap.disabled = !enabled;
+  report(
+    routeResult,
+    enabled
+      ? "Vimm's Lair downloads go to Downloads/romledger."
+      : "Downloads are left where the browser puts them.",
+    "ok",
+  );
+}
+
+async function resetGap(message) {
+  const saved = await api.storage.local.get(GAP_KEY);
+  gap.value = romledger.gapSeconds(saved[GAP_KEY]);
+  gap.setAttribute("aria-invalid", "true");
+  report(gapResult, message, "error");
 }
 
 async function saveGap() {
@@ -81,23 +101,17 @@ async function saveGap() {
     seconds >= romledger.MIN_GAP_SECONDS &&
     seconds <= romledger.MAX_GAP_SECONDS;
   if (!valid) {
-    const saved = await api.storage.local.get(GAP_KEY);
-    gap.value = romledger.gapSeconds(saved[GAP_KEY]);
-    gapResult.textContent = `Enter a number of seconds from ${range()}.`;
-    gapResult.dataset.kind = "error";
+    await resetGap(`Enter a number of seconds from ${range()}.`);
     return;
   }
   try {
     await api.storage.local.set({ [GAP_KEY]: seconds });
   } catch (error) {
-    const saved = await api.storage.local.get(GAP_KEY);
-    gap.value = romledger.gapSeconds(saved[GAP_KEY]);
-    gapResult.textContent = error.message;
-    gapResult.dataset.kind = "error";
+    await resetGap(error.message);
     return;
   }
-  gapResult.textContent = `Saved. Downloads start at least ${seconds} seconds apart.`;
-  gapResult.dataset.kind = "ok";
+  gap.removeAttribute("aria-invalid");
+  report(gapResult, `Saved. Downloads start at least ${seconds} seconds apart.`, "ok");
 }
 
 check.addEventListener("click", test);
