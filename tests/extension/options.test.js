@@ -203,12 +203,7 @@ test("a gap that cannot be stored is reported and the field is reset", async () 
   assert.match(elements["gap-result"].textContent, /quota/);
 });
 
-test("the gap field is disabled until downloads are on, and a refused gap is flagged invalid", async () => {
-  const off = load({});
-  await settle();
-  assert.equal(off.elements.gap.disabled, true);
-  const on = await toggle({}, true);
-  assert.equal(on.elements.gap.disabled, false);
+test("a refused gap is flagged invalid", async () => {
   const { elements } = await change("5", { stored: { gapSeconds: 30 } });
   assert.equal(elements.gap.attributes["aria-invalid"], "true");
 });

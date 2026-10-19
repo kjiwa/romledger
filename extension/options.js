@@ -31,7 +31,6 @@ async function load() {
     document.getElementById("route-field").hidden = false;
     document.getElementById("gap-field").hidden = false;
     route.checked = stored[ROUTE_KEY] === true && (await api.permissions.contains(DOWNLOADS));
-    gap.disabled = !route.checked;
   } else {
     document.getElementById("downloads-unsupported").hidden = false;
   }
@@ -73,10 +72,8 @@ async function toggleRoute() {
     const saved = await api.storage.local.get(ROUTE_KEY);
     route.checked = saved[ROUTE_KEY] === true;
     report(routeResult, error.message, "error");
-    gap.disabled = !route.checked;
     return;
   }
-  gap.disabled = !enabled;
   report(
     routeResult,
     enabled
