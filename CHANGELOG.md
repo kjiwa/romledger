@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.6.0
+
+romledger needs only the library and the inbox in its config now, and the command line is its only
+interface.
+
+- Every platform romledger knows (`romledger platforms`) is tracked. `import` and `scan` download
+  the DATs they lack, and `status` lists a platform once it holds a game; `status --all` lists
+  every platform. `init --platform` and `dats index` are gone.
+- Set what is wanted once under `[wanted]` (`regions`, `languages`, `include`) and override it for
+  one platform under `[platforms.<slug>]`. The `dat`, `sources` and `archive_item` keys were
+  removed; the error says to delete them.
+- `romledger platforms` is a table of platform, name, DAT set and sources that fits the terminal
+  width and is never cut when piped.
+- Prototypes, demos and programs are excluded by any word of a tag, not only the first: `Possible
+  Proto`, `Auto Demo`, `Tech Demo`, `Music Program`, `Jitsuen-you Sample` and a comma-joined
+  `Kiosk, GameCube` no longer count as wanted, and `Enhancement Chip` dumps are programs.
+- Sources are modeled by what each can do: Vimm's Lair in the browser (matched by hash), ConsoleRoms
+  from `romledger fetch` (matched by title). `fetch` needs no config, defaults to the platforms
+  that have games, and takes `--source`. CoolROM, the Internet Archive and emu-land are no longer
+  sources, and `missing --links` prints the Vimm's Lair search link only.
+- `romledger serve`, the dashboard, its API and the Docker image are gone. The extension talks to
+  romledger through a native host the browser starts itself: run `romledger extension install`
+  once (macOS and Linux; Chrome, Chromium, Brave, Edge, Firefox). It imports each Vimm's Lair
+  download as it finishes. `romledger import --watch` imports files you copy in by hand, and a
+  lock keeps imports from overlapping.
+- The extension supports Vimm's Lair only, behind a site adapter, and has a "Seconds between
+  downloads" option (15 to 600, default 15). Its options page no longer asks for a URL or token.
+- Output is consistent: result lines start with a verb, errors and warnings say what to do, and
+  progress lines appear only on a terminal. Color (bold headers, a colored done percentage, colored
+  verbs and error labels) follows `NO_COLOR`, `FORCE_COLOR` and `TERM=dumb`. `romledger` with no
+  command shows the help, which lists the usual order of use and the exit statuses; `dats update`
+  prints `updated <platform> <version>`.
+- The guide to playing what you collect, and the RomM mentions, are gone: romledger does not
+  integrate with them.
+
+### Migrating from 0.5
+
+1. In `config.toml`, delete `dat`, `sources` and `archive_item` from every `[platforms.<slug>]`
+   table. Empty tables can stay; tables that only set `regions`, `languages` or `include` keep
+   working.
+2. If you ran `romledger serve`, use `romledger import --watch` for files you copy in, and run
+   `romledger extension install` for the browser extension. Reload the extension; it forgets its
+   old URL and token. Add `~/Downloads/romledger` to `library.inboxes` if you use the download
+   option.
+3. If you used the container image, run romledger on the machine with your browser instead; the
+   image is no longer published.
+4. Scripts that read `dats update` output now see `updated|unchanged <platform> <version>`.
+
 ## 0.5.1
 
 - The "Download N missing" queue starts each download from the Vimm's Lair page, as the Download

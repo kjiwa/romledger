@@ -1,11 +1,10 @@
-import sys
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 
-from romledger import catalog, datindex, dats, http, igir, state
+from romledger import catalog, datindex, dats, http, igir, state, term
 from romledger.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
@@ -65,13 +64,13 @@ def ensure_dats(
     failed: dict[str, dats.DatError] = {}
     with (client_factory or http.client)(config.network.proxy) as client:
         for slug, dat in absent.items():
-            print(f"downloading the {slug} DAT ...", file=sys.stderr)
+            term.progress(f"downloading the {slug} DAT ...")
             try:
                 dats.update(data_dir, {slug: dat}, client)
             except dats.DatError as error:
                 failed[slug] = error
     for slug, problem in failed.items():
-        print(f"romledger: warning: skipping {slug}: {problem}", file=sys.stderr)
+        term.warning(f"skipping {slug}: {problem}")
     usable = [slug for slug in slugs if slug not in failed]
     if not usable:
         first = next(iter(failed.values()))

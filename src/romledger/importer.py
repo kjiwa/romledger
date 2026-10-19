@@ -1,13 +1,12 @@
 import dataclasses
 import shutil
 import subprocess
-import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from romledger import datindex, dats, igir, lock, scan, state
+from romledger import datindex, dats, igir, lock, scan, state, term
 from romledger.config import Config
 
 IgirMove = Callable[..., None]
@@ -111,9 +110,9 @@ def import_lines(result: ImportResult, *, dry_run: bool) -> list[str]:
 
 def print_result(result: ImportResult, *, dry_run: bool) -> int:
     for line in import_lines(result, dry_run=dry_run):
-        print(line)
+        term.say(line)
     for failure in result.hook_failures:
-        print(f"romledger: error: after_import hook failed: {failure}", file=sys.stderr)
+        term.error(f"after_import hook failed: {failure}")
     return 1 if result.hook_failures else 0
 
 
@@ -170,7 +169,7 @@ def _split_found(
         elif keys <= library_after:
             extracted.append(path)
         else:
-            print(f"romledger: warning: {path} was not imported; left in place", file=sys.stderr)
+            term.warning(f"{path} was not imported; left in place")
     return duplicates, extracted
 
 
@@ -202,10 +201,7 @@ def _relocate(paths: Sequence[Path], inboxes: Sequence[Path], directory: str) ->
     for path in paths:
         inbox = next((inbox for inbox in inboxes if path.is_relative_to(inbox)), None)
         if inbox is None:
-            print(
-                f"romledger: warning: {path} is not under any inbox; left in place",
-                file=sys.stderr,
-            )
+            term.warning(f"{path} is not under any inbox; left in place")
             continue
         destination = free_path(inbox / directory / path.relative_to(inbox))
         destination.parent.mkdir(parents=True, exist_ok=True)

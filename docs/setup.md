@@ -124,6 +124,30 @@ DATs, the igir hash cache, and scan results live in the first of these:
 
 The directory is created on first use.
 
+## Output and exit status
+
+Result lines start with a verb (`moved`, `fetched`, `updated`, `failed`, ...) so they read the same
+in every command and are easy to `grep`. Errors and warnings go to stderr as
+`romledger: error: ...` and `romledger: warning: ...`; each says what to do. Progress lines
+(`scanning snes ...`, `downloading the nes DAT ...`) appear only when stderr is a terminal, so cron
+logs and pipes stay quiet.
+
+Color is used only on a terminal: bold table headers, a done percentage that is green, yellow or
+red, and colored verbs and error labels. Set `NO_COLOR` to turn it off, or `FORCE_COLOR` to keep
+it when piping. `TERM=dumb` also turns it off. Tables fit the terminal width (`$COLUMNS`) and are
+never cut when piped.
+
+| Status | Meaning |
+| --- | --- |
+| 0 | Done. |
+| 1 | Something failed but the rest completed: a download, an `after_import` hook, a site layout, or a broken browser host. |
+| 2 | A usage or configuration error. Nothing was changed. |
+| 130 | Interrupted while prompting. |
+
+`romledger` with no command, and `romledger --help`, list the commands and a typical order for
+using them. A mistyped platform suggests the nearest match, and so does a mistyped command on
+Python 3.14 and later.
+
 ## Verify
 
 ```sh
@@ -141,7 +165,7 @@ romledger dats update [PLATFORM...]
 ```
 
 Downloads the DAT of each platform (all by default) from libretro-database. Prints
-`<platform> <version> (updated|unchanged)` per DAT. `scan` and `import` download the DATs they
+`updated <platform> <version>` or `unchanged <platform> <version>` per DAT. `scan` and `import` download the DATs they
 lack on their own, so run this only to pick up new releases and show them as missing.
 
 ## scan
