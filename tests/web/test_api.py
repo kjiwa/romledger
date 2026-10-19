@@ -1,4 +1,3 @@
-import dataclasses
 import threading
 
 from fastapi.testclient import TestClient
@@ -21,24 +20,15 @@ def test_platforms_before_and_after_a_scan(env: Env) -> None:
     assert after["percent"] == 33
     assert after["sites"] == {
         "vimm": "NES",
-        "coolrom": None,
         "consoleroms": "nes",
-        "emuland": "consoles/dendy",
     }
     assert (before[0]["tracked"], after["tracked"]) == (False, True)
 
 
-def test_platform_sites_report_configured_codes(env: Env) -> None:
-    nes = env.context.config.platforms["nes"]
-    env.context.config.platforms["nes"] = dataclasses.replace(nes, coolrom="NES")
+def test_platform_sites_are_null_for_a_platform_outside_the_registry(env: Env) -> None:
     env.context.platforms.pop("nes")
     sites = env.client.get("/api/platforms").json()[0]["sites"]
-    assert sites == {
-        "vimm": None,
-        "coolrom": "NES",
-        "consoleroms": None,
-        "emuland": None,
-    }
+    assert sites == {"vimm": None, "consoleroms": None}
 
 
 def test_missing_lists_games_with_links(env: Env) -> None:
@@ -48,7 +38,6 @@ def test_missing_lists_games_with_links(env: Env) -> None:
     assert body["games"][0]["game"] == "Beta (USA)"
     assert body["games"][0]["links"] == {
         "vimm": "https://vimm.net/vault/?p=list&system=NES&q=Beta",
-        "emuland": "https://www.emu-land.net/en/search_games?q=Beta",
     }
     assert env.client.get("/api/platforms/nes/missing?q=zzz").json()["games"] == []
     assert env.client.get("/api/platforms/nes/missing?limit=0").status_code == 422

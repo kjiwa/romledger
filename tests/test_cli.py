@@ -203,12 +203,11 @@ def test_missing_links(tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFix
     assert run(make_config(tmp_path), "missing", "nes", "--links") == 0
     assert capsys.readouterr().out.splitlines() == [
         "R (USA)",
-        "Super Mario Bros. (USA)\thttps://vimm.net/vault/?p=list&system=NES&q=Super+Mario+Bros."
-        "\thttps://www.emu-land.net/en/search_games?q=Super+Mario+Bros.",
+        "Super Mario Bros. (USA)\thttps://vimm.net/vault/?p=list&system=NES&q=Super+Mario+Bros.",
     ]
 
 
-def test_missing_links_leaves_an_empty_cell_for_a_site_without_a_code(
+def test_missing_links_leaves_a_game_bare_when_vimm_lacks_the_platform(
     tmp_path: Path,
     data_dir: Path,
     capsys: pytest.CaptureFixture[str],
@@ -219,10 +218,7 @@ def test_missing_links_leaves_an_empty_cell_for_a_site_without_a_code(
     monkeypatch.setattr(registry, "load", lambda: real)
     seed(data_dir, "nes", [state.Item("Contra (USA)", "missing", None)])
     assert run(make_config(tmp_path), "missing", "nes", "--links") == 0
-    assert (
-        capsys.readouterr().out
-        == "Contra (USA)\t\thttps://www.emu-land.net/en/search_games?q=Contra\n"
-    )
+    assert capsys.readouterr().out == "Contra (USA)\n"
 
 
 def test_missing_links_without_site_codes(
@@ -468,12 +464,68 @@ def test_fetch_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     assert capsys.readouterr().err.rstrip().endswith("run: romledger scan")
 
 
-def test_fetch_source_must_carry_the_platform(
+def test_fetch_source_that_cannot_be_fetched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(make_config(tmp_path), "fetch", "snes", "--source", "vimm") == 2
+    assert capsys.readouterr().err == (
+        "romledger: error: Vimm's Lair cannot be fetched from the command line; "
+        "download from it with the browser extension.\n"
+    )
+
+
+def test_fetch_unknown_source(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(make_config(tmp_path), "fetch", "--source", "coolrom") == 2
+    assert "unknown source 'coolrom'. Sources: vimm, consoleroms." in capsys.readouterr().err
+
+
+def test_fetch_defaults_to_the_platforms_that_have_games(
+    tmp_path: Path,
+    data_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)"])
+    seed(data_dir, "atari7800", [state.Item("A (USA)", "have", "/a")])
+    seed(data_dir, "snes", [state.Item("B (USA)", "have", "/b")])
+    seed(data_dir, "gb", [state.Item("C (USA)", "missing", None)])
+    seed(data_dir, "neo-geo-pocket-color", [state.Item("D (USA)", "have", "/d")])
+    assert run(make_config(tmp_path), "fetch") == 0
+    assert [call[1] for call in fake.calls] == ["snes", "atari7800"] or [
+        call[1] for call in fake.calls
+    ] == ["atari7800", "snes"]
+    assert capsys.readouterr().err.splitlines() == [
+        f"fetching {call[1]} ..." for call in fake.calls
+    ]
+
+
+def test_fetch_stops_at_the_limit_across_platforms(
+    tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = harness(monkeypatch, fetched=["A (USA)", "B (USA)"])
+    seed(data_dir, "atari7800", [state.Item("A (USA)", "have", "/a")])
+    seed(data_dir, "snes", [state.Item("B (USA)", "have", "/b")])
+    seed(data_dir, "nes", [state.Item("C (USA)", "have", "/c")])
+    assert run(make_config(tmp_path), "fetch", "--limit", "3") == 0
+    assert [call[3] for call in fake.calls] == [3, 1]
+
+
+def test_fetch_with_nothing_to_fetch(
     tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(data_dir, "atari7800", [state.Item("A (USA)", "missing", None)])
-    assert run(make_config(tmp_path), "fetch", "atari7800", "--source", "internet-archive") == 2
-    assert "no source 'internet-archive' carries atari7800" in capsys.readouterr().err
+    seed(data_dir, "neo-geo-pocket-color", [state.Item("D (USA)", "have", "/d")])
+    assert run(make_config(tmp_path), "fetch") == 0
+    assert capsys.readouterr().out.startswith("nothing to fetch")
+
+
+def test_fetch_with_a_source_skips_platforms_it_does_not_carry(
+    tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = harness(monkeypatch, not_found=["A (USA)"])
+    seed(data_dir, "snes", [state.Item("B (USA)", "have", "/b")])
+    seed(data_dir, "3ds", [state.Item("C (USA)", "have", "/c")])
+    assert run(make_config(tmp_path), "fetch", "--source", "consoleroms") == 0
+    assert [call[1] for call in fake.calls] == ["snes"]
 
 
 @pytest.mark.parametrize("limit", ["0", "-1", "x"])
@@ -511,14 +563,22 @@ def test_fetch_imports_after_a_successful_fetch(
 ) -> None:
     fake = harness(monkeypatch, fetched=["A (USA)"])
     assert (
-        run(sources_config(tmp_path), "fetch", "atari7800", "--limit", "5", "--source", "coolrom")
+        run(
+            sources_config(tmp_path),
+            "fetch",
+            "atari7800",
+            "--limit",
+            "5",
+            "--source",
+            "consoleroms",
+        )
         == 0
     )
     assert fake.imports == [False]
     args = fake.calls[0]
     assert args[1:4] == ("atari7800", config.data_dir(), 5)
     assert args[4] is False
-    assert args[-1] == "coolrom"
+    assert args[-1] == "consoleroms"
     assert capsys.readouterr().out == "moved atari7800 1\n"
 
 
@@ -586,7 +646,7 @@ def test_fetch_end_to_end(
         return httpx.Response(200, content=b"abc")
 
     class Stub:
-        name = "coolrom"
+        name = "consoleroms"
 
         def find(self, game: str) -> Candidate | None:
             if game != "A (USA)":
@@ -606,7 +666,7 @@ def test_fetch_end_to_end(
     assert run(make_config(tmp_path), "fetch", "atari7800", "--no-import") == 0
     assert (tmp_path / "inbox" / "A (USA).zip").read_bytes() == b"abc"
     assert capsys.readouterr().out.splitlines() == [
-        "fetched A (USA) (coolrom)",
+        "fetched A (USA) (consoleroms)",
         "not found B (USA)",
         "fetched 1, not found 1, failed 0, skipped 0",
     ]
@@ -741,7 +801,7 @@ def test_platforms_names_every_source_that_carries_a_platform(
     assert cli.main(["platforms"]) == 0
     out = capsys.readouterr().out
     assert next(line for line in out.splitlines() if line.startswith("atari7800 ")).endswith(
-        "vimm, consoleroms, coolrom"
+        "vimm, consoleroms"
     )
     assert next(
         line for line in out.splitlines() if line.startswith("neo-geo-pocket-color ")

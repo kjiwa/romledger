@@ -7,7 +7,7 @@ import httpx
 
 from romledger import http, igir, scan
 from romledger.config import Config, ConfigError, Platform
-from romledger.sources import consoleroms, coolrom
+from romledger.sources import SOURCES, consoleroms
 from romledger.sources.base import Source, fetch_to
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
@@ -37,20 +37,36 @@ def build_sources(
         consoleroms.NAME: lambda: consoleroms.ConsoleromsSource(
             platform.consoleroms or "", client, throttle
         ),
-        coolrom.NAME: lambda: coolrom.CoolromSource(platform.coolrom or "", client, throttle),
     }
     return [builders[name]() for name in names]
 
 
 def default_sources(platform: Platform) -> list[str]:
-    codes = {consoleroms.NAME: platform.consoleroms, coolrom.NAME: platform.coolrom}
-    return [name for name, code in codes.items() if code]
+    codes = {consoleroms.NAME: platform.consoleroms}
+    return [name for name, info in SOURCES.items() if info.fetch and codes.get(name)]
+
+
+def check_source(name: str) -> None:
+    info = SOURCES.get(name)
+    if info is None:
+        raise ConfigError(f"unknown source {name!r}. Sources: {', '.join(SOURCES)}.")
+    if not info.fetch:
+        raise ConfigError(
+            f"{info.label} cannot be fetched from the command line; "
+            "download from it with the browser extension."
+        )
+
+
+def select_sources_or_none(platform: Platform, only: str | None) -> list[str]:
+    available = default_sources(platform)
+    return available if only is None else [name for name in available if name == only]
 
 
 def select_sources(slug: str, platform: Platform, only: str | None) -> list[str]:
     available = default_sources(platform)
     if only is None:
         return available
+    check_source(only)
     if only not in available:
         raise ConfigError(
             f"no source {only!r} carries {slug}. Sources for {slug}: {', '.join(available)}."

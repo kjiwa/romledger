@@ -1,8 +1,8 @@
 # Browser extension
 
-The extension marks games on Vimm's Lair, CoolROM, ConsoleRoms and emu-land as in your library, in
-your inbox, missing or not wanted, so you can browse and pick what to download. On Vimm's Lair it
-can also download the missing games of a list page for you; that is off until you turn it on (see
+The extension marks games on Vimm's Lair as in your library, in your inbox, missing or not
+wanted, so you can browse and pick what to download. It can also download the missing games of a
+list page for you; that is off until you turn it on (see
 [Download from Vimm's Lair](#download-from-vimms-lair)). Nothing else clicks or downloads.
 
 <picture>
@@ -65,9 +65,6 @@ the files by itself; see [serve](setup.md#serve).
 | --- | --- | --- |
 | Vimm's Lair | A game (`/vault/<id>`) | A box with the state of each disc or file, matched by SHA-1 and then by title. |
 | Vimm's Lair | A platform list, including each letter page | A badge after every game, matched by title. |
-| CoolROM | A game or a platform listing | A badge by title. |
-| ConsoleRoms | A game or a platform listing | A badge by title. |
-| emu-land | A game or a platform listing | A badge by title. |
 
 | Badge | Meaning |
 | --- | --- |

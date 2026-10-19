@@ -100,20 +100,6 @@ def pages() -> dict[tuple[str, str], str]:
         f'<tr><td><a href="/vault/{number}">{name}</a></td></tr>'
         for number, name in ((31, "Foxtrot Run (USA)"), (32, "Golf Run (USA)"), (33, "Echo Run"))
     )
-    cool = "".join(
-        f'<div><a href="/roms/genesis/{number}/{name.replace(" ", "_")}.php">{name}</a></div>'
-        for number, name in enumerate(GENESIS, start=1)
-    )
-    slugs = {name: name.split(" (")[0].lower().replace(" ", "-") for name in GENESIS}
-    console = "".join(
-        f'<div><a href="/roms/sega-genesis/{slug}" class="btn" role="button">View</a></div>'
-        f'<div><a href="/roms/sega-genesis/{slug}">{name}</a></div>'
-        for name, slug in slugs.items()
-    )
-    emu = "".join(
-        f'<div><a href="/en/consoles/genesis/roms/{slug}">{name}</a></div>'
-        for name, slug in slugs.items()
-    )
     return {
         ("vimm.net", "/vault/77"): game,
         ("vimm.net", "/vault/"): f"<title>GB - The Vault</title><table>{rows}</table>",
@@ -125,12 +111,6 @@ def pages() -> dict[tuple[str, str], str]:
         ("vimm.net", "/vault/31"): download_form(31),
         ("vimm.net", "/vault/32"): download_form(32),
         ("vimm.net", "/vault/33"): download_form(33),
-        ("coolrom.com", "/roms/genesis/D/"): f"<title>Genesis - D</title>{cool}",
-        ("www.consoleroms.com", "/roms/sega-genesis"): f"<title>Genesis</title>{console}",
-        (
-            "www.emu-land.net",
-            "/en/consoles/genesis/roms/d",
-        ): f'<title>Genesis - D</title><a href="/en/consoles/genesis/roms/e">E</a>{emu}',
     }
 
 
@@ -435,33 +415,6 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
     )
 
 
-def check_coolrom(context: BrowserContext) -> list[str]:
-    page = context.new_page()
-    page.goto("https://coolrom.com/roms/genesis/D/")
-    found = badges(page, 2)
-    page.close()
-    expected = ["Delta Run (USA) In library", "Echo Run (USA) Missing"]
-    return [] if found == expected else [f"coolrom: {found}"]
-
-
-def check_consoleroms(context: BrowserContext) -> list[str]:
-    page = context.new_page()
-    page.goto("https://www.consoleroms.com/roms/sega-genesis")
-    found = badges(page, 2)
-    page.close()
-    expected = ["Delta Run (USA) In library", "Echo Run (USA) Missing"]
-    return [] if found == expected else [f"consoleroms: {found}"]
-
-
-def check_emuland(context: BrowserContext) -> list[str]:
-    page = context.new_page()
-    page.goto("https://www.emu-land.net/en/consoles/genesis/roms/d")
-    found = badges(page, 2)
-    page.close()
-    expected = ["Delta Run (USA) In library", "Echo Run (USA) Missing"]
-    return [] if found == expected else [f"emuland: {found}"]
-
-
 def check_popup(context: BrowserContext, extension_id: str, output: Path | None) -> list[str]:
     problems = []
     page = context.new_page()
@@ -503,17 +456,12 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
         extension_id = worker.url.split("/")[2]
         worker.evaluate(f"chrome.storage.local.set({{ url: '{base}', token: '{TOKEN}' }})")
         context.route(
-            re.compile(
-                r"https://(vimm\.net|coolrom\.com|www\.consoleroms\.com|www\.emu-land\.net)/.*"
-            ),
+            re.compile(r"https://vimm\.net/.*"),
             serve_fixture,
         )
         problems = (
             check_vimm_game(context)
             + check_vimm_list(context)
-            + check_coolrom(context)
-            + check_consoleroms(context)
-            + check_emuland(context)
             + check_popup(context, extension_id, output)
             + check_vimm_queue(context, worker)
             + check_vimm_queue_stops(context, worker)

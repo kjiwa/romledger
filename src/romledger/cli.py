@@ -26,6 +26,7 @@ from romledger import (
     term,
 )
 from romledger.context import Context, load_context
+from romledger.sources import SOURCES
 from romledger.web import auth
 from romledger.web.app import create_app
 
@@ -68,10 +69,10 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument(
         "--all", action="store_true", help="include platforms that have no games"
     )
-    fetch_parser = commands.add_parser(
-        "fetch", help="download missing games from configured sources"
+    fetch_parser = commands.add_parser("fetch", help="download missing games from the sources")
+    fetch_parser.add_argument(
+        "platforms", nargs="*", metavar="PLATFORM", help="default: platforms that have games"
     )
-    fetch_parser.add_argument("platform", metavar="PLATFORM")
     fetch_parser.add_argument(
         "--limit", type=positive_int, metavar="N", help="fetch at most N games"
     )
@@ -81,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument(
         "--no-import", action="store_true", help="leave the downloads in the inbox"
     )
-    fetch_parser.add_argument("--source", metavar="NAME", help="use only this configured source")
+    fetch_parser.add_argument("--source", metavar="NAME", help="use only this source")
     canary_parser = commands.add_parser(
         "canary", help="check that the supported sites and upstream pins still match"
     )
@@ -93,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     missing.add_argument(
         "--links",
         action="store_true",
-        help="append Vimm's Lair and emu-land search URLs, tab-separated",
+        help="append the Vimm's Lair search URL, tab-separated",
     )
     serve_parser = commands.add_parser("serve", help="run the local dashboard and API")
     serve_parser.add_argument(
@@ -148,8 +149,7 @@ def show_platforms(args: argparse.Namespace) -> int:
 
 
 def _sources(entry: registry.Entry) -> str:
-    names = [site for site in ("vimm", "consoleroms", "coolrom") if getattr(entry, site)]
-    return ", ".join(names) or "-"
+    return ", ".join(name for name in SOURCES if getattr(entry, name)) or "-"
 
 
 def show_config(args: argparse.Namespace) -> int:
@@ -214,26 +214,56 @@ def run_import(context: Context, dry_run: bool) -> int:
 
 def fetch_games(args: argparse.Namespace) -> int:
     context = load_context(args.config)
-    (slug,) = selected(context, [args.platform])
-    if not fetch.default_sources(context.config.platforms[slug]):
-        raise config.ConfigError(f"no source can fetch {slug}. Download it by hand into an inbox.")
+    if args.source:
+        fetch.check_source(args.source)
+    slugs = fetch_targets(context, args.platforms, args.source)
+    if not slugs:
+        print("nothing to fetch: no platform with games has a source; name a platform to try it")
+        return 0
+    failed = fetched = 0
     with http.client(context.config.network.proxy) as client:
         throttle = http.Throttle()
-        result = fetch.fetch_platform(
-            context.config,
-            slug,
-            context.data_dir,
-            args.limit,
-            args.dry_run,
-            functools.partial(fetch.build_sources, client=client, throttle=throttle),
-            client,
-            throttle,
-            args.source,
-        )
-    status = 1 if result.failed else 0
-    if result.fetched and not args.dry_run and not args.no_import:
+        for slug in slugs:
+            remaining = None if args.limit is None else args.limit - fetched
+            if remaining is not None and remaining <= 0:
+                break
+            print(f"fetching {slug} ...", file=sys.stderr)
+            result = fetch.fetch_platform(
+                context.config,
+                slug,
+                context.data_dir,
+                remaining,
+                args.dry_run,
+                functools.partial(fetch.build_sources, client=client, throttle=throttle),
+                client,
+                throttle,
+                args.source,
+            )
+            failed += len(result.failed)
+            fetched += len(result.fetched)
+    status = 1 if failed else 0
+    if fetched and not args.dry_run and not args.no_import:
         status = max(status, run_import(context, dry_run=False))
     return status
+
+
+def fetch_targets(context: Context, names: Sequence[str], source: str | None) -> list[str]:
+    if names:
+        slugs = selected(context, names)
+        for slug in slugs:
+            if not fetch.default_sources(context.config.platforms[slug]):
+                raise config.ConfigError(
+                    f"no source can fetch {slug}. Download it by hand into an inbox."
+                )
+            fetch.select_sources(slug, context.config.platforms[slug], source)
+        return slugs
+    with state.State(context.data_dir / "state.db") as database:
+        counts = database.counts()
+    return [
+        slug
+        for slug, platform in context.config.platforms.items()
+        if has_games(counts.get(slug)) and fetch.select_sources_or_none(platform, source)
+    ]
 
 
 def show_status(args: argparse.Namespace) -> int:
@@ -277,15 +307,9 @@ def show_missing(args: argparse.Namespace) -> int:
     games = scan.missing_games(context.data_dir, slug)
     entry = context.platforms.get(slug)
     for game in games:
-        found = _search_links(entry, game) if args.links and entry else ()
-        print("\t".join((game, *found)) if any(found) else game)
+        found = links.vimm_search(entry.vimm, game) if args.links and entry and entry.vimm else None
+        print(f"{game}\t{found}" if found else game)
     return 0
-
-
-def _search_links(entry: registry.Entry, game: str) -> tuple[str, str]:
-    vimm = links.vimm_search(entry.vimm, game) if entry.vimm else None
-    emuland = links.emuland_search(game) if entry.emuland else None
-    return vimm or "", emuland or ""
 
 
 def serve(args: argparse.Namespace) -> int:

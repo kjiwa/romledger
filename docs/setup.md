@@ -180,17 +180,20 @@ out. `--all` lists every platform; those never scanned show `-`.
 romledger missing PLATFORM [--links]
 ```
 
-Prints one missing game per line. `--links` appends tab-separated Vimm's Lair and emu-land search
-URLs for the platforms each site carries; the column stays empty for a platform a site lacks.
+Prints one missing game per line. `--links` appends a tab and the Vimm's Lair search URL, for the
+platforms Vimm's Lair carries.
 
 ## fetch
 
 ```sh
-romledger fetch PLATFORM [--limit N] [--dry-run] [--no-import] [--source NAME]
+romledger fetch [PLATFORM...] [--limit N] [--dry-run] [--no-import] [--source NAME]
 ```
 
-Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks
-every source that carries the platform, in order, and takes the first match. A download is written
+Downloads the games `missing` lists, one at a time, into the first inbox, for the platforms you
+name or, by default, every platform that has games and a source that can be fetched from the
+command line. For each game it asks every such source that carries the platform, in order, and
+takes the first match. `romledger platforms` lists the sources of each platform; see
+[sources.md](sources.md) for what each can do. A download is written
 as `<name>.part`, resumed if it was interrupted, checked against the size the server announced (and
 the checksum, where the source lists one), then renamed. Then it runs `import`, unless
 `--no-import`.
@@ -200,13 +203,13 @@ Output per game is `fetched <game> (<source>)`, `not found <game>`, `skipped <ga
 skipped when the file a source would send already sits in `<inbox>/unmatched/`, `unwanted/` or
 `duplicates/` from an earlier import; delete that file to try again.
 
-- `--limit N`: stop after N games.
+- `--limit N`: stop after N games in all.
 - `--dry-run`: look games up and print `would fetch <game> (<source>)`; download and import nothing.
-  CoolROM is asked for section pages only; ConsoleRoms for listing and download pages.
-- `--source NAME`: use only that source, which must carry the platform.
+  ConsoleRoms is asked for listing and download pages.
+- `--source NAME`: use only that source. Vimm's Lair cannot be fetched from the command line.
 
-Run `scan` first. Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
-robots.txt asks), ConsoleRoms at least 1 second. A source whose robots.txt disallows a URL is
+Run `scan` first. Requests are spaced politely: ConsoleRoms at least 1 second apart (more if its
+robots.txt asks). A source whose robots.txt disallows a URL is
 skipped for the run. Exit status is 0, 1 if any game failed or a site's layout changed (or an
 `after_import` hook failed), or 2 for errors.
 
@@ -242,7 +245,7 @@ link in your browser; otherwise copy it from the terminal. Open it once; the bro
 cookie. Pages and files are served from the local machine only; nothing loads from a CDN.
 
 - Overview: progress per platform.
-- Platform: missing, inbox or have games, a search box, and Vimm's Lair and emu-land search links
+- Platform: missing, inbox or have games, a search box, and a Vimm's Lair search link
   for missing games.
 - Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
   there, and the counts set aside by `import` (unmatched, unwanted, duplicates, extracted). Press
@@ -276,8 +279,8 @@ Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors ar
 
 | Request | Meaning |
 | --- | --- |
-| `GET /api/platforms` | Per platform, all of them: `slug`, `name`, `tracked` (it holds a game), `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom`, `consoleroms` and `emuland`: the platform's code on each site, or null). |
-| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing titles, each by its preferred release, with `links.vimm` and `links.emuland`. |
+| `GET /api/platforms` | Per platform, all of them: `slug`, `name`, `tracked` (it holds a game), `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm` and `consoleroms`: the platform's code on each site, or null). |
+| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing titles, each by its preferred release, with `links.vimm`. |
 | `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
 | `GET /api/lookup?name=<game>&platform=<slug>&regions=<names>` | Match by name: exact, else by title ignoring tags (`exact` is false). `regions` is an optional comma list of No-Intro region names (`USA,Europe`) that narrows the candidates, as do extra tags in the name. `matches` lists every game that still fits. `name` is at most 300 characters. |
 | `GET /api/jobs/current` | The running scan or import, or null. |

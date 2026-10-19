@@ -47,22 +47,11 @@ def test_vimm_search_skips_short_titles() -> None:
     assert links.vimm_search("NES", "R (USA)") is None
 
 
-def test_emuland_search() -> None:
-    assert links.emuland_search("Super Mario Bros. (USA)") == (
-        "https://www.emu-land.net/en/search_games?q=Super+Mario+Bros."
-    )
-
-
-def test_emuland_search_skips_short_titles() -> None:
-    assert links.emuland_search("R (USA)") is None
-
-
 @pytest.mark.parametrize("hostile", [" " * 50_000, "(" * 50_000, "a" + " (" * 25_000])
 def test_normalize_is_linear_on_hostile_input(hostile: str) -> None:
     started = time.monotonic()
     titles.normalize(hostile)
     links.vimm_search("NES", hostile)
-    links.emuland_search(hostile)
     assert time.monotonic() - started < 1
 
 

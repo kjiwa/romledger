@@ -42,7 +42,6 @@ class Game:
     name: str
     state: str
     vimm: str | None
-    emuland: str | None
 
 
 @dataclass(frozen=True)
@@ -101,10 +100,9 @@ def games_page(
 
 def _game(item: state.Item, entry: registry.Entry | None) -> Game:
     if item.state != "missing" or entry is None:
-        return Game(item.game, item.state, None, None)
+        return Game(item.game, item.state, None)
     vimm = links.vimm_search(entry.vimm, item.game) if entry.vimm else None
-    emuland = links.emuland_search(item.game) if entry.emuland else None
-    return Game(item.game, item.state, vimm, emuland)
+    return Game(item.game, item.state, vimm)
 
 
 def page_url(path: str, params: dict[str, str | int], offset: int) -> str:

@@ -25,7 +25,7 @@ WANTED_KEYS = {"regions", "languages", "include"}
 REMOVED_PLATFORM_KEYS = {
     "dat": "romledger picks each platform's DAT",
     "sources": "fetch uses every source that carries the platform",
-    "archive_item": "the Internet Archive is no longer a fetch source",
+    "archive_item": "the Internet Archive is no longer a source",
 }
 
 
@@ -52,7 +52,6 @@ class Platform:
     regions: tuple[str, ...] = Wanted.regions
     languages: tuple[str, ...] = Wanted.languages
     include: tuple[str, ...] = Wanted.include
-    coolrom: str | None = None
     consoleroms: str | None = None
 
 
@@ -235,7 +234,6 @@ def _parse_platform(
         regions=wanted.regions,
         languages=wanted.languages,
         include=wanted.include,
-        coolrom=entry.coolrom,
         consoleroms=entry.consoleroms,
     )
 
