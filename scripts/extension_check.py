@@ -35,6 +35,8 @@ from romledger.context import load_context
 
 EXTENSION = Path(__file__).resolve().parent.parent / "extension"
 SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
+WORKER_TRIES = 300
+WORKER_NUDGE = 30
 SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Quest (USA)": "c" * 40}
 GENESIS = {"Delta Run (USA)": "d" * 40, "Echo Run (USA)": "e" * 40}
 QUEUED = {"Foxtrot Run (USA)": "1" * 40, "Golf Run (USA)": "2" * 40}
@@ -378,7 +380,7 @@ def is_romledger(worker: Worker) -> bool:
         return False
 
 
-def check_vimm_download(playwright: Playwright, directory: Path, extension: Path) -> list[str]:
+def check_vimm_download(playwright: Playwright, directory: Path, unpacked: Path) -> list[str]:
     """Runs a browser Playwright does not steer: its download handling replaces the file names."""
     saved_to = directory / "downloads"
     preferences = directory / "download-profile" / "Default" / "Preferences"
@@ -396,8 +398,8 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
             "--headless=new",
             f"--remote-debugging-port={debug_port}",
             f"--user-data-dir={directory / 'download-profile'}",
-            f"--disable-extensions-except={extension}",
-            f"--load-extension={extension}",
+            f"--disable-extensions-except={unpacked}",
+            f"--load-extension={unpacked}",
             "--disable-features=DisableLoadExtensionCommandLineSwitch",
             "--host-resolver-rules=MAP dl3.vimm.net 127.0.0.1",
             "--no-sandbox",
@@ -423,10 +425,13 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
         )
         context = connected.contexts[0]
         worker = None
-        for _ in range(100):
+        for attempt in range(WORKER_TRIES):
             worker = next((w for w in context.service_workers if is_romledger(w)), None)
             if worker:
                 break
+            if attempt == WORKER_NUDGE:
+                # An idle service worker only starts when something talks to the extension.
+                context.new_page().goto(f"chrome-extension://{extension.EXTENSION_ID}/options.html")
             time.sleep(0.1)
         if worker is None:
             return ["vimm download: the extension did not load"]

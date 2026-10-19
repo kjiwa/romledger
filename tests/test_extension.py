@@ -68,7 +68,9 @@ def test_windows_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_launcher_sets_the_config_and_runs_the_host() -> None:
-    text = extension.launcher_text("/opt/py thon/bin/python", Path("/home/user/my config.toml"), None)
+    text = extension.launcher_text(
+        "/opt/py thon/bin/python", Path("/home/user/my config.toml"), None
+    )
     assert text == (
         "#!/bin/sh\n"
         "export ROMLEDGER_CONFIG='/home/user/my config.toml'\n"
