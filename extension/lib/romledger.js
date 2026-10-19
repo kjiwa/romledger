@@ -17,7 +17,8 @@ const romledger = (() => {
   const sites = {};
 
   // A site adapter (see sites/vimm.js) registers itself here, and the generic scripts find it by
-  // the page's host. Supporting another site means one adapter and one manifest entry.
+  // the page's host. Supporting another site means one adapter (also listed in background.js importScripts)
+  // and one manifest entry.
   function register(site) {
     sites[site.id] = site;
   }
@@ -97,7 +98,6 @@ const romledger = (() => {
     progress,
     downloadTarget,
     queueable,
-    DEFAULT_GAP_SECONDS,
     MIN_GAP_SECONDS,
     MAX_GAP_SECONDS,
   };

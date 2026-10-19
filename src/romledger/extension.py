@@ -17,19 +17,19 @@ MANIFEST = f"{native.HOST_NAME}.json"
 HOSTS_DIR = "NativeMessagingHosts"
 PING_SECONDS = 20
 
-# (name, family, data directory below the platform's base, host manifest directory)
+# (name, family, data directory below the platform's base)
 MACOS = [
-    ("Chrome", "chromium", "Google/Chrome", HOSTS_DIR),
-    ("Chromium", "chromium", "Chromium", HOSTS_DIR),
-    ("Brave", "chromium", "BraveSoftware/Brave-Browser", HOSTS_DIR),
-    ("Edge", "chromium", "Microsoft Edge", HOSTS_DIR),
-    ("Firefox", "firefox", "Mozilla", HOSTS_DIR),
+    ("Chrome", "chromium", "Google/Chrome"),
+    ("Chromium", "chromium", "Chromium"),
+    ("Brave", "chromium", "BraveSoftware/Brave-Browser"),
+    ("Edge", "chromium", "Microsoft Edge"),
+    ("Firefox", "firefox", "Mozilla"),
 ]
 LINUX = [
-    ("Chrome", "chromium", "google-chrome", HOSTS_DIR),
-    ("Chromium", "chromium", "chromium", HOSTS_DIR),
-    ("Brave", "chromium", "BraveSoftware/Brave-Browser", HOSTS_DIR),
-    ("Edge", "chromium", "microsoft-edge", HOSTS_DIR),
+    ("Chrome", "chromium", "google-chrome"),
+    ("Chromium", "chromium", "chromium"),
+    ("Brave", "chromium", "BraveSoftware/Brave-Browser"),
+    ("Edge", "chromium", "microsoft-edge"),
 ]
 
 
@@ -66,8 +66,8 @@ def browsers(home: Path, platform: str | None = None) -> list[Browser]:
             home / ".mozilla" / "native-messaging-hosts" / MANIFEST,
         )
     found = [
-        Browser(name, family, base / root, base / root / directory / MANIFEST)
-        for name, family, root, directory in table
+        Browser(name, family, base / root, base / root / HOSTS_DIR / MANIFEST)
+        for name, family, root in table
     ]
     return [*found, *([firefox] if firefox else [])]
 

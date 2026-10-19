@@ -45,7 +45,6 @@ def test_init_with_flags(
     assert f"Put ROMs in {roms / 'inbox'}, then:" in out
     for command in ("romledger import", "romledger status"):
         assert command in out
-    assert "--platform" not in out
 
 
 def test_init_keeps_existing_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

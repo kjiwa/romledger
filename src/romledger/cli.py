@@ -39,7 +39,7 @@ Typical use:
   romledger fetch           download missing games where a source allows it
 
 Exit status: 0 success; 1 something failed (a download, a hook, a browser host);
-2 a usage or configuration error; 130 interrupted.
+2 a usage or configuration error; 130 cancelled at a prompt.
 Docs: https://github.com/kjiwa/romledger/tree/master/docs
 """
 

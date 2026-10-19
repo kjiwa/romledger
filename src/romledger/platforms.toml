@@ -1,5 +1,4 @@
-# One table per platform slug (the folder name igir files games under, from its {romm} token,
-# verified on 2026-10-13).
+# One table per platform slug (the folder name igir files games under, from its {romm} token).
 # dat: <set>/<name> under libretro-database metadat. vimm, consoleroms: site system codes.
 # [ignore] lists site systems that are deliberately unsupported (no console DAT is mapped).
 

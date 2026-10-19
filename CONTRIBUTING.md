@@ -31,7 +31,7 @@ site's pages (`read`), which downloads are its own (`isDownload`), how a game pa
 download (`downloadUrl`) and its own wording. The generic scripts do the rest: `content/annotate.js`
 badges games and `content/queue.js` runs the download queue for any adapter. To support another
 site, add its adapter, list the adapter and those scripts under a new `content_scripts` entry in
-`manifest.json` (and the adapter in the background `scripts`), and give the site a code column in
+`manifest.json` (and the adapter in `background.js` `importScripts`), and give the site a code column in
 `src/romledger/platforms.toml` and `romledger.sources.SOURCES`. Shared helpers and the adapter
 registry are in `extension/lib/romledger.js`.
 

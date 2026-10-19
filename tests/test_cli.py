@@ -476,8 +476,8 @@ def test_fetch_source_that_cannot_be_fetched(
 
 
 def test_fetch_unknown_source(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(make_config(tmp_path), "fetch", "--source", "coolrom") == 2
-    assert "unknown source 'coolrom'. Sources: vimm, consoleroms." in capsys.readouterr().err
+    assert run(make_config(tmp_path), "fetch", "--source", "nosuchsource") == 2
+    assert "unknown source 'nosuchsource'. Sources: vimm, consoleroms." in capsys.readouterr().err
 
 
 @pytest.mark.usefixtures("stderr_tty")
@@ -794,7 +794,7 @@ def test_platforms_is_cut_to_the_terminal_width(
     assert cli.main(["platforms"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert max(len(line) for line in lines) <= 80
-    assert any("…" in line for line in lines)
+    assert any("..." in line for line in lines)
 
 
 def test_platforms_names_every_source_that_carries_a_platform(

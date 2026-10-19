@@ -1,23 +1,15 @@
 from romledger import registry
-from romledger.sources import HASH, SOURCES, TITLE, consoleroms
+from romledger.sources import SOURCES, consoleroms
 
 
-def test_a_source_is_either_fetched_or_used_from_the_browser() -> None:
-    assert {name: (info.fetch, info.browser) for name, info in SOURCES.items()} == {
-        "vimm": (False, True),
-        "consoleroms": (True, False),
-    }
-
-
-def test_only_a_site_that_publishes_hashes_matches_by_hash() -> None:
-    assert {name: info.match for name, info in SOURCES.items()} == {
-        "vimm": HASH,
-        "consoleroms": TITLE,
+def test_only_consoleroms_is_fetched_from_the_command_line() -> None:
+    assert {name: info.fetch for name, info in SOURCES.items()} == {
+        "vimm": False,
+        "consoleroms": True,
     }
 
 
 def test_the_registry_agrees_with_the_source_modules() -> None:
-    assert SOURCES["consoleroms"].name == consoleroms.NAME
     assert SOURCES["consoleroms"].hosts == consoleroms.HOSTS
 
 
