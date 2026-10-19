@@ -35,7 +35,6 @@ EXTENSION = Path(__file__).resolve().parent.parent / "extension"
 SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Quest (USA)": "c" * 40}
 GENESIS = {"Delta Run (USA)": "d" * 40, "Echo Run (USA)": "e" * 40}
 QUEUED = {"Foxtrot Run (USA)": "1" * 40, "Golf Run (USA)": "2" * 40}
-ITEM = "gb-item"
 MISSING_SHA1 = "f" * 40
 JAPAN_TWIN = {"gb": {"Omega Quest (Japan)": "9" * 40}}
 FLAG = '<img src="/images/flags/{file}.png" class="flag" title="{title}">'
@@ -51,13 +50,6 @@ def write_dat(path: Path, games: dict[str, str]) -> None:
 
 
 def seed(root: Path) -> None:
-    config_file = root / "config.toml"
-    config_file.write_text(
-        config_file.read_text().replace(
-            "[platforms.gb]\n",
-            f'[platforms.gb]\nsources = ["internet-archive"]\narchive_item = "{ITEM}"\n',
-        )
-    )
     context = load_context(None)
     layouts = {
         "gb": (SHA1, ("have", "missing", "inbox")),
@@ -139,8 +131,6 @@ def pages() -> dict[tuple[str, str], str]:
             "www.emu-land.net",
             "/en/consoles/genesis/roms/d",
         ): f'<title>Genesis - D</title><a href="/en/consoles/genesis/roms/e">E</a>{emu}',
-        ("archive.org", f"/details/{ITEM}"): "<title>GB item</title><h1>GB item</h1>",
-        ("archive.org", "/details/other"): "<title>Other</title><h1>Other</h1>",
     }
 
 
@@ -472,21 +462,6 @@ def check_emuland(context: BrowserContext) -> list[str]:
     return [] if found == expected else [f"emuland: {found}"]
 
 
-def check_archive(context: BrowserContext) -> list[str]:
-    problems = []
-    page = context.new_page()
-    page.goto(f"https://archive.org/details/{ITEM}")
-    found = badges(page, 1)
-    if "of 3 wanted games" not in found[0]:
-        problems.append(f"archive {ITEM}: {found}")
-    page.goto("https://archive.org/details/other")
-    page.wait_for_timeout(1500)
-    if page.locator(".romledger-panel").count():
-        problems.append("archive other: a panel appeared on an unrelated item")
-    page.close()
-    return problems
-
-
 def check_popup(context: BrowserContext, extension_id: str, output: Path | None) -> list[str]:
     problems = []
     page = context.new_page()
@@ -529,8 +504,7 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
         worker.evaluate(f"chrome.storage.local.set({{ url: '{base}', token: '{TOKEN}' }})")
         context.route(
             re.compile(
-                r"https://(vimm\.net|coolrom\.com|www\.consoleroms\.com|www\.emu-land\.net"
-                r"|archive\.org)/.*"
+                r"https://(vimm\.net|coolrom\.com|www\.consoleroms\.com|www\.emu-land\.net)/.*"
             ),
             serve_fixture,
         )
@@ -540,7 +514,6 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
             + check_coolrom(context)
             + check_consoleroms(context)
             + check_emuland(context)
-            + check_archive(context)
             + check_popup(context, extension_id, output)
             + check_vimm_queue(context, worker)
             + check_vimm_queue_stops(context, worker)

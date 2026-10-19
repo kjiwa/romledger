@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from romledger import cli, config, igir
+from romledger import cli, config, igir, registry
 from romledger.igir import ReportRow
 
 pytestmark = pytest.mark.igir
@@ -17,6 +17,12 @@ GAMES = {
     "Beta (USA)": b"C" * 1200,
     "Gamma (Japan)": b"D" * 1300,
 }
+
+
+@pytest.fixture(autouse=True)
+def only_nes(monkeypatch: pytest.MonkeyPatch) -> None:
+    nes = registry.load()["nes"]
+    monkeypatch.setattr(registry, "load", lambda: {"nes": nes})
 
 
 def dat_text(name: str = "Test") -> str:
@@ -91,10 +97,7 @@ def test_import_end_to_end(
     for name, content in junk.items():
         (inbox / name).write_bytes(content)
     path = tmp_path / "config.toml"
-    path.write_text(
-        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
-        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
-    )
+    path.write_text(f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n')
 
     assert cli.main(["--config", str(path), "import"]) == 0
     assert capsys.readouterr().out == (
@@ -139,10 +142,7 @@ def test_import_extracts_a_zip_with_an_extra_file_and_keeps_the_inbox(
         archive.writestr(inner, GAMES["Alpha (USA)"])
         archive.writestr("readme.txt", "downloaded from somewhere")
     path = tmp_path / "config.toml"
-    path.write_text(
-        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
-        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
-    )
+    path.write_text(f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n')
 
     assert cli.main(["--config", str(path), "import"]) == 0
     assert capsys.readouterr().out == ("moved nes 1\nextracted 1 (moved to <inbox>/extracted)\n")
@@ -168,10 +168,7 @@ def test_import_survives_the_inbox_being_removed_under_the_cwd(
     inbox.mkdir()
     (inbox / "Alpha (USA).nes").write_bytes(GAMES["Alpha (USA)"])
     path = tmp_path / "config.toml"
-    path.write_text(
-        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
-        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
-    )
+    path.write_text(f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n')
     monkeypatch.chdir(inbox)
 
     assert cli.main(["--config", str(path), "import"]) == 0
@@ -202,10 +199,7 @@ def test_import_files_a_game_whose_name_repeats_in_another_dat_block(
     inbox.mkdir()
     (inbox / "Delta (USA).nes").write_bytes(alternate)
     path = tmp_path / "config.toml"
-    path.write_text(
-        f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n'
-        f'[platforms.nes]\ndat = "no-intro/{NES}"\n'
-    )
+    path.write_text(f'[library]\nroms = "{roms}"\ninboxes = ["{inbox}"]\n')
 
     assert cli.main(["--config", str(path), "import"]) == 0
     assert capsys.readouterr().out == "moved nes 1\n"

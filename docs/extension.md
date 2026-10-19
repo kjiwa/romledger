@@ -1,13 +1,13 @@
 # Browser extension
 
-The extension marks games on Vimm's Lair, CoolROM, ConsoleRoms, emu-land and the Internet Archive as in your library, in
+The extension marks games on Vimm's Lair, CoolROM, ConsoleRoms and emu-land as in your library, in
 your inbox, missing or not wanted, so you can browse and pick what to download. On Vimm's Lair it
 can also download the missing games of a list page for you; that is off until you turn it on (see
 [Download from Vimm's Lair](#download-from-vimms-lair)). Nothing else clicks or downloads.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/extension-popup-dark.png">
-  <img alt="The extension popup: a progress bar and a count of wanted games had for each configured platform." src="images/extension-popup-light.png">
+  <img alt="The extension popup: a progress bar and a count of wanted games had for each platform that has games." src="images/extension-popup-light.png">
 </picture>
 
 ## Install
@@ -30,7 +30,7 @@ the extension's card in `chrome://extensions`; until then the browser keeps runn
 2. Open the extension's options. Enter the service URL (the field starts as `http://127.0.0.1:8730`, for a service on this
    machine) and the token (the part after `?token=` in the link).
 3. Choose Save and test, then allow the browser to reach that address. The page reports the
-   number of configured platforms.
+   number of platforms that have games.
 
 The URL and token stay in this browser. The extension sends the SHA-1 hashes and titles it finds
 on a page only to that address.
@@ -68,7 +68,6 @@ the files by itself; see [serve](setup.md#serve).
 | CoolROM | A game or a platform listing | A badge by title. |
 | ConsoleRoms | A game or a platform listing | A badge by title. |
 | emu-land | A game or a platform listing | A badge by title. |
-| Internet Archive | An item that you set as a platform's `archive_item` | The platform's progress. |
 
 | Badge | Meaning |
 | --- | --- |
@@ -77,14 +76,14 @@ the files by itself; see [serve](setup.md#serve).
 | Missing | The DAT lists the game, you want it, and you do not have it. |
 | Not wanted | The DAT lists it, but the platform's regions, languages or `include` leave its title out. |
 | Not scanned | The platform has no scan yet. Run `romledger scan`. |
-| Not in any DAT | No DAT for a configured platform lists it. |
+| Not in any DAT | No DAT lists it. |
 
 A badge that says `(approximate)` was matched by title. On Vimm's Lair lists the row's region
 flags narrow the match; when several games still fit, the badge shows the best state among them.
-Check the region and version before you rely on it. Platforms that are not in your config get no badges.
+Check the region and version before you rely on it.
 
 Vimm's Lair offers some GameCube games in extra formats (`ciso`, `nkit`, `rvz`). Only the
 default ISO matches a Redump DAT, so download that one.
 
-The toolbar popup lists every platform's progress. If it says the page layout was not recognized,
+The toolbar popup lists the progress of each platform that has games. If it says the page layout was not recognized,
 the site changed; see [troubleshooting.md](troubleshooting.md).

@@ -24,15 +24,13 @@ def test_platforms_before_and_after_a_scan(env: Env) -> None:
         "coolrom": None,
         "consoleroms": "nes",
         "emuland": "consoles/dendy",
-        "archive_item": None,
     }
+    assert (before[0]["tracked"], after["tracked"]) == (False, True)
 
 
 def test_platform_sites_report_configured_codes(env: Env) -> None:
     nes = env.context.config.platforms["nes"]
-    env.context.config.platforms["nes"] = dataclasses.replace(
-        nes, coolrom="NES", archive_item="item-1"
-    )
+    env.context.config.platforms["nes"] = dataclasses.replace(nes, coolrom="NES")
     env.context.platforms.pop("nes")
     sites = env.client.get("/api/platforms").json()[0]["sites"]
     assert sites == {
@@ -40,7 +38,6 @@ def test_platform_sites_report_configured_codes(env: Env) -> None:
         "coolrom": "NES",
         "consoleroms": None,
         "emuland": None,
-        "archive_item": "item-1",
     }
 
 
@@ -159,21 +156,6 @@ def test_a_second_job_is_refused_while_one_runs(env: Env) -> None:
     finally:
         release.set()
         env.services.jobs.wait(5)
-
-
-def test_actions_need_platforms_and_dats(env: Env) -> None:
-    env.context.config.platforms.clear()
-    none = env.client.post("/api/scan")
-    assert none.status_code == 400
-    assert "no platforms configured" in none.json()["detail"]
-
-
-def test_actions_need_a_downloaded_dat(env: Env) -> None:
-    for path in env.data.rglob("*.dat"):
-        path.unlink()
-    response = env.client.post("/api/scan")
-    assert response.status_code == 400
-    assert "dats update" in response.json()["detail"]
 
 
 def test_unmounted_library_is_a_503(env: Env) -> None:

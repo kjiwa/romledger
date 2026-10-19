@@ -10,7 +10,6 @@ roms = "{roms}"
 inboxes = ["{inbox}"]
 
 [platforms.nes]
-dat = "no-intro/Nintendo - Nintendo Entertainment System"
 """
 
 
@@ -33,6 +32,16 @@ def test_load_valid(tmp_path: Path) -> None:
     assert loaded.library.roms == tmp_path / "roms"
     assert loaded.library.inboxes == (tmp_path / "inbox",)
     assert loaded.platforms["nes"].dat.endswith("Entertainment System")
+    assert set(loaded.platforms) == set(registry.load())
+
+
+def test_a_config_with_only_a_library_is_valid(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).split("[platforms.nes]")[0]
+    loaded = load(write(tmp_path, text))
+    assert loaded.platforms["snes"] == config.Platform(
+        dat=registry.load()["snes"].dat, coolrom=None, consoleroms="snes"
+    )
+    assert loaded.wanted == config.Wanted()
 
 
 def test_platform_defaults(tmp_path: Path) -> None:
@@ -121,8 +130,8 @@ def test_wrong_type(tmp_path: Path) -> None:
 
 
 def test_wrong_type_string(tmp_path: Path) -> None:
-    text = valid_text(tmp_path).replace('dat = "', "dat = 5 #")
-    with pytest.raises(config.ConfigError, match=r"platforms\.nes\.dat must be a non-empty string"):
+    text = valid_text(tmp_path).replace('roms = "', "roms = 5 #")
+    with pytest.raises(config.ConfigError, match=r"library\.roms must be a non-empty string"):
         load(write(tmp_path, text))
 
 
@@ -271,38 +280,67 @@ def test_non_utf8_file_rejected(tmp_path: Path) -> None:
         load(path)
 
 
-def no_dat_text(tmp_path: Path, slug: str = "nes") -> str:
-    return valid_text(tmp_path).split("[platforms.nes]")[0] + f"[platforms.{slug}]\n"
-
-
-def test_dat_defaults_from_registry(tmp_path: Path) -> None:
-    platform = load(write(tmp_path, no_dat_text(tmp_path))).platforms["nes"]
+def test_dat_comes_from_the_registry(tmp_path: Path) -> None:
+    platform = load(write(tmp_path, valid_text(tmp_path))).platforms["nes"]
     assert platform.dat == "no-intro/Nintendo - Nintendo Entertainment System"
 
 
-def test_dat_explicit_wins(tmp_path: Path) -> None:
-    text = no_dat_text(tmp_path) + 'dat = "redump/Other"\n'
-    assert load(write(tmp_path, text)).platforms["nes"].dat == "redump/Other"
+def test_unknown_platform_suggests_the_nearest(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace("platforms.nes", "platforms.snez")
+    with pytest.raises(config.ConfigError, match=r"platforms\.snez: unknown platform 'snez'.*snes"):
+        load(write(tmp_path, text))
 
 
-def test_unknown_platform_without_dat(tmp_path: Path) -> None:
-    with pytest.raises(config.ConfigError) as error:
-        load(write(tmp_path, no_dat_text(tmp_path, "bogus")))
-    message = str(error.value)
-    assert "'bogus'" in message
-    assert "atari2600, " in message
-    assert message.endswith("; or set dat.")
+def test_unknown_platform_without_a_near_match(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace("platforms.nes", "platforms.zzzzzz")
+    with pytest.raises(config.ConfigError, match=r"Run romledger platforms to list them"):
+        load(write(tmp_path, text))
 
 
-def test_unknown_platform_with_dat(tmp_path: Path) -> None:
-    text = no_dat_text(tmp_path, "bogus") + 'dat = "no-intro/Some - Thing"\n'
-    assert load(write(tmp_path, text)).platforms["bogus"].dat == "no-intro/Some - Thing"
+@pytest.mark.parametrize(
+    ("line", "reason"),
+    [
+        ('dat = "no-intro/X"', "romledger picks each platform's DAT"),
+        ('sources = ["coolrom"]', "fetch uses every source that carries the platform"),
+        ('archive_item = "x"', "the Internet Archive is no longer a fetch source"),
+    ],
+)
+def test_removed_platform_keys_say_what_to_do(tmp_path: Path, line: str, reason: str) -> None:
+    key = line.split(" ")[0]
+    with pytest.raises(
+        config.ConfigError, match=rf"platforms\.nes\.{key} was removed in 0.6\. Delete it: {reason}"
+    ):
+        load(write(tmp_path, valid_text(tmp_path) + line + "\n"))
 
 
-@pytest.mark.parametrize("dat", ["nes", "other/Name", "no-intro/", "No-Intro/Name"])
-def test_dat_shape_rejected(tmp_path: Path, dat: str) -> None:
-    text = no_dat_text(tmp_path) + f'dat = "{dat}"\n'
-    with pytest.raises(config.ConfigError, match=r"must look like <no-intro\|redump>/<name>"):
+def test_wanted_sets_the_default_for_every_platform(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace(
+        "[platforms.nes]", '[wanted]\nregions = ["EUR"]\ninclude = ["bad"]\n\n[platforms.nes]'
+    )
+    loaded = load(write(tmp_path, text))
+    assert loaded.wanted == config.Wanted(regions=("EUR",), include=("bad",))
+    assert loaded.platforms["snes"].regions == ("EUR",)
+    assert loaded.platforms["snes"].languages == ("EN",)
+    assert loaded.platforms["snes"].include == ("bad",)
+
+
+def test_a_platform_overrides_wanted_key_by_key(tmp_path: Path) -> None:
+    text = valid_text(tmp_path).replace(
+        "[platforms.nes]", '[wanted]\nregions = ["EUR"]\n\n[platforms.nes]'
+    )
+    nes = load(write(tmp_path, text + 'languages = ["FR"]\n')).platforms["nes"]
+    assert (nes.regions, nes.languages) == (("EUR",), ("FR",))
+
+
+def test_unknown_wanted_key(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + '\n[wanted]\nregion = ["USA"]\n'
+    with pytest.raises(config.ConfigError, match=r"unknown key wanted\.region"):
+        load(write(tmp_path, text))
+
+
+def test_wanted_errors_name_the_wanted_table(tmp_path: Path) -> None:
+    text = valid_text(tmp_path) + '\n[wanted]\nlanguages = ["XX"]\n'
+    with pytest.raises(config.ConfigError, match=r"wanted\.languages has unknown code 'XX'"):
         load(write(tmp_path, text))
 
 
@@ -349,66 +387,13 @@ def test_empty_regions_rejected(tmp_path: Path) -> None:
         load(write(tmp_path, text))
 
 
-def sources_text(tmp_path: Path, lines: str) -> str:
-    return valid_text(tmp_path) + lines
-
-
-def test_sources_default_to_none(tmp_path: Path) -> None:
-    platform = load(write(tmp_path, valid_text(tmp_path))).platforms["nes"]
-    assert platform.sources == ()
-    assert platform.archive_item is None
-    assert platform.coolrom is None
-    assert platform.consoleroms == "nes"
-
-
-def test_sources_parsed(tmp_path: Path) -> None:
-    text = valid_text(tmp_path).replace("platforms.nes", "platforms.atari7800").splitlines()
-    text = [line for line in text if not line.startswith("dat")]
-    sources = '["coolrom", "consoleroms", "internet-archive", "coolrom"]'
-    text.extend([f"sources = {sources}", 'archive_item = "x"'])
-    platform = load(write(tmp_path, "\n".join(text))).platforms["atari7800"]
-    assert platform.sources == ("coolrom", "consoleroms", "internet-archive")
-    assert platform.archive_item == "x"
-    assert platform.coolrom == "atari7800"
-    assert platform.consoleroms == "atari-7800"
-
-
-def test_unknown_source(tmp_path: Path) -> None:
-    text = sources_text(tmp_path, 'sources = ["vimm"]\n')
-    with pytest.raises(
-        config.ConfigError, match=r"platforms\.nes\.sources has unknown source 'vimm'"
-    ):
-        load(write(tmp_path, text))
-
-
-def test_archive_item_required_for_internet_archive(tmp_path: Path) -> None:
-    text = sources_text(tmp_path, 'sources = ["internet-archive"]\n')
-    with pytest.raises(config.ConfigError, match=r"missing platforms\.nes\.archive_item"):
-        load(write(tmp_path, text))
-
-
-def test_archive_item_without_internet_archive_is_kept(tmp_path: Path) -> None:
-    text = sources_text(tmp_path, 'archive_item = "x"\n')
-    assert load(write(tmp_path, text)).platforms["nes"].archive_item == "x"
-
-
-@pytest.mark.parametrize(
-    ("slug", "source", "label"),
-    [
-        ("nes", "coolrom", "CoolROM"),
-        ("custom", "coolrom", "CoolROM"),
-        ("wiiu", "consoleroms", "ConsoleRoms"),
-        ("custom", "consoleroms", "ConsoleRoms"),
-    ],
-)
-def test_site_source_requires_a_registry_code(
-    tmp_path: Path, slug: str, source: str, label: str
-) -> None:
-    text = valid_text(tmp_path).replace("[platforms.nes]", f"[platforms.{slug}]")
-    text = text.replace("no-intro/Nintendo - Nintendo Entertainment System", "no-intro/Custom")
-    match = rf"platforms\.{slug}\.sources lists {source} but {label} has no system"
-    with pytest.raises(config.ConfigError, match=match):
-        load(write(tmp_path, text + f'sources = ["{source}"]\n'))
+def test_site_codes_come_from_the_registry(tmp_path: Path) -> None:
+    platforms = load(write(tmp_path, valid_text(tmp_path))).platforms
+    assert (platforms["nes"].coolrom, platforms["nes"].consoleroms) == (None, "nes")
+    assert (platforms["atari7800"].coolrom, platforms["atari7800"].consoleroms) == (
+        "atari7800",
+        "atari-7800",
+    )
 
 
 def test_no_network_by_default(tmp_path: Path) -> None:

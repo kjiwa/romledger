@@ -22,8 +22,10 @@ from romledger import (
     registry,
     scan,
     state,
+    term,
 )
 from romledger.context import Context
+from romledger.sources.base import Candidate
 from romledger.web import app as web_app
 
 
@@ -41,9 +43,18 @@ def make_config(tmp_path: Path, *, mkdirs: bool = True) -> Path:
     path = tmp_path / "config.toml"
     path.write_text(
         f'[library]\nroms = "{tmp_path / "roms"}"\ninboxes = ["{tmp_path / "inbox"}"]\n'
-        "[platforms.nes]\n"
     )
     return path
+
+
+def no_dats(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        http, "client", lambda proxy=None: httpx.Client(transport=httpx.MockTransport(not_found))
+    )
+
+
+def not_found(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(404)
 
 
 def test_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -58,9 +69,8 @@ def test_config_summary(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     assert cli.main(["--config", str(path), "config"]) == 0
     out = capsys.readouterr().out
     assert str(path) in out
-    assert "nes: no-intro/Nintendo - Nintendo Entertainment System" in out
-    assert "  regions: USA, WORLD" in out
-    assert "  languages: EN" in out
+    assert "wanted:  regions USA, WORLD; languages EN\n" in out
+    assert "nes:" not in out
     assert "include" not in out
     assert out.isascii()
 
@@ -69,9 +79,20 @@ def test_config_summary_lists_included_categories(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = make_config(tmp_path)
-    path.write_text(path.read_text() + 'include = ["unlicensed", "bad"]\n')
+    path.write_text(path.read_text() + '[wanted]\ninclude = ["unlicensed", "bad"]\n')
     assert cli.main(["--config", str(path), "config"]) == 0
-    assert "  include: unlicensed, bad\n" in capsys.readouterr().out
+    assert "; include unlicensed, bad\n" in capsys.readouterr().out
+
+
+def test_config_summary_lists_only_platforms_that_differ(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = make_config(tmp_path)
+    path.write_text(path.read_text() + '[platforms.snes]\nregions = ["JPN"]\n[platforms.nes]\n')
+    assert cli.main(["--config", str(path), "config"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert "snes:  regions JPN; languages EN" in lines
+    assert [line for line in lines if line.startswith(("nes:", "gb:"))] == []
 
 
 def test_config_error_exit_code(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -107,32 +128,61 @@ def test_config_shows_data_dir(
     assert f"data:    {data_dir}" in capsys.readouterr().out
 
 
-def test_status_golden(tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    path = make_config(tmp_path)
-    path.write_text(path.read_text() + "[platforms.snes]\n")
+def test_status_shows_only_platforms_that_have_games(
+    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     seed(
         data_dir,
         "nes",
         [state.Item("A", "have", "/a"), state.Item("B", "inbox", "/b")]
         + [state.Item(f"M{n}", "missing", None) for n in range(2)],
     )
-    assert run(path, "status") == 0
+    seed(data_dir, "snes", [state.Item("A", "missing", None)])
+    assert run(make_config(tmp_path), "status") == 0
     assert capsys.readouterr().out == (
         "platform  wanted  have  inbox  missing  unmatched  done\n"
         "nes            4     1      1        2          1   25%\n"
-        "snes           -     -      -        -          -     -\n"
-        "run: romledger scan\n"
+        f"{len(registry.load()) - 1} platforms with no games hidden; romledger status --all\n"
     )
 
 
-def test_status_all_scanned_has_no_hint(
+def test_status_all_lists_every_platform(
     tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(data_dir, "nes", [])
+    seed(data_dir, "nes", [state.Item("A", "have", "/a")])
+    assert run(make_config(tmp_path), "status", "--all") == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == len(registry.load()) + 2
+    assert lines[1].startswith("atari2600  ")
+    assert lines[1].endswith("-")
+    assert lines[-1] == "run: romledger scan"
+
+
+def test_status_before_any_scan_says_to_scan(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert run(make_config(tmp_path), "status") == 0
-    out = capsys.readouterr().out
-    assert "scan" not in out
-    assert out.splitlines()[1].endswith("-")
+    assert capsys.readouterr().out == "run: romledger scan\n"
+
+
+def test_status_with_no_games_says_to_import(
+    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(data_dir, "nes", [state.Item("A", "missing", None)])
+    assert run(make_config(tmp_path), "status") == 0
+    assert capsys.readouterr().out == (
+        "no games yet; put ROMs in an inbox and run: romledger import\n"
+    )
+
+
+def test_status_with_every_platform_tracked_has_no_footer(
+    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for slug in registry.load():
+        seed(data_dir, slug, [state.Item("A", "have", "/a")])
+    assert run(make_config(tmp_path), "status") == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == len(registry.load()) + 1
 
 
 def test_missing_lists_games(
@@ -178,12 +228,8 @@ def test_missing_links_leaves_an_empty_cell_for_a_site_without_a_code(
 def test_missing_links_without_site_codes(
     tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = make_config(tmp_path)
-    path.write_text(
-        path.read_text().replace("[platforms.nes]", "[platforms.custom]") + 'dat = "redump/X"\n'
-    )
-    seed(data_dir, "custom", [state.Item("Game (USA)", "missing", None)])
-    assert run(path, "missing", "custom", "--links") == 0
+    seed(data_dir, "neo-geo-pocket-color", [state.Item("Game (USA)", "missing", None)])
+    assert run(make_config(tmp_path), "missing", "neo-geo-pocket-color", "--links") == 0
     assert capsys.readouterr().out == "Game (USA)\n"
 
 
@@ -192,22 +238,24 @@ def test_missing_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert "nes has not been scanned. run: romledger scan" in capsys.readouterr().err
 
 
-def test_unknown_platform_lists_configured(
+def test_unknown_platform_suggests_the_nearest(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(make_config(tmp_path), "missing", "snes") == 2
+    assert run(make_config(tmp_path), "missing", "snez") == 2
+    assert "unknown platform 'snez'. Nearest: snes" in capsys.readouterr().err
+
+
+def test_scan_downloads_dats_and_fails_when_none_can_be_fetched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    no_dats(monkeypatch)
+    assert run(make_config(tmp_path), "scan", "nes") == 2
     err = capsys.readouterr().err
-    assert "unknown platform 'snes'. Configured platforms: nes." in err
+    assert "downloading the nes DAT ..." in err
+    assert "romledger: error: no DAT could be downloaded (1 failed)" in err
 
 
-def test_scan_without_dat_prints_fix(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(make_config(tmp_path), "scan") == 2
-    err = capsys.readouterr().err
-    assert err.startswith("romledger: error: no DAT for nes")
-    assert err.rstrip().endswith("run: romledger dats update")
-
-
-def test_scan_runs_each_platform(
+def test_scan_runs_the_named_platform(
     tmp_path: Path,
     data_dir: Path,
     capsys: pytest.CaptureFixture[str],
@@ -218,12 +266,33 @@ def test_scan_runs_each_platform(
     dat.parent.mkdir(parents=True)
     dat.write_text("x")
     scanned: list[str] = []
-    monkeypatch.setattr(scan, "scan_platform", lambda cfg, slug, data: scanned.append(slug))
+
+    def fake_scan(
+        cfg: config.Config, slugs: list[str], data: Path, progress: Callable[[str], None]
+    ) -> None:
+        scanned.extend(slugs)
+        progress("inbox")
+        progress("nes")
+
+    monkeypatch.setattr(scan, "scan_platforms", fake_scan)
     assert run(path, "scan", "nes", "nes") == 0
     captured = capsys.readouterr()
     assert scanned == ["nes"]
-    assert captured.err == "scanning nes ...\n"
+    assert captured.err == "scanning inbox ...\nscanning nes ...\n"
     assert captured.out == "scanned 1 platform(s)\n"
+
+
+def test_scan_covers_every_platform_by_default(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scanned: list[str] = []
+    monkeypatch.setattr(scan, "ensure_dats", lambda cfg, slugs, data: slugs)
+    monkeypatch.setattr(
+        scan, "scan_platforms", lambda cfg, slugs, data, progress: scanned.extend(slugs)
+    )
+    assert run(make_config(tmp_path), "scan") == 0
+    assert scanned == list(registry.load())
+    assert capsys.readouterr().out == f"scanned {len(registry.load())} platform(s)\n"
 
 
 def test_dats_update_output(
@@ -329,9 +398,12 @@ def test_import_hook_failure_exits_1(
     assert captured.err == "romledger: error: after_import hook failed: touch x: exit status 1\n"
 
 
-def test_import_without_dat_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_import_without_any_dat_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    no_dats(monkeypatch)
     assert run(make_config(tmp_path), "import") == 2
-    assert "no DAT for nes" in capsys.readouterr().err
+    assert "no DAT could be downloaded" in capsys.readouterr().err
 
 
 def test_config_lists_hooks(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -354,44 +426,41 @@ def test_os_error_is_a_clean_error(
 
 def sources_config(tmp_path: Path, extra: str = "") -> Path:
     path = make_config(tmp_path)
-    sources = (
-        '[platforms.atari7800]\nsources = ["coolrom", "internet-archive"]\n'
-        'archive_item = "No-Intro_Atari7800"\n'
-    )
-    path.write_text(path.read_text().replace("[platforms.nes]\n", sources) + extra)
+    path.write_text(path.read_text() + extra)
     return path
 
 
-def test_config_lists_sources_and_proxy(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_config_lists_the_proxy_without_its_password(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     path = sources_config(tmp_path, '[network]\nproxy = "http://alice:secret@proxy.example:3128"\n')
     assert run(path, "config") == 0
     out = capsys.readouterr().out
-    assert "  sources: coolrom, internet-archive" in out
-    assert "  archive_item: No-Intro_Atari7800" in out
     assert "proxy:   http://***@proxy.example:3128" in out
     assert "secret" not in out
     assert out.isascii()
 
 
-def test_config_without_sources_prints_neither(
+def test_config_without_a_proxy_prints_none(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run(make_config(tmp_path), "config") == 0
-    out = capsys.readouterr().out
-    assert "sources:" not in out
-    assert "proxy:" not in out
+    assert "proxy:" not in capsys.readouterr().out
 
 
-def test_fetch_requires_sources(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(make_config(tmp_path), "fetch", "nes") == 2
+def test_fetch_needs_a_source_that_carries_the_platform(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(make_config(tmp_path), "fetch", "neo-geo-pocket-color") == 2
     assert capsys.readouterr().err == (
-        "romledger: error: nes has no sources configured; set platforms.nes.sources\n"
+        "romledger: error: no source can fetch neo-geo-pocket-color. "
+        "Download it by hand into an inbox.\n"
     )
 
 
 def test_fetch_unknown_platform(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(sources_config(tmp_path), "fetch", "snes") == 2
-    assert "unknown platform 'snes'" in capsys.readouterr().err
+    assert run(sources_config(tmp_path), "fetch", "snez") == 2
+    assert "unknown platform 'snez'. Nearest: snes" in capsys.readouterr().err
 
 
 def test_fetch_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -399,14 +468,12 @@ def test_fetch_unscanned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     assert capsys.readouterr().err.rstrip().endswith("run: romledger scan")
 
 
-def test_fetch_source_must_be_configured(
+def test_fetch_source_must_carry_the_platform(
     tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = sources_config(tmp_path)
-    path.write_text(path.read_text().replace('["coolrom", "internet-archive"]', '["coolrom"]'))
     seed(data_dir, "atari7800", [state.Item("A (USA)", "missing", None)])
-    assert run(path, "fetch", "atari7800", "--source", "internet-archive") == 2
-    assert "does not list source 'internet-archive'" in capsys.readouterr().err
+    assert run(make_config(tmp_path), "fetch", "atari7800", "--source", "internet-archive") == 2
+    assert "no source 'internet-archive' carries atari7800" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("limit", ["0", "-1", "x"])
@@ -516,11 +583,17 @@ def test_fetch_end_to_end(
     )
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/robots.txt":
-            return httpx.Response(404)
-        if request.url.path == "/metadata/No-Intro_Atari7800":
-            return httpx.Response(200, json={"files": [{"name": "A (USA).zip", "size": "3"}]})
         return httpx.Response(200, content=b"abc")
+
+    class Stub:
+        name = "coolrom"
+
+        def find(self, game: str) -> Candidate | None:
+            if game != "A (USA)":
+                return None
+            return Candidate(game, lambda: "https://dl.example/A.zip", "A (USA).zip", 3)
+
+    monkeypatch.setattr(fetch, "build_sources", lambda platform, names, client, throttle: [Stub()])
 
     monkeypatch.setattr(
         http, "client", lambda proxy=None: httpx.Client(transport=httpx.MockTransport(handler))
@@ -530,14 +603,10 @@ def test_fetch_end_to_end(
     monkeypatch.setattr(
         importer, "import_inboxes", lambda *args: importer.ImportResult({}, [], [], [], [])
     )
-    path = sources_config(tmp_path)
-    path.write_text(
-        path.read_text().replace('["coolrom", "internet-archive"]', '["internet-archive"]')
-    )
-    assert run(path, "fetch", "atari7800", "--no-import") == 0
+    assert run(make_config(tmp_path), "fetch", "atari7800", "--no-import") == 0
     assert (tmp_path / "inbox" / "A (USA).zip").read_bytes() == b"abc"
     assert capsys.readouterr().out.splitlines() == [
-        "fetched A (USA) (internet-archive)",
+        "fetched A (USA) (coolrom)",
         "not found B (USA)",
         "fetched 1, not found 1, failed 0, skipped 0",
     ]
@@ -635,31 +704,48 @@ def test_canary_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
     assert "usage:" in capsys.readouterr().err
 
 
-def write_dat(data_dir: Path) -> None:
-    dat = dats.dat_path(data_dir, "no-intro/Nintendo - Nintendo Entertainment System")
-    dat.parent.mkdir(parents=True)
-    dat.write_text('clrmamepro (\n\tversion "1"\n)\ngame (\n\tname "A (USA)"\n)\n')
-
-
-def test_dats_index_builds_then_reports_unchanged(
-    tmp_path: Path, data_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    path = make_config(tmp_path)
-    write_dat(data_dir)
-    assert run(path, "dats", "index") == 0
-    assert run(path, "dats", "index", "nes") == 0
-    assert capsys.readouterr().out == "nes indexed\nnes unchanged\n"
-    with state.State(data_dir / "state.db") as database:
-        stamp = database.index_stamp("nes")
-        assert stamp is not None
-        assert stamp.version == "1"
-
-
-def test_dats_index_without_a_dat_prints_fix(
+def test_platforms_lists_every_platform_without_a_config(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(make_config(tmp_path), "dats", "index") == 2
-    assert capsys.readouterr().err.rstrip().endswith("run: romledger dats update")
+    assert cli.main(["--config", str(tmp_path / "none.toml"), "platforms"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].split() == ["platform", "name", "dat", "sources"]
+    assert len(lines) == len(registry.load()) + 1
+    snes = next(line for line in lines if line.startswith("snes "))
+    assert snes.split(maxsplit=1)[1].startswith("Nintendo - Super Nintendo Entertainment System")
+    assert snes.endswith("no-intro  vimm, consoleroms")
+    assert all(line.isascii() for line in lines)
+
+
+def test_platforms_columns_line_up(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["platforms"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    offsets = {line.index("no-intro") for line in lines if "no-intro" in line}
+    assert len(offsets) == 1
+    assert lines[0].index("dat") == offsets.pop()
+
+
+def test_platforms_is_cut_to_the_terminal_width(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(term, "width", lambda: 80)
+    assert cli.main(["platforms"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert max(len(line) for line in lines) <= 80
+    assert any("…" in line for line in lines)
+
+
+def test_platforms_names_every_source_that_carries_a_platform(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert cli.main(["platforms"]) == 0
+    out = capsys.readouterr().out
+    assert next(line for line in out.splitlines() if line.startswith("atari7800 ")).endswith(
+        "vimm, consoleroms, coolrom"
+    )
+    assert next(
+        line for line in out.splitlines() if line.startswith("neo-geo-pocket-color ")
+    ).endswith("no-intro  -")
 
 
 def test_serve_prints_the_link_and_runs_uvicorn(

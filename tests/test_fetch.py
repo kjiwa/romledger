@@ -6,7 +6,7 @@ import pytest
 
 from romledger import fetch, http, state
 from romledger.config import Config, ConfigError, Library, Platform
-from romledger.sources import consoleroms, coolrom, internet_archive
+from romledger.sources import consoleroms, coolrom
 from romledger.sources.base import Candidate, Source
 from romledger.sources.errors import SourceBlocked, SourceChanged
 
@@ -66,7 +66,7 @@ def data_dir(tmp_path: Path) -> Path:
 
 
 def make_config(inbox: Path) -> Config:
-    platform = Platform(dat="no-intro/x", sources=("coolrom", "internet-archive"))
+    platform = Platform(dat="no-intro/x", coolrom="nes", consoleroms="nes")
     return Config(Library(inbox.parent / "roms", (inbox,)), {"nes": platform})
 
 
@@ -143,7 +143,7 @@ def test_a_failed_game_does_not_stop_the_run(
 
 def test_the_next_source_is_tried(inbox: Path, data_dir: Path) -> None:
     first = FakeSource("coolrom", {"Alpha (USA)": httpx.ConnectError("")})
-    second = FakeSource("internet-archive", {game: found(game) for game in GAMES})
+    second = FakeSource("consoleroms", {game: found(game) for game in GAMES})
     result = run(inbox, data_dir, [first, second])
     assert result.fetched == GAMES
     assert result.failed == []
@@ -185,7 +185,7 @@ def test_a_set_aside_download_does_not_stop_the_next_source(inbox: Path, data_di
     seed_set_aside(inbox)
     first = FakeSource("coolrom", {"Alpha (USA)": found("Alpha (USA)")})
     second = FakeSource(
-        "internet-archive",
+        "consoleroms",
         {"Alpha (USA)": Candidate("Alpha (USA)", lambda: "https://ia.example/a", "Alpha.zip")},
     )
     result = run(inbox, data_dir, [first, second])
@@ -203,7 +203,7 @@ def test_a_dry_run_reports_a_set_aside_download_as_skipped(inbox: Path, data_dir
 
 def test_a_failure_survives_a_later_miss(inbox: Path, data_dir: Path) -> None:
     first = FakeSource("coolrom", {"Alpha (USA)": httpx.ReadTimeout("")})
-    result = run(inbox, data_dir, [first, FakeSource("internet-archive", {})])
+    result = run(inbox, data_dir, [first, FakeSource("consoleroms", {})])
     assert result.failed[0] == ("Alpha (USA)", "ReadTimeout")
     assert result.not_found == ["Beta (USA)", "Gamma (USA)"]
 
@@ -221,7 +221,7 @@ def test_source_changed_drops_the_source(
 ) -> None:
     changed = SourceChanged("https://coolrom.com/x", "no rows")
     broken = FakeSource("coolrom", {"Alpha (USA)": changed})
-    backup = FakeSource("internet-archive", {"Beta (USA)": found("Beta (USA)")})
+    backup = FakeSource("consoleroms", {"Beta (USA)": found("Beta (USA)")})
     result = run(inbox, data_dir, [broken, backup])
     assert broken.asked == ["Alpha (USA)"]
     assert result.fetched == ["Beta (USA)"]
@@ -351,35 +351,37 @@ def test_only_restricts_to_one_configured_source(inbox: Path, data_dir: Path) ->
         factory,
         Network().client(),
         http.Throttle(0.0),
-        "internet-archive",
+        "consoleroms",
     )
-    assert asked == [["internet-archive"]]
+    assert asked == [["consoleroms"]]
 
 
-def test_only_must_be_configured(inbox: Path, data_dir: Path) -> None:
+def test_only_must_be_a_source_that_carries_the_platform(inbox: Path) -> None:
     config = make_config(inbox)
-    platform = Platform(dat="x", sources=("coolrom",))
-    with pytest.raises(ConfigError, match="nes does not list source 'internet-archive'"):
-        fetch.select_sources("nes", platform, "internet-archive")
-    assert fetch.select_sources("nes", config.platforms["nes"], None) == [
+    platform = Platform(dat="x", coolrom="nes")
+    with pytest.raises(
+        ConfigError, match=r"no source 'consoleroms' carries nes.*Sources for nes: coolrom"
+    ):
+        fetch.select_sources("nes", platform, "consoleroms")
+    assert fetch.select_sources("nes", config.platforms["nes"], None) == ["consoleroms", "coolrom"]
+    assert fetch.select_sources("nes", config.platforms["nes"], "coolrom") == ["coolrom"]
+
+
+def test_default_sources_follow_the_registry_codes() -> None:
+    assert fetch.default_sources(Platform(dat="x")) == []
+    assert fetch.default_sources(Platform(dat="x", coolrom="a")) == ["coolrom"]
+    assert fetch.default_sources(Platform(dat="x", coolrom="a", consoleroms="b")) == [
+        "consoleroms",
         "coolrom",
-        "internet-archive",
     ]
 
 
 def test_build_sources_in_order() -> None:
-    platform = Platform(
-        dat="x",
-        sources=("internet-archive", "coolrom", "consoleroms"),
-        archive_item="item",
-        coolrom="nes",
-        consoleroms="nes",
-    )
+    platform = Platform(dat="x", coolrom="nes", consoleroms="nes")
     builder: Callable[..., list[Source]] = fetch.build_sources
-    built = builder(platform, platform.sources, httpx.Client(), http.Throttle())
+    built = builder(platform, ["coolrom", "consoleroms"], httpx.Client(), http.Throttle())
     assert [type(source) for source in built] == [
-        internet_archive.InternetArchiveSource,
         coolrom.CoolromSource,
         consoleroms.ConsoleromsSource,
     ]
-    assert [source.name for source in built] == ["internet-archive", "coolrom", "consoleroms"]
+    assert [source.name for source in built] == ["coolrom", "consoleroms"]

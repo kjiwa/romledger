@@ -1,52 +1,25 @@
-import difflib
 import json
 import os
-import re
 import sys
 import tempfile
-import textwrap
-from collections.abc import Collection, Mapping
 from pathlib import Path
 
-from romledger import config, registry
+from romledger import config
 
-WIDTH = 60
 DEFAULT_ROMS = "~/roms"
 EXTENSION_INBOX = "~/Downloads/romledger"
-NEXT_COMMANDS = ("romledger dats update", "romledger scan", "romledger serve --open")
-USAGE = (
-    "usage: romledger init [--roms DIR] --platform SLUG [--platform SLUG ...] [--force]. "
-    "Run it on a terminal to be prompted instead."
-)
-
-
-def wrap(text: str, indent: str = "") -> list[str]:
-    return textwrap.wrap(
-        text, WIDTH, subsequent_indent=indent, break_long_words=False, break_on_hyphens=False
-    )
-
-
-def platform_lines(entries: Mapping[str, registry.Entry], configured: Collection[str]) -> list[str]:
-    lines: list[str] = []
-    for slug, entry in entries.items():
-        marker = "  [configured]" if slug in configured else ""
-        lines.extend(wrap(f"{slug}  {entry.dat}{marker}", "    "))
-    return lines
-
-
-def unknown_message(slugs: list[str], entries: Mapping[str, registry.Entry]) -> str | None:
-    parts = []
-    for slug in slugs:
-        if slug in entries:
-            continue
-        near = difflib.get_close_matches(slug, entries, n=3, cutoff=0.5)
-        hint = f"Nearest: {', '.join(near)}." if near else "Run romledger platforms to list them."
-        parts.append(f"unknown platform {slug!r}. {hint}")
-    return " ".join(parts) or None
-
-
-def parse_slugs(answer: str) -> list[str]:
-    return list(dict.fromkeys(slug for slug in re.split(r"[,\s]+", answer) if slug))
+NEXT_COMMANDS = ("romledger import", "romledger status")
+CONFIG_HINTS = """\
+# Optional. What each platform wants; these are the defaults.
+# [wanted]
+# regions = ["USA", "WORLD"]
+# languages = ["EN"]
+# include = []
+#
+# Override them for one platform; `romledger platforms` lists the names.
+# [platforms.snes]
+# regions = ["USA", "JPN"]
+"""
 
 
 class Interrupted(Exception):
@@ -68,20 +41,6 @@ def ask_roms() -> str:
     return read_line(f"ROM folder [{DEFAULT_ROMS}]: ") or DEFAULT_ROMS
 
 
-def ask_platforms(entries: Mapping[str, registry.Entry]) -> list[str]:
-    print("Platforms romledger knows:")
-    print("\n".join(platform_lines(entries, ())))
-    while True:
-        slugs = parse_slugs(read_line("Platforms (slugs, comma or space separated): "))
-        if not slugs:
-            print("Enter at least one platform.")
-            continue
-        message = unknown_message(slugs, entries)
-        if message is None:
-            return slugs
-        print("\n".join(wrap(message)))
-
-
 def ask_extension_inbox() -> bool:
     answer = read_line(f"Add {EXTENSION_INBOX} as an extension inbox? [y/N]: ")
     return answer.lower() in ("y", "yes")
@@ -99,10 +58,11 @@ def inbox_paths(roms: Path, extension_inbox: bool) -> list[Path]:
     return inboxes
 
 
-def render_config(library: Path, inboxes: list[Path], platforms: list[str]) -> str:
+def render_config(library: Path, inboxes: list[Path]) -> str:
     inbox_list = ", ".join(json.dumps(str(inbox)) for inbox in inboxes)
-    tables = "\n".join(f"[platforms.{slug}]\n" for slug in platforms)
-    return f"[library]\nroms = {json.dumps(str(library))}\ninboxes = [{inbox_list}]\n\n{tables}"
+    return (
+        f"[library]\nroms = {json.dumps(str(library))}\ninboxes = [{inbox_list}]\n\n{CONFIG_HINTS}"
+    )
 
 
 def check_creatable(directory: Path) -> None:
@@ -141,33 +101,24 @@ def write_config(path: Path, text: str, directories: list[Path]) -> None:
         raise
 
 
-def next_steps(path: Path) -> list[str]:
-    lines = ["Next:", *(f"  {command}" for command in NEXT_COMMANDS)]
+def next_steps(path: Path, inbox: Path) -> list[str]:
+    lines = [f"Put ROMs in {inbox}, then:", *(f"  {command}" for command in NEXT_COMMANDS)]
     if path != config.config_path(None):
-        lines.extend(wrap(f"This config is not in the default place; pass --config {path}", "  "))
+        lines.append(f"This config is not in the default place; pass --config {path}")
     return lines
 
 
-def run_init(
-    path: Path, roms_arg: str | None, platforms_arg: list[str], force: bool, interactive: bool
-) -> None:
-    entries = registry.load()
+def run_init(path: Path, roms_arg: str | None, force: bool, interactive: bool) -> None:
     require_absent(path, force)
-    if not interactive and not platforms_arg:
-        raise config.ConfigError(USAGE)
     roms_text = roms_arg or (ask_roms() if interactive else DEFAULT_ROMS)
-    platforms = list(dict.fromkeys(platforms_arg)) or ask_platforms(entries)
-    message = unknown_message(platforms, entries)
-    if message:
-        raise config.ConfigError(message)
     extension_inbox = interactive and ask_extension_inbox()
     roms = Path(roms_text).expanduser().absolute()
     inboxes = inbox_paths(roms, extension_inbox)
     library = roms / "library"
     check_targets(path, [library, *inboxes])
-    write_config(path, render_config(library, inboxes, platforms), [library, *inboxes])
+    write_config(path, render_config(library, inboxes), [library, *inboxes])
     print(f"wrote {path}")
-    print("\n".join(next_steps(path)))
+    print("\n".join(next_steps(path, inboxes[0])))
 
 
 def stdin_is_terminal() -> bool:

@@ -22,8 +22,9 @@ def overview(request: Request, services: Services, token: str | None = None) -> 
         return _sign_in(request)
     context = services.context_factory()
     with state.State(context.data_dir / "state.db") as database:
-        platforms = views.platform_views(context, database)
-    return render(request, "overview.html", platforms=platforms, scanned=_scanned(platforms))
+        everything = views.platform_views(context, database)
+    platforms = [view for view in everything if view.tracked]
+    return render(request, "overview.html", platforms=platforms, scanned=_scanned(everything))
 
 
 @router.get("/platforms/{slug}")

@@ -1,4 +1,6 @@
+import difflib
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.resources import files
 
@@ -29,6 +31,12 @@ def ignored() -> dict[str, frozenset[str]]:
     if unknown:
         raise ValueError(f"platforms.toml: {IGNORE_TABLE}: unknown keys {sorted(unknown)}")
     return {site: _codes(site, raw.get(site, [])) for site in SITES}
+
+
+def unknown(slug: str, entries: Mapping[str, Entry]) -> str:
+    near = difflib.get_close_matches(slug, entries, n=3, cutoff=0.5)
+    hint = f"Nearest: {', '.join(near)}." if near else "Run romledger platforms to list them."
+    return f"unknown platform {slug!r}. {hint}"
 
 
 def _parse() -> dict[str, object]:

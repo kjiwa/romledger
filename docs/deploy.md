@@ -73,8 +73,6 @@ Write `config/config.toml` with container paths, as in [setup.md](setup.md):
 [library]
 roms = "/library/roms"
 inboxes = ["/library/inbox"]
-
-[platforms.nes]
 ```
 
 Point `ROMLEDGER_LIBRARY` at your library directory (default `./library`) and start it:

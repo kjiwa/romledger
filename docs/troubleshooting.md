@@ -19,15 +19,6 @@ Cause: a download zip held a readme or similar next to the ROM. igir extracts th
 library but keeps a zip it did not fully use. Fix: none needed; the ROM is filed. Delete the zip
 when you no longer want it.
 
-## `unknown platform 'X'. Use one of: ...; or set dat.`
-
-Symptom: `[platforms.X]` has no `dat` and X is not a known platform slug. Cause: typo or an
-unsupported platform. Fix: use a listed slug, or set `dat = "<no-intro or redump>/<name>"`.
-
-## `platforms.X.dat 'Y' must look like <no-intro|redump>/<name>`
-
-Cause: the DAT name has no set prefix. Fix: write `no-intro/<name>` or `redump/<name>`.
-
 ## `platforms.X.regions has unknown code 'Y'`
 
 Cause: not an igir region code, or lower case. Fix: use an upper-case code from the list in
@@ -43,24 +34,32 @@ Cause: `include` lists a name that is not a category. Fix: use one of `unlicense
 Cause: not an igir language code, or lower case. Fix: use an upper-case code from the list
 in the message.
 
-## `unknown platform 'X'. Configured platforms: ...`
+## `unknown platform 'X'. Nearest: ...`
 
-Symptom: a command argument names a platform that is not in the config. Fix: add
-`[platforms.X]` to the config, or use a listed platform.
+Symptom: a command argument or a `[platforms.X]` table names a platform romledger does not know.
+Cause: a typo, or a platform that is not supported. Fix: use a slug from `romledger platforms`.
+
+## `platforms.X.dat was removed in 0.6. Delete it: ...`
+
+Cause: a config from 0.5 still has `dat`, `sources` or `archive_item` under a platform. Fix: delete
+the key. romledger picks each platform's DAT, and `fetch` uses every source that carries the
+platform.
 
 ## `<url>: HTTP 404`
 
-Cause: no such DAT in libretro-database. Fix: correct `platforms.<slug>.dat`; names are
-case-sensitive file names under `metadat/no-intro` and `metadat/redump`.
+Cause: libretro-database has no DAT under that name, which means romledger's table is out of date.
+Fix: update romledger, or [open an issue](https://github.com/kjiwa/romledger/issues).
 
 ## `<url>: request failed (...)`
 
 Cause: no network, a blocked host, or a timeout. Fix: check the connection and `HTTPS_PROXY`,
-then run `romledger dats update` again.
+then run the command again.
 
-## `no DAT for X (...). run: romledger dats update`
+## `no DAT could be downloaded (N failed). ...`
 
-Cause: `scan` or `import` ran before the DAT was downloaded. Fix: run `romledger dats update`.
+Cause: `scan` or `import` found no DAT on disk and could not download any, usually because there is
+no network. A platform whose DAT alone fails is skipped with a warning. Fix: check the connection
+and `HTTPS_PROXY`, then run the command again.
 
 ## `X has not been scanned. run: romledger scan`
 
@@ -158,34 +157,15 @@ command by hand. Hooks run only when a file moved, so re-running `import` does n
 Cause: a relative data directory depends on the working directory, so `scan` and `status`
 would disagree. Fix: set it to a full path.
 
-## `<platform> has no sources configured; set platforms.<platform>.sources`
+## `no source can fetch X. Download it by hand into an inbox.`
 
-Cause: `fetch` ran for a platform with no `sources`. Fix: add `sources = ["consoleroms"]`, `["coolrom"]` and/or
-`["internet-archive"]` to `[platforms.<platform>]`; see [sources.md](sources.md).
+Cause: no fetch source carries the platform. Fix: download its games in a browser into an inbox;
+see [sources.md](sources.md).
 
-## `<platform> does not list source 'X'. Configured sources: ...`
+## `no source 'X' carries <platform>. Sources for <platform>: ...`
 
-Cause: `--source X` names a source the platform does not use. Fix: use one of the listed names, or
-add X to `platforms.<platform>.sources`.
-
-## `platforms.X.sources has unknown source 'Y'`
-
-Cause: typo or an unsupported source. Fix: use `consoleroms`, `coolrom` or `internet-archive`.
-
-## `missing platforms.X.archive_item`
-
-Cause: `internet-archive` is listed but no item is named. Fix: set `archive_item` to the Internet
-Archive item that holds the platform's `<game name>.zip` files.
-
-## `platforms.X.sources lists coolrom but CoolROM has no system for 'X'`
-
-Cause: CoolROM does not carry the platform (no Nintendo systems), or a custom platform has no
-CoolROM code. Fix: remove `coolrom` from the list.
-
-## `platforms.X.sources lists consoleroms but ConsoleRoms has no system for 'X'`
-
-Cause: ConsoleRoms does not carry the platform, or a custom platform has no ConsoleRoms code. Fix:
-remove `consoleroms` from the list.
+Cause: `--source X` names a source that does not carry the platform. Fix: use one of the listed
+names, or leave `--source` out.
 
 ## `network.proxy ... must be <scheme>://[user@]host[:port]`
 

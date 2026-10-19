@@ -7,7 +7,7 @@ import httpx
 
 from romledger import http, igir, scan
 from romledger.config import Config, ConfigError, Platform
-from romledger.sources import consoleroms, coolrom, internet_archive
+from romledger.sources import consoleroms, coolrom
 from romledger.sources.base import Source, fetch_to
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
@@ -38,20 +38,22 @@ def build_sources(
             platform.consoleroms or "", client, throttle
         ),
         coolrom.NAME: lambda: coolrom.CoolromSource(platform.coolrom or "", client, throttle),
-        internet_archive.NAME: lambda: internet_archive.InternetArchiveSource(
-            platform.archive_item or "", client, throttle
-        ),
     }
     return [builders[name]() for name in names]
 
 
+def default_sources(platform: Platform) -> list[str]:
+    codes = {consoleroms.NAME: platform.consoleroms, coolrom.NAME: platform.coolrom}
+    return [name for name, code in codes.items() if code]
+
+
 def select_sources(slug: str, platform: Platform, only: str | None) -> list[str]:
+    available = default_sources(platform)
     if only is None:
-        return list(platform.sources)
-    if only not in platform.sources:
+        return available
+    if only not in available:
         raise ConfigError(
-            f"{slug} does not list source {only!r}. "
-            f"Configured sources: {', '.join(platform.sources)}."
+            f"no source {only!r} carries {slug}. Sources for {slug}: {', '.join(available)}."
         )
     return [only]
 

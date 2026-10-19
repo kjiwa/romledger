@@ -1,3 +1,4 @@
+import dataclasses
 import shutil
 import subprocess
 import sys
@@ -6,10 +7,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from romledger import DOCS_URL, datindex, dats, igir, scan, state
-from romledger.config import Config, ConfigError
-
-NO_PLATFORMS = f"no platforms configured. Add a [platforms.<slug>] table; see {DOCS_URL}/setup.md."
+from romledger import datindex, dats, igir, scan, state
+from romledger.config import Config
 
 IgirMove = Callable[..., None]
 RunHook = Callable[[Sequence[str]], int]
@@ -38,11 +37,10 @@ def import_inboxes(
     igir_report: scan.IgirReport = igir.report,
     igir_move: IgirMove = igir.move,
     hook: RunHook = run_hook,
+    client_factory: scan.ClientFactory | None = None,
 ) -> ImportResult:
-    slugs = list(config.platforms)
-    if not slugs:
-        raise ConfigError(NO_PLATFORMS)
-    scan.require_dats(config, slugs, data_dir)
+    slugs = scan.ensure_dats(config, list(config.platforms), data_dir, client_factory)
+    config = dataclasses.replace(config, platforms={slug: config.platforms[slug] for slug in slugs})
     with tempfile.TemporaryDirectory() as temp:
         subsets = _write_subsets(config, data_dir, Path(temp))
         return _import(config, data_dir, subsets, dry_run, igir_report, igir_move, hook)
@@ -83,8 +81,7 @@ def _import(
     unwanted, unmatched = _leftovers(config, data_dir, igir_report, before, wanted)
     unwanted = _relocate(unwanted, inboxes, igir.UNWANTED_DIR)
     unmatched = _relocate(unmatched, inboxes, igir.UNMATCHED_DIR)
-    for slug in moved:
-        scan.scan_platform(config, slug, data_dir, igir_report)
+    scan.scan_platforms(config, list(moved), data_dir, igir_report)
     hook_failures = _run_hooks(config, moved, hook)
     return ImportResult(moved, duplicates, unwanted, unmatched, hook_failures, extracted)
 

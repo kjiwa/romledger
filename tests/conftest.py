@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import pytest
 
 from romledger import http
@@ -26,3 +27,11 @@ def fake_throttle() -> FakeThrottle:
         return http.Throttle(gap, clock=lambda: now[0], sleep=sleep), sleeps
 
     return build
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(self: httpx.HTTPTransport, request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"test tried to reach {request.url}")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", refuse)

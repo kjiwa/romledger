@@ -96,6 +96,7 @@ def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
     return {
         "slug": view.slug,
         "name": view.name,
+        "tracked": view.tracked,
         "scanned_at": view.scanned_at,
         "wanted": view.wanted if counts else None,
         "have": counts.have if counts else None,
@@ -108,6 +109,5 @@ def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
             "coolrom": configured.coolrom,
             "consoleroms": views.site_code(context, view.slug, "consoleroms"),
             "emuland": views.site_code(context, view.slug, "emuland"),
-            "archive_item": configured.archive_item,
         },
     }

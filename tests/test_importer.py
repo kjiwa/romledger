@@ -3,9 +3,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from xml.etree import ElementTree
 
+import httpx
 import pytest
 
-from romledger import config, dats, igir, importer, scan
+from romledger import config, dats, igir, importer, registry, scan
 
 DAT_NAME = "Nintendo - Nintendo Entertainment System"
 GAMES = ["Alpha (USA)", "Alpha (USA) (Rev 1)", "Beta (USA) (Unl)", "Gamma (Japan)", "Delta (World)"]
@@ -22,7 +23,7 @@ def row(status: str, game: str = "", path: Path | str = "") -> Row:
 
 @pytest.fixture(autouse=True)
 def no_rescan(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(scan, "scan_platform", lambda *args: None)
+    monkeypatch.setattr(scan, "scan_platforms", lambda *args, **kwargs: None)
 
 
 class Env:
@@ -83,9 +84,11 @@ class Env:
             raise FileNotFoundError(argv[0])
         return self.hook_status
 
-    def run(self, *, dry_run: bool = False) -> importer.ImportResult:
+    def run(
+        self, *, dry_run: bool = False, client_factory: scan.ClientFactory | None = None
+    ) -> importer.ImportResult:
         return importer.import_inboxes(
-            self.config, self.data, dry_run, self.report, self.move, self.hook
+            self.config, self.data, dry_run, self.report, self.move, self.hook, client_factory
         )
 
 
@@ -101,18 +104,42 @@ def make_files(env: Env) -> dict[str, Path]:
     return files
 
 
-def test_missing_dat(tmp_path: Path) -> None:
-    env = Env(tmp_path)
-    dats.dat_path(env.data, f"no-intro/{DAT_NAME}").unlink()
-    with pytest.raises(config.ConfigError, match="no DAT for nes"):
-        env.run()
+def serving(content: dict[str, str]) -> scan.ClientFactory:
+    def handler(request: httpx.Request) -> httpx.Response:
+        text = content.get(request.url.path.rsplit("/", 1)[-1])
+        return httpx.Response(200, text=text) if text else httpx.Response(404)
+
+    return lambda proxy: httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_no_platforms_configured(tmp_path: Path) -> None:
+def test_a_missing_dat_is_downloaded(tmp_path: Path) -> None:
     env = Env(tmp_path)
-    env.config = config.Config(env.config.library, {}, env.config.hooks)
-    with pytest.raises(config.ConfigError, match="no platforms configured"):
-        env.run()
+    env.full_dat.unlink()
+    env.reports = [[row("MISSING", "A")]]
+    env.run(client_factory=serving({f"{DAT_NAME}.dat": DAT}))
+    assert env.full_dat.read_text() == DAT
+
+
+def test_a_dat_that_cannot_be_downloaded_is_skipped(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = Env(tmp_path)
+    snes = registry.load()["snes"].dat
+    env.config = config.Config(
+        env.config.library,
+        {**env.config.platforms, "snes": config.Platform(snes)},
+    )
+    env.reports = [[row("MISSING", "A")]]
+    env.run(client_factory=serving({}))
+    assert "warning: skipping snes" in capsys.readouterr().err
+    assert len(env.report_dats[0]) == 1
+
+
+def test_no_dat_can_be_downloaded(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    env.full_dat.unlink()
+    with pytest.raises(config.ConfigError, match=r"no DAT could be downloaded \(1 failed\)"):
+        env.run(client_factory=serving({}))
 
 
 def test_empty_inbox(tmp_path: Path) -> None:
@@ -190,7 +217,9 @@ def test_leftover_report_is_skipped_when_every_file_matched(tmp_path: Path) -> N
 def test_rescans_only_moved_platforms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     env = Env(tmp_path)
     rescanned: list[str] = []
-    monkeypatch.setattr(scan, "scan_platform", lambda cfg, slug, data, rep: rescanned.append(slug))
+    monkeypatch.setattr(
+        scan, "scan_platforms", lambda cfg, slugs, data, rep: rescanned.extend(slugs)
+    )
     env.reports = [[row("FOUND", "A", "/gone/A")], []]
     env.run()
     assert rescanned == ["nes"]
