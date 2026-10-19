@@ -117,11 +117,6 @@ const romledger = (() => {
     return found && !EMULAND_INDEX_PAGES.test(found[1]) ? found[1] : null;
   }
 
-  function archiveItemFromPath(path) {
-    const found = /^\/details\/([^/?#]+)/.exec(path);
-    return found ? decodeURIComponent(found[1]) : null;
-  }
-
   function slugFor(platforms, site, code) {
     const wanted = String(code || "").toLowerCase();
     const found = platforms.find((platform) => {
@@ -235,7 +230,6 @@ const romledger = (() => {
     consoleromsGameSlug,
     emulandSystemFromPath,
     emulandGameSlug,
-    archiveItemFromPath,
     slugFor,
     progress,
   };

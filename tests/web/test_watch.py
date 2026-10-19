@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from romledger import dats, igir
+from romledger import igir
 from romledger.config import ConfigError
 from romledger.context import Context
 from romledger.web import actions, watch
@@ -293,11 +293,3 @@ def test_pages_say_when_auto_import_is_on(env: Env) -> None:
         assert "imported into the library automatically" in client.get("/inbox").text
         assert "automatic imports" in client.get("/activity").text
     assert "automatic imports" not in env.client.get("/activity").text
-
-
-def test_the_dat_is_required_for_the_import_to_start(env: Env) -> None:
-    dats.dat_path(env.data, env.context.config.platforms["nes"].dat).unlink()
-    watcher = poller(env)
-    put(env.inbox / "a.nes")
-    quiet(watcher)
-    assert watcher.poll() is False

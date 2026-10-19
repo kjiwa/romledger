@@ -23,6 +23,10 @@ class PlatformView:
     counts: state.Counts | None
 
     @property
+    def tracked(self) -> bool:
+        return self.counts is not None and self.counts.has_games
+
+    @property
     def wanted(self) -> int:
         counts = self.counts
         return counts.have + counts.inbox + counts.missing if counts else 0

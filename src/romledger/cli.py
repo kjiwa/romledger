@@ -13,7 +13,6 @@ from romledger import (
     __version__,
     canary,
     config,
-    datindex,
     dats,
     fetch,
     http,
@@ -24,6 +23,7 @@ from romledger import (
     scan,
     setup,
     state,
+    term,
 )
 from romledger.context import Context, load_context
 from romledger.web import auth
@@ -50,9 +50,6 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True, metavar="command")
     init_parser = commands.add_parser("init", help="create the config file and library folders")
     init_parser.add_argument("--roms", metavar="DIR", help="ROM folder (default: ~/roms)")
-    init_parser.add_argument(
-        "--platform", action="append", default=[], metavar="SLUG", help="platform to track; repeat"
-    )
     init_parser.add_argument("--force", action="store_true", help="overwrite an existing config")
     commands.add_parser("platforms", help="list the platforms romledger knows")
     commands.add_parser("config", help="validate the config file and print a summary")
@@ -60,19 +57,17 @@ def build_parser() -> argparse.ArgumentParser:
     dats_commands = dats_parser.add_subparsers(dest="dats_command", required=True, metavar="action")
     update = dats_commands.add_parser("update", help="download the latest DATs")
     update.set_defaults(command="dats update")
-    update.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all configured")
-    index = dats_commands.add_parser("index", help="rebuild the DAT hash index")
-    index.set_defaults(command="dats index")
-    index.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all configured")
+    update.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
     scan_parser = commands.add_parser("scan", help="match library and inbox files to DATs")
-    scan_parser.add_argument(
-        "platforms", nargs="*", metavar="PLATFORM", help="default: all configured"
-    )
+    scan_parser.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
     import_parser = commands.add_parser("import", help="file inbox games into the library")
     import_parser.add_argument(
         "--dry-run", action="store_true", help="show what would happen; move nothing"
     )
-    commands.add_parser("status", help="show have/missing counts per platform")
+    status_parser = commands.add_parser("status", help="show have/missing counts per platform")
+    status_parser.add_argument(
+        "--all", action="store_true", help="include platforms that have no games"
+    )
     fetch_parser = commands.add_parser(
         "fetch", help="download missing games from configured sources"
     )
@@ -129,57 +124,59 @@ def positive_int(text: str) -> int:
 
 
 def selected(context: Context, names: Sequence[str]) -> list[str]:
-    configured = list(context.config.platforms)
     for name in names:
         if name not in context.config.platforms:
-            raise config.ConfigError(
-                f"unknown platform {name!r}. Configured platforms: "
-                f"{', '.join(configured) or 'none'}."
-            )
-    return list(dict.fromkeys(names)) or configured
+            raise config.ConfigError(registry.unknown(name, context.platforms))
+    return list(dict.fromkeys(names)) or list(context.config.platforms)
 
 
 def init_config(args: argparse.Namespace) -> int:
     path = config.config_path(args.config)
-    setup.run_init(path, args.roms, args.platform, args.force, setup.stdin_is_terminal())
+    setup.run_init(path, args.roms, args.force, setup.stdin_is_terminal())
     return 0
 
 
 def show_platforms(args: argparse.Namespace) -> int:
-    entries = registry.load()
-    configured: set[str] = set()
-    path = config.config_path(args.config)
-    if path.is_file():
-        try:
-            configured = set(config.load(path, entries).platforms)
-        except config.ConfigError as error:
-            print(f"romledger: warning: {error}", file=sys.stderr)
-    print("\n".join(setup.platform_lines(entries, configured)))
+    rows = [
+        (slug, entry.dat.partition("/")[2], entry.dat.partition("/")[0], _sources(entry))
+        for slug, entry in registry.load().items()
+    ]
+    header = ("platform", "name", "dat", "sources")
+    for line in term.table(header, rows, flex=1, columns=term.width()):
+        print(line)
     return 0
+
+
+def _sources(entry: registry.Entry) -> str:
+    names = [site for site in ("vimm", "consoleroms", "coolrom") if getattr(entry, site)]
+    return ", ".join(names) or "-"
 
 
 def show_config(args: argparse.Namespace) -> int:
     context = load_context(args.config)
+    wanted = context.config.wanted
     print(f"config:  {context.path}")
     print(f"data:    {context.data_dir}")
     print(f"roms:    {context.config.library.roms}")
     for inbox in context.config.library.inboxes:
         print(f"inbox:   {inbox}")
+    print(f"wanted:  {_wanted_text(wanted)}")
     for slug, platform in context.config.platforms.items():
-        print(f"{slug}: {platform.dat}")
-        print(f"  regions: {', '.join(platform.regions)}")
-        print(f"  languages: {', '.join(platform.languages)}")
-        if platform.include:
-            print(f"  include: {', '.join(platform.include)}")
-        if platform.sources:
-            print(f"  sources: {', '.join(platform.sources)}")
-        if platform.archive_item:
-            print(f"  archive_item: {platform.archive_item}")
+        own = config.Wanted(platform.regions, platform.languages, platform.include)
+        if own != wanted:
+            print(f"{slug}:  {_wanted_text(own)}")
     if context.config.network.proxy:
         print(f"proxy:   {http.redact(context.config.network.proxy)}")
     for argv in context.config.hooks.after_import:
         print(f"hook:    after_import {' '.join(argv)}")
     return 0
+
+
+def _wanted_text(wanted: config.Wanted) -> str:
+    parts = [f"regions {', '.join(wanted.regions)}", f"languages {', '.join(wanted.languages)}"]
+    if wanted.include:
+        parts.append(f"include {', '.join(wanted.include)}")
+    return "; ".join(parts)
 
 
 def update_dats(args: argparse.Namespace) -> int:
@@ -195,9 +192,14 @@ def update_dats(args: argparse.Namespace) -> int:
 
 def scan_platforms(args: argparse.Namespace) -> int:
     context = load_context(args.config)
-    slugs = selected(context, args.platforms)
-    scan.require_dats(context.config, slugs, context.data_dir)
-    scan.scan_each(slugs, lambda slug: scan.scan_platform(context.config, slug, context.data_dir))
+    slugs = scan.ensure_dats(context.config, selected(context, args.platforms), context.data_dir)
+    scan.scan_platforms(
+        context.config,
+        slugs,
+        context.data_dir,
+        progress=lambda name: print(f"scanning {name} ...", file=sys.stderr),
+    )
+    print(f"scanned {len(slugs)} platform(s)")
     return 0
 
 
@@ -213,8 +215,8 @@ def run_import(context: Context, dry_run: bool) -> int:
 def fetch_games(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     (slug,) = selected(context, [args.platform])
-    if not context.config.platforms[slug].sources:
-        raise config.ConfigError(f"{slug} has no sources configured; set platforms.{slug}.sources")
+    if not fetch.default_sources(context.config.platforms[slug]):
+        raise config.ConfigError(f"no source can fetch {slug}. Download it by hand into an inbox.")
     with http.client(context.config.network.proxy) as client:
         throttle = http.Throttle()
         result = fetch.fetch_platform(
@@ -238,12 +240,26 @@ def show_status(args: argparse.Namespace) -> int:
     context = load_context(args.config)
     with state.State(context.data_dir / "state.db") as database:
         counts = database.counts()
-    rows = [status_row(slug, counts.get(slug)) for slug in context.config.platforms]
-    for line in format_table(("platform", *STATUS_COLUMNS), rows):
-        print(line)
-    if any(slug not in counts for slug in context.config.platforms):
+    everything = list(context.config.platforms)
+    slugs = [slug for slug in everything if args.all or has_games(counts.get(slug))]
+    if slugs:
+        rows = [status_row(slug, counts.get(slug)) for slug in slugs]
+        header = ("platform", *STATUS_COLUMNS)
+        for line in term.table(header, rows, right=range(1, len(header))):
+            print(line)
+    if not counts or any(slug not in counts for slug in slugs):
         print(scan.SCAN_HINT)
+    elif not slugs:
+        print("no games yet; put ROMs in an inbox and run: romledger import")
+    elif len(slugs) < len(everything):
+        print(
+            f"{len(everything) - len(slugs)} platforms with no games hidden; romledger status --all"
+        )
     return 0
+
+
+def has_games(counts: state.Counts | None) -> bool:
+    return counts is not None and counts.has_games
 
 
 def status_row(slug: str, counts: state.Counts | None) -> tuple[str, ...]:
@@ -253,17 +269,6 @@ def status_row(slug: str, counts: state.Counts | None) -> tuple[str, ...]:
     done = f"{counts.have * 100 // wanted}%" if wanted else "-"
     values = (wanted, counts.have, counts.inbox, counts.missing, counts.unmatched)
     return (slug, *(str(value) for value in values), done)
-
-
-def format_table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
-    widths = [max(len(cells[i]) for cells in (header, *rows)) for i in range(len(header))]
-    return [
-        "  ".join(
-            cell.ljust(width) if i == 0 else cell.rjust(width)
-            for i, (cell, width) in enumerate(zip(cells, widths, strict=True))
-        ).rstrip()
-        for cells in (header, *rows)
-    ]
 
 
 def show_missing(args: argparse.Namespace) -> int:
@@ -281,18 +286,6 @@ def _search_links(entry: registry.Entry, game: str) -> tuple[str, str]:
     vimm = links.vimm_search(entry.vimm, game) if entry.vimm else None
     emuland = links.emuland_search(game) if entry.emuland else None
     return vimm or "", emuland or ""
-
-
-def index_dats(args: argparse.Namespace) -> int:
-    context = load_context(args.config)
-    slugs = selected(context, args.platforms)
-    scan.require_dats(context.config, slugs, context.data_dir)
-    with state.State(context.data_dir / "state.db") as database:
-        for slug in slugs:
-            dat = dats.dat_path(context.data_dir, context.config.platforms[slug].dat)
-            rebuilt = datindex.ensure(database, slug, dat)
-            print(f"{slug} {'indexed' if rebuilt else 'unchanged'}")
-    return 0
 
 
 def serve(args: argparse.Namespace) -> int:
@@ -340,7 +333,6 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "platforms": show_platforms,
     "config": show_config,
     "dats update": update_dats,
-    "dats index": index_dats,
     "scan": scan_platforms,
     "import": import_games,
     "fetch": fetch_games,

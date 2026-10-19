@@ -53,16 +53,16 @@ pipx install romledger
 romledger init
 ```
 
-It asks for a ROM folder and the platforms to track, creates `<roms>/library` and `<roms>/inbox`,
-and writes `~/.config/romledger/config.toml`. `romledger platforms` lists the platform names.
-Without a terminal, pass `romledger init --roms ~/roms --platform nes --platform snes`.
+It asks for a ROM folder, creates `<roms>/library` and `<roms>/inbox`, and writes
+`~/.config/romledger/config.toml`. Nothing else needs configuring: romledger knows the platforms
+`romledger platforms` lists and downloads their DATs when it first needs them. Without a terminal,
+pass `romledger init --roms ~/roms`.
 
-Then fetch the DATs, scan and open the dashboard:
+Then put ROMs in the inbox, import them and see where you stand:
 
 ```sh
-romledger dats update
-romledger scan
-romledger serve --open
+romledger import
+romledger status
 ```
 
 See [docs/setup.md](https://github.com/kjiwa/romledger/blob/master/docs/setup.md) for all options,

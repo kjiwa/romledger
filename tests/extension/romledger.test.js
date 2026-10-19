@@ -57,8 +57,6 @@ test("site codes come from titles and paths", () => {
   assert.equal(romledger.emulandSystemFromPath("/portable/gb"), "portable/gb");
   assert.equal(romledger.emulandSystemFromPath("/en/news/today"), null);
   assert.equal(romledger.emulandSystemFromPath("/en"), null);
-  assert.equal(romledger.archiveItemFromPath("/details/No-Intro_NES"), "No-Intro_NES");
-  assert.equal(romledger.archiveItemFromPath("/search"), null);
 });
 
 test("emulandGameSlug accepts game pages and skips index pages", () => {

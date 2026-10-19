@@ -21,7 +21,12 @@ LANGUAGES = [
     *("JA", "KO", "NL", "NO", "PT", "RU", "SV", "ZH"),
 ]
 
-SOURCES = ("consoleroms", "coolrom", "internet-archive")
+WANTED_KEYS = {"regions", "languages", "include"}
+REMOVED_PLATFORM_KEYS = {
+    "dat": "romledger picks each platform's DAT",
+    "sources": "fetch uses every source that carries the platform",
+    "archive_item": "the Internet Archive is no longer a fetch source",
+}
 
 
 class ConfigError(Exception):
@@ -35,13 +40,18 @@ class Library:
 
 
 @dataclass(frozen=True)
-class Platform:
-    dat: str
+class Wanted:
     regions: tuple[str, ...] = ("USA", "WORLD")
     languages: tuple[str, ...] = ("EN",)
     include: tuple[str, ...] = ()
-    sources: tuple[str, ...] = ()
-    archive_item: str | None = None
+
+
+@dataclass(frozen=True)
+class Platform:
+    dat: str
+    regions: tuple[str, ...] = Wanted.regions
+    languages: tuple[str, ...] = Wanted.languages
+    include: tuple[str, ...] = Wanted.include
     coolrom: str | None = None
     consoleroms: str | None = None
 
@@ -62,6 +72,7 @@ class Config:
     platforms: dict[str, Platform]
     hooks: Hooks = Hooks()
     network: Network = Network()
+    wanted: Wanted = Wanted()
 
 
 def config_path(arg: str | None, env: Mapping[str, str] | None = None) -> Path:
@@ -107,19 +118,26 @@ def load(path: Path, platforms_registry: Mapping[str, registry.Entry]) -> Config
         raise ConfigError(
             f"{path}: cannot read the file ({error}). Fix its permissions."
         ) from error
-    _reject_unknown(path, "", data, {"library", "platforms", "hooks", "network"})
+    _reject_unknown(path, "", data, {"library", "wanted", "platforms", "hooks", "network"})
     library = _table(path, data, "library", required=True)
-    platforms = _table(path, data, "platforms", required=False)
+    wanted = _parse_wanted(path, _table(path, data, "wanted", required=False))
+    overrides = _table(path, data, "platforms", required=False)
     hooks = _table(path, data, "hooks", required=False)
     network = _table(path, data, "network", required=False)
+    for slug in overrides:
+        if slug not in platforms_registry:
+            raise ConfigError(
+                f"{path}: platforms.{slug}: {registry.unknown(slug, platforms_registry)}"
+            )
     return Config(
         library=_parse_library(path, library),
         platforms={
-            slug: _parse_platform(path, slug, raw, platforms_registry)
-            for slug, raw in platforms.items()
+            slug: _parse_platform(path, slug, overrides.get(slug, {}), entry, wanted)
+            for slug, entry in platforms_registry.items()
         },
         hooks=_parse_hooks(path, hooks),
         network=_parse_network(path, network),
+        wanted=wanted,
     )
 
 
@@ -196,34 +214,44 @@ def _check_proxy(path: Path, proxy: str) -> None:
         )
 
 
+def _parse_wanted(path: Path, table: dict[str, Any]) -> Wanted:
+    _reject_unknown(path, "wanted.", table, WANTED_KEYS)
+    return _wanted(path, "wanted", table, Wanted())
+
+
 def _parse_platform(
-    path: Path, slug: str, raw: object, platforms_registry: Mapping[str, registry.Entry]
+    path: Path, slug: str, raw: object, entry: registry.Entry, defaults: Wanted
 ) -> Platform:
     key = f"platforms.{slug}"
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: {key} must be a table. Write it as [{key}].")
-    _reject_unknown(
-        path, f"{key}.", raw, {"dat", "regions", "languages", "include", "sources", "archive_item"}
-    )
-    defaults = Platform(dat="")
-    sources = _sources(path, raw, key)
-    entry = platforms_registry.get(slug, registry.Entry(slug, ""))
+    for removed, reason in REMOVED_PLATFORM_KEYS.items():
+        if removed in raw:
+            raise ConfigError(f"{path}: {key}.{removed} was removed in 0.6. Delete it: {reason}.")
+    _reject_unknown(path, f"{key}.", raw, WANTED_KEYS)
+    wanted = _wanted(path, key, raw, defaults)
     return Platform(
-        dat=_dat(path, slug, raw, platforms_registry),
+        dat=entry.dat,
+        regions=wanted.regions,
+        languages=wanted.languages,
+        include=wanted.include,
+        coolrom=entry.coolrom,
+        consoleroms=entry.consoleroms,
+    )
+
+
+def _wanted(path: Path, key: str, raw: dict[str, Any], defaults: Wanted) -> Wanted:
+    return Wanted(
         regions=_codes(path, raw, f"{key}.regions", "regions", defaults.regions, REGIONS),
         languages=_codes(path, raw, f"{key}.languages", "languages", defaults.languages, LANGUAGES),
-        include=_include(path, raw, key),
-        sources=sources,
-        archive_item=_archive_item(path, raw, key, sources),
-        coolrom=_site_code(path, slug, key, sources, entry.coolrom, "coolrom", "CoolROM"),
-        consoleroms=_site_code(
-            path, slug, key, sources, entry.consoleroms, "consoleroms", "ConsoleRoms"
-        ),
+        include=_include(path, raw, key, defaults.include),
     )
 
 
-def _include(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:
-    names = _strings(path, raw, f"{key}.include", "include", default=())
+def _include(
+    path: Path, raw: dict[str, Any], key: str, default: tuple[str, ...]
+) -> tuple[str, ...]:
+    names = _strings(path, raw, f"{key}.include", "include", default=default)
     for name in names:
         if name not in catalog.CATEGORIES:
             raise ConfigError(
@@ -231,61 +259,6 @@ def _include(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:
                 f"Allowed: {', '.join(catalog.CATEGORIES)}."
             )
     return tuple(dict.fromkeys(names))
-
-
-def _sources(path: Path, raw: dict[str, Any], key: str) -> tuple[str, ...]:
-    names = _strings(path, raw, f"{key}.sources", "sources", default=())
-    for name in names:
-        if name not in SOURCES:
-            raise ConfigError(
-                f"{path}: {key}.sources has unknown source {name!r}. Allowed: {', '.join(SOURCES)}."
-            )
-    return tuple(dict.fromkeys(names))
-
-
-def _archive_item(
-    path: Path, raw: dict[str, Any], key: str, sources: tuple[str, ...]
-) -> str | None:
-    if "archive_item" in raw or "internet-archive" in sources:
-        return _string(path, raw, f"{key}.archive_item", "archive_item")
-    return None
-
-
-def _site_code(
-    path: Path,
-    slug: str,
-    key: str,
-    sources: tuple[str, ...],
-    code: str | None,
-    source: str,
-    label: str,
-) -> str | None:
-    if source in sources and code is None:
-        raise ConfigError(
-            f"{path}: {key}.sources lists {source} but {label} has no system for {slug!r}. "
-            f"Remove {source} from the list."
-        )
-    return code
-
-
-def _dat(
-    path: Path, slug: str, raw: dict[str, Any], platforms_registry: Mapping[str, registry.Entry]
-) -> str:
-    key = f"platforms.{slug}.dat"
-    if "dat" not in raw:
-        if slug not in platforms_registry:
-            raise ConfigError(
-                f"{path}: unknown platform {slug!r}. Use one of: "
-                f"{', '.join(sorted(platforms_registry))}; or set dat."
-            )
-        return platforms_registry[slug].dat
-    dat = _string(path, raw, key, "dat")
-    dat_set, _, name = dat.partition("/")
-    if dat_set not in registry.DAT_SETS or not name:
-        raise ConfigError(
-            f"{path}: {key} {dat!r} must look like <{'|'.join(registry.DAT_SETS)}>/<name>."
-        )
-    return dat
 
 
 def _directory(path: Path, dotted: str, value: str) -> Path:

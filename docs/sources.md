@@ -2,7 +2,7 @@
 
 A source is automated only if it offers an official API, or its robots.txt and terms allow
 automated access, or you hold the site owner's permission. You are responsible for having it
-before you list a source. All other sources are manual: download in your browser into an inbox;
+before you use a source. All other sources are manual: download in your browser into an inbox;
 the next import files it (see [Where files go](setup.md#where-files-go)).
 
 romledger identifies itself as `romledger/<version> (+https://github.com/kjiwa/romledger)`, never
@@ -16,7 +16,7 @@ not download a file again while the earlier copy sits in either folder.
 ## CoolROM
 
 Source name `coolrom`, host `coolrom.com`. Carries about two dozen platforms and no Nintendo
-systems; listing `coolrom` for a platform it does not carry is an error.
+systems; `fetch` asks it only about platforms it carries.
 
 - Games are matched by title with tags and punctuation ignored. When several rows share a title,
   the one whose region equals the DAT game's first region wins (World counts as USA). Otherwise a
@@ -33,7 +33,7 @@ systems; listing `coolrom` for a platform it does not carry is an error.
 
 Source name `consoleroms`, hosts `www.consoleroms.com` and `downloads.consoleroms.com`. Carries
 about thirty of the registry's platforms, Nintendo systems included; listing `consoleroms` for a
-platform it does not carry is an error.
+platform it does not carry is never asked.
 
 - Games are matched by title with tags and punctuation ignored. Only a unique match is used; an
   ambiguous title is skipped with a warning, and you download it by hand.
@@ -43,17 +43,6 @@ platform it does not carry is an error.
 - It follows `robots.txt`, which allows crawling, and honours any crawl delay it sets. It keeps at
   least 1 second between requests.
 - Crawl it only if the site's terms and permission allow; see the top of this page.
-
-## Internet Archive
-
-Source name `internet-archive`, host `archive.org`, through its public metadata and download
-endpoints. Set `platforms.<slug>.archive_item` to an item holding No-Intro style files named
-`<DAT game name>.zip`; a game is found only by that exact name.
-
-- The item's file list is read once per run. It carries a checksum per file; a download whose md5
-  differs is deleted.
-- Keeps at least 1 second between requests.
-- Whether an item may be used is the uploader's and the Archive's decision; check the item's page.
 
 ## Vimm's Lair
 

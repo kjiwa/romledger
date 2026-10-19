@@ -44,7 +44,11 @@ async function main() {
     .sendMessage({ type: "platforms" })
     .catch(() => ({ ok: false, error: "The extension could not reach its background worker." }));
   if (reply.ok) {
-    document.getElementById("platforms").replaceChildren(...reply.data.map(platformItem));
+    const tracked = reply.data.filter((platform) => platform.tracked);
+    document.getElementById("platforms").replaceChildren(...tracked.map(platformItem));
+    if (!tracked.length) {
+      showError("No games yet. Put ROMs in an inbox and run romledger import.");
+    }
   } else {
     showError(reply.error);
   }

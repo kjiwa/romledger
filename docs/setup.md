@@ -8,13 +8,14 @@
 
 ## Config file
 
-`romledger init` writes this file for you. It prompts for the ROM folder, the platforms and
-whether to add `~/Downloads/romledger` as a second inbox (for the
-[browser extension](extension.md)), then creates `<roms>/library` and `<roms>/inbox`. It never
-overwrites an existing file unless you pass `--force`. Without a terminal it needs
-`--platform SLUG` (repeatable) and uses `--roms DIR`, default `~/roms`.
+`romledger init` writes this file for you. It prompts for the ROM folder and whether to add
+`~/Downloads/romledger` as a second inbox (for the [browser extension](extension.md)), then creates
+`<roms>/library` and `<roms>/inbox`. It never overwrites an existing file unless you pass
+`--force`. Without a terminal it uses `--roms DIR`, default `~/roms`.
 
-`romledger platforms` lists every platform slug with its DAT and marks the ones in your config.
+The library and the inboxes are all you have to configure. romledger knows every platform that
+`romledger platforms` lists and downloads a platform's DAT the first time it needs it, so a ROM for
+any of them is imported and its platform shows up in `status` as soon as it holds a game.
 
 The reference for editing by hand follows.
 
@@ -31,17 +32,15 @@ Unknown keys and wrong types are errors. Paths must be absolute; `~` is expanded
 roms = "~/roms/library"
 inboxes = ["~/roms/inbox"]
 
-[platforms.nes]
+# Optional: what every platform wants. These are the defaults.
+[wanted]
 regions = ["USA", "WORLD"]
 languages = ["EN"]
+include = []
+
+# Optional: change any of those three keys for one platform.
+[platforms.nes]
 include = ["unlicensed"]
-
-[platforms.atari7800]
-sources = ["coolrom", "internet-archive"]
-archive_item = "No-Intro_Atari7800"
-
-[platforms.custom-system]
-dat = "no-intro/Some - Custom System"
 
 [hooks]
 after_import = [["touch", "/path/to/roms/.imported"]]
@@ -54,16 +53,15 @@ proxy = "socks5h://proxy.example:1080"
 | --- | --- | --- |
 | `library.roms` | yes | Library directory. Games for `<slug>` live in `<roms>/<slug>/`. |
 | `library.inboxes` | yes | One or more mixed-platform directories where new files arrive. |
-| `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
-| `platforms.<slug>.regions` | no | Wanted regions, igir codes, best first. Default `["USA", "WORLD"]`. |
-| `platforms.<slug>.languages` | no | Wanted languages, igir codes, best first. Default `["EN"]`. |
-| `platforms.<slug>.include` | no | Categories of release to want that are left out by default: `unlicensed`, `aftermarket`, `prerelease`, `programs`, `bad`. Default none. |
-| `platforms.<slug>.sources` | no | Sources `fetch` tries, in order: `consoleroms`, `coolrom`, `internet-archive`. Default none. `consoleroms` and `coolrom` need a platform the site carries. |
-| `platforms.<slug>.archive_item` | with `internet-archive` | Internet Archive item that holds `<game name>.zip` files, such as a No-Intro set. |
+| `wanted.regions` | no | Wanted regions, igir codes, best first. Default `["USA", "WORLD"]`. |
+| `wanted.languages` | no | Wanted languages, igir codes, best first. Default `["EN"]`. |
+| `wanted.include` | no | Categories of release to want that are left out by default: `unlicensed`, `aftermarket`, `prerelease`, `programs`, `bad`. Default none. |
+| `platforms.<slug>.regions`, `.languages`, `.include` | no | The same keys for one platform, replacing the `wanted` value. `romledger platforms` lists the slugs. |
 | `network.proxy` | no | Proxy URL for every request. Schemes: `http`, `https`, `socks5`, `socks5h`. |
 | `hooks.after_import` | no | Commands to run after `import` moved at least one file. Each is an argument list, run without a shell. Default none. |
 
-Codes are upper case.
+A config from 0.5 may name `dat`, `sources` or `archive_item` under a platform; those keys were
+removed, and the error says to delete them. Codes are upper case.
 
 - Regions: ARG ASI AUS BEL BRA CAN CHN DAN EUR FRA FYN GER GRE HK HOL ITA JPN KOR MEX NOR
   NZ POR RUS SPA SWE TAI UK UNK USA WORLD
@@ -92,8 +90,9 @@ ROM names (so `Possible Proto`, `Tech Demo` and `Music Program` count):
 
 A game with no language tag is taken to speak its region's language.
 
-Run `romledger platforms` to see the platform slugs, their DATs and which ones your config
-tracks. Set `regions`, `languages` and `include` per platform (see [Config file](#config-file)).
+Run `romledger platforms` to see the platform slugs, their DATs and the sources that carry them.
+Set `regions`, `languages` and `include` for every platform under `[wanted]`, or per platform (see
+[Config file](#config-file)).
 
 ## Where files go
 
@@ -131,9 +130,9 @@ The directory is created on first use.
 romledger config
 ```
 
-It prints the resolved config file, data directory, library paths, platforms with their sources, and
-the proxy with credentials hidden. If a path is not a directory, mount the drive or share and
-run it again.
+It prints the resolved config file, data directory, library paths, what is wanted (plus any platform
+that differs), and the proxy with credentials hidden. If a path is not a directory, mount the drive
+or share and run it again.
 
 ## dats update
 
@@ -141,9 +140,9 @@ run it again.
 romledger dats update [PLATFORM...]
 ```
 
-Downloads the DAT of each configured platform (all by default) from libretro-database. Prints
-`<platform> <version> (updated|unchanged)` per DAT. Run it before the first scan and
-whenever you want new releases to show up as missing.
+Downloads the DAT of each platform (all by default) from libretro-database. Prints
+`<platform> <version> (updated|unchanged)` per DAT. `scan` and `import` download the DATs they
+lack on their own, so run this only to pick up new releases and show them as missing.
 
 ## scan
 
@@ -151,9 +150,10 @@ whenever you want new releases to show up as missing.
 romledger scan [PLATFORM...]
 ```
 
-Hashes the files in `<library.roms>/<slug>` and in every inbox, and matches them to the DAT.
-The first scan of a large library is slow; later scans reuse the hash cache. Counts are per
-wanted title (see [What counts as wanted](#what-counts-as-wanted)).
+Hashes the files in `<library.roms>/<slug>` and in every inbox, and matches them to the DATs, for
+every platform unless you name some. It downloads the DATs it lacks. The first scan of a large
+library is slow; later scans reuse the hash cache. Counts are per wanted title (see [What counts as
+wanted](#what-counts-as-wanted)).
 
 - have: any wanted release of the title is in the library.
 - inbox: a wanted release is in an inbox only.
@@ -161,26 +161,18 @@ wanted title (see [What counts as wanted](#what-counts-as-wanted)).
 - unmatched: library files that match no DAT entry.
 
 Files under `<inbox>/unmatched/`, `<inbox>/unwanted/`, `<inbox>/duplicates/` and
-`<inbox>/extracted/` are ignored, as are AppleDouble (`._*`), `.DS_Store`, and partial downloads (`*.part`, `*.crdownload`, `*.download`).
-
-## dats index
-
-```sh
-romledger dats index [PLATFORM...]
-```
-
-Rebuilds the hash index (SHA-1, MD5, CRC per game) that `serve` uses for lookups, from the DATs
-already downloaded. `scan` does this itself whenever a platform's DAT version changed, so run it
-only to index without scanning. Prints `<platform> indexed|unchanged`.
+`<inbox>/extracted/` are ignored, as are AppleDouble (`._*`), `.DS_Store`, and partial downloads
+(`*.part`, `*.crdownload`, `*.download`).
 
 ## status
 
 ```sh
-romledger status
+romledger status [--all]
 ```
 
-Prints one row per configured platform: `wanted` is have + inbox + missing, `done` is
-have as a percent of wanted. Platforms never scanned show `-`.
+Prints one row per platform that holds at least one game, in the library or an inbox: `wanted` is
+have + inbox + missing, `done` is have as a percent of wanted. A footer counts the platforms left
+out. `--all` lists every platform; those never scanned show `-`.
 
 ## missing
 
@@ -197,10 +189,11 @@ URLs for the platforms each site carries; the column stays empty for a platform 
 romledger fetch PLATFORM [--limit N] [--dry-run] [--no-import] [--source NAME]
 ```
 
-Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks the
-platform's `sources` in order and takes the first match. A download is written as `<name>.part`,
-resumed if it was interrupted, checked against the size the server announced (and the checksum,
-where the source lists one), then renamed. Then it runs `import`, unless `--no-import`.
+Downloads the games `missing` lists, one at a time, into the first inbox. For each game it asks
+every source that carries the platform, in order, and takes the first match. A download is written
+as `<name>.part`, resumed if it was interrupted, checked against the size the server announced (and
+the checksum, where the source lists one), then renamed. Then it runs `import`, unless
+`--no-import`.
 
 Output per game is `fetched <game> (<source>)`, `not found <game>`, `skipped <game>: <path> ...` or
 `failed <game>: <reason>`, then a summary line. A failed game does not stop the others. A game is
@@ -210,10 +203,10 @@ skipped when the file a source would send already sits in `<inbox>/unmatched/`, 
 - `--limit N`: stop after N games.
 - `--dry-run`: look games up and print `would fetch <game> (<source>)`; download and import nothing.
   CoolROM is asked for section pages only; ConsoleRoms for listing and download pages.
-- `--source NAME`: use only that one configured source.
+- `--source NAME`: use only that source, which must carry the platform.
 
 Run `scan` first. Requests are spaced politely: CoolROM at least 10 seconds apart (more if its
-robots.txt asks), ConsoleRoms and Internet Archive at least 1 second. A source whose robots.txt disallows a URL is
+robots.txt asks), ConsoleRoms at least 1 second. A source whose robots.txt disallows a URL is
 skipped for the run. Exit status is 0, 1 if any game failed or a site's layout changed (or an
 `after_import` hook failed), or 2 for errors.
 
@@ -224,8 +217,8 @@ romledger import [--dry-run]
 ```
 
 Files the inbox into the library; see [Where files go](#where-files-go). Only wanted releases are
-filed. Afterwards it rescans the platforms that received files and runs `hooks.after_import`. An
-inbox that igir empties is recreated.
+filed. It downloads any DAT it lacks first. Afterwards it rescans the platforms that received files
+and runs `hooks.after_import`. An inbox that igir empties is recreated.
 
 Output lists `moved <slug> <n>`, `extracted <n>`, `duplicates <n>`, `unwanted <n>` and
 `unmatched <n>`; an inbox with nothing to do prints `inbox is empty`.
@@ -244,10 +237,9 @@ Partial downloads are skipped until the browser renames them. `serve` imports on
 romledger serve [--host 127.0.0.1] [--port 8730] [--open] [--no-auto-import]
 ```
 
-Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the link in your
-browser; otherwise copy it from the terminal. Open it once; the browser keeps a session cookie.
-Pages and files are served from the local machine only; nothing
-loads from a CDN.
+Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the
+link in your browser; otherwise copy it from the terminal. Open it once; the browser keeps a session
+cookie. Pages and files are served from the local machine only; nothing loads from a CDN.
 
 - Overview: progress per platform.
 - Platform: missing, inbox or have games, a search box, and Vimm's Lair and emu-land search links
@@ -258,12 +250,12 @@ loads from a CDN.
 - Activity: scans and imports, with their output. One runs at a time.
 
 While `serve` runs it also imports on its own. Every 5 seconds it checks all inboxes, skipping
-`unmatched`, `unwanted`, `duplicates` and `extracted` and files that are still downloading
-(`.part`, `.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or modification time over the last two
-checks, and no scan or import is running, it starts an import. The job shows on the Activity
-page like a manual one. If it fails, or leaves files behind, those files are not retried; add or change a file, or press
-Import, to try again. `--no-auto-import` turns this off; the Inbox and Activity pages say when it
-is on.
+`unmatched`, `unwanted`, `duplicates` and `extracted` and files that are still downloading (`.part`,
+`.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or
+modification time over the last two checks, and no scan or import is running, it starts an import.
+The job shows on the Activity page like a manual one. If it fails, or leaves files behind, those
+files are not retried; add or change a file, or press Import, to try again. `--no-auto-import` turns
+this off; the Inbox and Activity pages say when it is on.
 
 The service reads the config file on every request, so edits and a remounted library take effect
 without a restart. Scan and import need the DATs (`romledger dats update`) and igir, as on the
@@ -284,7 +276,7 @@ Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors ar
 
 | Request | Meaning |
 | --- | --- |
-| `GET /api/platforms` | Per platform: `slug`, `name`, `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom`, `consoleroms`, `emuland` and `archive_item`: the platform's code on each site, or null). |
+| `GET /api/platforms` | Per platform, all of them: `slug`, `name`, `tracked` (it holds a game), `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm`, `coolrom`, `consoleroms` and `emuland`: the platform's code on each site, or null). |
 | `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing titles, each by its preferred release, with `links.vimm` and `links.emuland`. |
 | `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
 | `GET /api/lookup?name=<game>&platform=<slug>&regions=<names>` | Match by name: exact, else by title ignoring tags (`exact` is false). `regions` is an optional comma list of No-Intro region names (`USA,Europe`) that narrows the candidates, as do extra tags in the name. `matches` lists every game that still fits. `name` is at most 300 characters. |

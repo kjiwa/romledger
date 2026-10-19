@@ -3,16 +3,19 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from romledger import catalog, datindex, dats, igir, state
+import httpx
+
+from romledger import catalog, datindex, dats, http, igir, state
 from romledger.config import Config, ConfigError, Platform
 
 FOUND = "FOUND"
 MISSING = "MISSING"
 UNUSED = "UNUSED"
-DATS_HINT = "run: romledger dats update"
 SCAN_HINT = "run: romledger scan"
 
 IgirReport = Callable[..., list[igir.ReportRow]]
+ClientFactory = Callable[[str | None], httpx.Client]
+Progress = Callable[[str], None]
 
 
 def classify(
@@ -46,11 +49,34 @@ def cache_path(data_dir: Path) -> Path:
     return data_dir / "igir.cache"
 
 
-def require_dats(config: Config, slugs: Sequence[str], data_dir: Path) -> None:
-    for slug in slugs:
-        dat = dats.dat_path(data_dir, config.platforms[slug].dat)
-        if not dat.is_file():
-            raise ConfigError(f"no DAT for {slug} ({dat}). {DATS_HINT}")
+def ensure_dats(
+    config: Config,
+    slugs: Sequence[str],
+    data_dir: Path,
+    client_factory: ClientFactory | None = None,
+) -> list[str]:
+    absent = {
+        slug: config.platforms[slug].dat
+        for slug in slugs
+        if not dats.dat_path(data_dir, config.platforms[slug].dat).is_file()
+    }
+    if not absent:
+        return list(slugs)
+    failed: dict[str, dats.DatError] = {}
+    with (client_factory or http.client)(config.network.proxy) as client:
+        for slug, dat in absent.items():
+            print(f"downloading the {slug} DAT ...", file=sys.stderr)
+            try:
+                dats.update(data_dir, {slug: dat}, client)
+            except dats.DatError as error:
+                failed[slug] = error
+    for slug, problem in failed.items():
+        print(f"romledger: warning: skipping {slug}: {problem}", file=sys.stderr)
+    usable = [slug for slug in slugs if slug not in failed]
+    if not usable:
+        first = next(iter(failed.values()))
+        raise ConfigError(f"no DAT could be downloaded ({len(failed)} failed). {first}")
+    return usable
 
 
 def missing_games(data_dir: Path, slug: str) -> list[str]:
@@ -58,13 +84,6 @@ def missing_games(data_dir: Path, slug: str) -> list[str]:
         if database.scanned_at(slug) is None:
             raise ConfigError(f"{slug} has not been scanned. {SCAN_HINT}")
         return database.missing(slug)
-
-
-def scan_each(slugs: Sequence[str], scan_one: Callable[[str], None]) -> None:
-    for slug in slugs:
-        print(f"scanning {slug} ...", file=sys.stderr)
-        scan_one(slug)
-    print(f"scanned {len(slugs)} platform(s)")
 
 
 def wanted_groups(
@@ -78,17 +97,44 @@ def wanted_groups(
 def scan_platform(
     config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
 ) -> None:
-    platform = config.platforms[slug]
-    dat = dats.dat_path(data_dir, platform.dat)
-    with state.State(data_dir / "state.db") as database:
-        groups = wanted_groups(database, slug, platform, dat)
+    scan_platforms(config, [slug], data_dir, igir_report)
+
+
+def scan_platforms(
+    config: Config,
+    slugs: Sequence[str],
+    data_dir: Path,
+    igir_report: IgirReport = igir.report,
+    progress: Progress = lambda _: None,
+) -> None:
+    if not slugs:
+        return
+    dat_files = {slug: dats.dat_path(data_dir, config.platforms[slug].dat) for slug in slugs}
     cache = cache_path(data_dir)
-    excludes = igir.inbox_excludes(config.library.inboxes)
-    inbox_rows = igir_report([dat], config.library.inboxes, cache, excludes)
-    library = config.library.roms / slug
-    library_rows = igir_report([dat], [library], cache, ()) if library.is_dir() else []
-    items, unmatched = classify(groups, library_rows, inbox_rows)
-    with state.State(data_dir / "state.db") as database:
-        database.replace_platform(
-            slug, items, unmatched, dats.version_of(dat), datetime.now(UTC).isoformat()
+    progress("inbox")
+    inbox_rows = _rows_by_dat(
+        igir_report(
+            list(dat_files.values()),
+            config.library.inboxes,
+            cache,
+            igir.inbox_excludes(config.library.inboxes),
         )
+    )
+    for slug, dat in dat_files.items():
+        progress(slug)
+        with state.State(data_dir / "state.db") as database:
+            groups = wanted_groups(database, slug, config.platforms[slug], dat)
+        library = config.library.roms / slug
+        library_rows = igir_report([dat], [library], cache, ()) if library.is_dir() else []
+        items, unmatched = classify(groups, library_rows, inbox_rows.get(dats.name_of(dat), []))
+        with state.State(data_dir / "state.db") as database:
+            database.replace_platform(
+                slug, items, unmatched, dats.version_of(dat), datetime.now(UTC).isoformat()
+            )
+
+
+def _rows_by_dat(rows: Sequence[igir.ReportRow]) -> dict[str, list[igir.ReportRow]]:
+    grouped: dict[str, list[igir.ReportRow]] = {}
+    for row in rows:
+        grouped.setdefault(row.dat, []).append(row)
+    return grouped

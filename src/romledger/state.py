@@ -99,6 +99,10 @@ class Counts:
     missing: int
     unmatched: int
 
+    @property
+    def has_games(self) -> bool:
+        return self.have + self.inbox > 0
+
 
 @dataclass(frozen=True)
 class IndexedGame:

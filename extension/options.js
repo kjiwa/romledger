@@ -45,7 +45,7 @@ async function save(event) {
   await api.storage.local.set({ url, token: form.token.value.trim() });
   const reply = await api.runtime.sendMessage({ type: "platforms" });
   if (reply.ok) {
-    show(`Connected. ${reply.data.length} platform(s) configured.`, "ok");
+    show(`Connected. ${reply.data.filter((platform) => platform.tracked).length} platform(s) with games.`, "ok");
   } else {
     show(reply.error, "error");
   }
