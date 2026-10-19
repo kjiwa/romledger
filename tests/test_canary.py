@@ -9,12 +9,9 @@ from conftest import FakeThrottle
 from romledger import canary, dats, http, igir, registry
 
 VIMM_LIST = "vimm.net/vault/?p=list&system=NES&section=x"
-COOLROM_SECTION = "coolrom.com/roms/atari7800/x/"
 CONSOLEROMS_LISTING = "www.consoleroms.com/roms/atari-7800"
 CONSOLEROMS_DOWNLOAD = "www.consoleroms.com/roms/atari-7800/pole-position-2/download"
 CONSOLEROMS_SITEMAP = "www.consoleroms.com/sitemaps/consoles.xml"
-EMULAND_INDEX = "www.emu-land.net/en"
-ARCHIVE_METADATA = "archive.org/metadata/No-Intro_NES"
 IGIR_RELEASE = "api.github.com/repos/emmercm/igir/releases/latest"
 Page = httpx.Response | Callable[[], httpx.Response]
 
@@ -25,14 +22,8 @@ def html(text: str) -> httpx.Response:
 
 class World:
     def __init__(self, fixtures: Path) -> None:
-        coolrom = fixtures / "coolrom"
-        section = (coolrom / "section.html").read_text().replace("genesis", "atari7800")
         self.requests: list[tuple[str, str]] = []
         self.pages: dict[str, Page] = {
-            "coolrom.com/robots.txt": httpx.Response(200, text="User-agent: *\nCrawl-delay: 10\n"),
-            "coolrom.com/roms/": html((coolrom / "index.html").read_text()),
-            COOLROM_SECTION: html(section),
-            "coolrom.com/dlpop.php?id=6013": html((coolrom / "dlpop.html").read_text()),
             "vimm.net/robots.txt": httpx.Response(200, text=""),
             "vimm.net/vault/": html((fixtures / "vimm" / "vault.html").read_text()),
             VIMM_LIST: html((fixtures / "vimm" / "list.html").read_text()),
@@ -46,18 +37,6 @@ class World:
             ),
             CONSOLEROMS_LISTING: html((fixtures / "consoleroms" / "listing.html").read_text()),
             CONSOLEROMS_DOWNLOAD: html((fixtures / "consoleroms" / "download.html").read_text()),
-            "www.emu-land.net/robots.txt": httpx.Response(
-                200, text="User-agent: *\nDisallow: /*act=getmfl\nCrawl-delay: 2\n"
-            ),
-            EMULAND_INDEX: html((fixtures / "emuland" / "index.html").read_text()),
-            "archive.org/robots.txt": httpx.Response(
-                200, text="User-agent: *\nDisallow: /control/\n"
-            ),
-            ARCHIVE_METADATA: httpx.Response(
-                200,
-                text=(fixtures / "archive" / "metadata.json").read_text(),
-                headers={"Content-Type": "application/json"},
-            ),
             IGIR_RELEASE: httpx.Response(200, json={"tag_name": f"v{igir.IGIR_VERSION}"}),
         }
 
@@ -107,82 +86,11 @@ def test_never_requests_the_signed_link_or_a_game_page(
 ) -> None:
     world.run(fake_throttle)
     hosts = {key.split("/", 1)[0] for key in world.requested()}
-    assert "dl.coolrom.com" not in hosts
+    assert "downloads.consoleroms.com" not in hosts
     assert not [
         key for key in world.requested() if key.startswith("vimm.net/vault/") and key[15:].isdigit()
     ]
-    assert world.requested().count("coolrom.com/dlpop.php?id=6013") == 1
-
-
-def test_coolrom_requests_keep_the_crawl_delay(world: World, fake_throttle: FakeThrottle) -> None:
-    client = httpx.Client(transport=httpx.MockTransport(world.handle))
-    throttle, sleeps = fake_throttle(1.0)
-    canary.run(client, throttle, registry.load(), registry.ignored())
-    assert sleeps.count(10.0) >= 3
-
-
-def test_coolrom_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
-    index = world.pages["coolrom.com/roms/"]
-    assert isinstance(index, httpx.Response)
-    world.pages["coolrom.com/roms/"] = html(index.text.replace('href="/roms/psx/"', 'href="/x/"'))
-    report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:missing-platform:psx"]
-    assert report.findings[0].title.isascii()
-
-
-def test_coolrom_empty_platform_index_is_page_drift(
-    world: World, fake_throttle: FakeThrottle
-) -> None:
-    world.pages["coolrom.com/roms/"] = html("<html>moved</html>")
-    report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:platform-links"]
-    assert report.inconclusive == []
-
-
-def test_coolrom_new_platform_proposes_a_registry_line(
-    world: World, fake_throttle: FakeThrottle
-) -> None:
-    index = world.pages["coolrom.com/roms/"]
-    assert isinstance(index, httpx.Response)
-    world.pages["coolrom.com/roms/"] = html(
-        index.text.replace("</body>", '<a href="/roms/zx81/">ZX81</a></body>')
-    )
-    report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:new-platform:zx81"]
-    assert 'coolrom = "zx81"' in report.findings[0].detail
-
-
-def test_coolrom_ignored_codes_are_in_the_index(world: World) -> None:
-    index = world.pages["coolrom.com/roms/"]
-    assert isinstance(index, httpx.Response)
-    for code in registry.ignored()["coolrom"]:
-        assert f'href="/roms/{code}/"' in index.text
-
-
-@pytest.mark.parametrize(
-    "page",
-    [
-        html("<html><body>moved</body></html>"),
-        httpx.Response(404),
-        html('<div class="header"><a href="/roms/atari7800/">Atari 7800</a></div>'),
-    ],
-    ids=["no-rows-no-breadcrumb", "not-found", "no-rows"],
-)
-def test_coolrom_section_contract(
-    world: World, fake_throttle: FakeThrottle, page: httpx.Response
-) -> None:
-    world.pages[COOLROM_SECTION] = page
-    report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:section"]
-    assert "/roms/atari7800/x/" in report.findings[0].detail
-    assert not [key for key in world.requested() if "dlpop" in key]
-
-
-def test_coolrom_download_contract(world: World, fake_throttle: FakeThrottle) -> None:
-    world.pages["coolrom.com/dlpop.php?id=6013"] = html("<html>no script</html>")
-    report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:download-link"]
-    assert "no download link" in report.findings[0].detail
+    assert world.requested().count(CONSOLEROMS_DOWNLOAD) == 1
 
 
 def test_consoleroms_requests_never_touch_the_download_host(
@@ -270,61 +178,6 @@ def test_consoleroms_download_contract(
     assert keys(report) == ["consoleroms:contract:download-link"]
 
 
-def test_emuland_requests_keep_the_crawl_delay(world: World, fake_throttle: FakeThrottle) -> None:
-    client = httpx.Client(transport=httpx.MockTransport(world.handle))
-    throttle, sleeps = fake_throttle(1.0)
-    canary.run(client, throttle, registry.load(), registry.ignored())
-    assert 2.0 in sleeps
-
-
-def test_emuland_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
-    index = world.pages[EMULAND_INDEX]
-    assert isinstance(index, httpx.Response)
-    world.pages[EMULAND_INDEX] = html(index.text.replace("/en/consoles/snes", "/en/x"))
-    report = world.run(fake_throttle)
-    assert keys(report) == ["emuland:missing-platform:consoles/snes"]
-
-
-def test_emuland_empty_platform_index_is_page_drift(
-    world: World, fake_throttle: FakeThrottle
-) -> None:
-    world.pages[EMULAND_INDEX] = html("<html>moved</html>")
-    report = world.run(fake_throttle)
-    assert keys(report) == ["emuland:contract:platform-links"]
-    assert report.inconclusive == []
-
-
-def test_emuland_new_platform_proposes_a_registry_line(
-    world: World, fake_throttle: FakeThrottle
-) -> None:
-    index = world.pages[EMULAND_INDEX]
-    assert isinstance(index, httpx.Response)
-    world.pages[EMULAND_INDEX] = html(
-        index.text.replace("</body>", '<a href="/en/consoles/odyssey2">x</a></body>')
-    )
-    report = world.run(fake_throttle)
-    assert keys(report) == ["emuland:new-platform:consoles/odyssey2"]
-    assert 'emuland = "consoles/odyssey2"' in report.findings[0].detail
-
-
-def test_emuland_links_outside_the_platform_groups_are_not_platforms(
-    world: World, fake_throttle: FakeThrottle
-) -> None:
-    index = world.pages[EMULAND_INDEX]
-    assert isinstance(index, httpx.Response)
-    world.pages[EMULAND_INDEX] = html(
-        index.text.replace("</body>", '<a href="/en/news/today">x</a></body>')
-    )
-    assert world.run(fake_throttle) == canary.Report([], [], [])
-
-
-def test_emuland_ignored_codes_are_in_the_index(world: World) -> None:
-    index = world.pages[EMULAND_INDEX]
-    assert isinstance(index, httpx.Response)
-    for code in registry.ignored()["emuland"]:
-        assert f'href="/en/{code}"' in index.text
-
-
 def test_vimm_missing_registry_code(world: World, fake_throttle: FakeThrottle) -> None:
     page = world.pages["vimm.net/vault/"]
     assert isinstance(page, httpx.Response)
@@ -368,20 +221,6 @@ def test_vimm_list_contract(world: World, fake_throttle: FakeThrottle) -> None:
     world.pages[VIMM_LIST] = html('<a href="/vault/NES">NES</a>')
     report = world.run(fake_throttle)
     assert keys(report) == ["vimm:contract:list"]
-
-
-@pytest.mark.parametrize(
-    "body",
-    [
-        "<html>not json</html>",
-        "[]",
-        '{"files": []}',
-        '{"files": [{"name": "a.zip"}]}',
-    ],
-)
-def test_archive_contract(world: World, fake_throttle: FakeThrottle, body: str) -> None:
-    world.pages[ARCHIVE_METADATA] = httpx.Response(200, text=body)
-    assert keys(world.run(fake_throttle)) == ["internet-archive:contract:metadata"]
 
 
 def test_dat_missing(world: World, fake_throttle: FakeThrottle) -> None:
@@ -441,22 +280,10 @@ def timeout() -> httpx.Response:
 
 
 CHALLENGE = html("<html><title>Just a moment...</title></html>")
-SITES = {
-    "coolrom": "coolrom.com/roms/",
-    "vimm": "vimm.net/vault/",
-    "consoleroms": CONSOLEROMS_SITEMAP,
-    "emuland": EMULAND_INDEX,
-    "archive": ARCHIVE_METADATA,
-}
+SITES = {"vimm": "vimm.net/vault/", "consoleroms": CONSOLEROMS_SITEMAP}
 
 
-GROUPS = {
-    "coolrom": "coolrom",
-    "vimm": "vimm",
-    "consoleroms": "consoleroms",
-    "emuland": "emuland",
-    "archive": "internet-archive",
-}
+GROUPS = {"vimm": "vimm", "consoleroms": "consoleroms"}
 
 
 @pytest.mark.parametrize("site", SITES)
@@ -482,20 +309,19 @@ def test_inconclusive_site_is_a_note_not_a_finding(
 def test_inconclusive_site_skips_its_remaining_checks(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    world.pages["coolrom.com/roms/"] = httpx.Response(403)
+    world.pages["vimm.net/vault/"] = httpx.Response(403)
     world.run(fake_throttle)
-    assert COOLROM_SECTION not in world.requested()
-    assert VIMM_LIST in world.requested()
+    assert VIMM_LIST not in world.requested()
+    assert CONSOLEROMS_LISTING in world.requested()
 
 
 def test_findings_before_an_inconclusive_response_are_kept(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    world.pages[COOLROM_SECTION] = html("<html></html>")
-    world.pages["coolrom.com/dlpop.php?id=6013"] = httpx.Response(200)
-    world.pages["vimm.net/vault/"] = httpx.Response(429)
+    world.pages[VIMM_LIST] = html("<html></html>")
+    world.pages[CONSOLEROMS_SITEMAP] = httpx.Response(429)
     report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:section"]
+    assert keys(report) == ["vimm:contract:list"]
     assert len(report.notes) == 1
 
 
@@ -538,10 +364,15 @@ def test_cloudflare_mitigation_header_is_a_challenge(
     assert report.notes == ["https://vimm.net/vault/: bot challenge page"]
 
 
-def test_a_game_title_in_json_is_not_a_challenge(world: World, fake_throttle: FakeThrottle) -> None:
-    body = '{"files": [{"name": "Just a Moment.zip", "md5": "0"}]}'
-    world.pages[ARCHIVE_METADATA] = httpx.Response(
-        200, text=body, headers={"Content-Type": "application/json"}
+def test_a_game_title_in_a_page_is_not_a_challenge(
+    world: World, fake_throttle: FakeThrottle
+) -> None:
+    page = world.pages["vimm.net/vault/"]
+    assert isinstance(page, httpx.Response)
+    world.pages["vimm.net/vault/"] = httpx.Response(
+        200,
+        text=page.text.replace("</body>", "<td>Just a Moment.zip</td></body>"),
+        headers={"Content-Type": "application/json"},
     )
     assert world.run(fake_throttle) == canary.Report([], [], [])
 
@@ -556,46 +387,45 @@ def test_live_canary() -> None:
 def test_the_cloudflare_beacon_on_a_normal_page_is_not_a_challenge(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    page = world.pages["coolrom.com/roms/"]
+    page = world.pages["vimm.net/vault/"]
     assert isinstance(page, httpx.Response)
     beacon = '<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>'
-    world.pages["coolrom.com/roms/"] = html(page.text.replace("</body>", f"{beacon}</body>"))
+    world.pages["vimm.net/vault/"] = html(page.text.replace("</body>", f"{beacon}</body>"))
     assert world.run(fake_throttle) == canary.Report([], [], [])
 
 
 def test_inconclusive_lists_the_group_and_every_skipped_check(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    world.pages["coolrom.com/roms/"] = httpx.Response(403)
+    world.pages["vimm.net/vault/"] = httpx.Response(403)
     assert world.run(fake_throttle).inconclusive == [
-        "coolrom",
-        "coolrom:contract:platform-links",
-        "coolrom:missing-platform",
-        "coolrom:new-platform",
-        "coolrom:contract:section",
-        "coolrom:contract:download-link",
+        "vimm",
+        "vimm:contract:platform-links",
+        "vimm:missing-platform",
+        "vimm:new-platform",
+        "vimm:contract:list",
     ]
 
 
 def test_inconclusive_section_skips_the_download_check(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    world.pages[COOLROM_SECTION] = httpx.Response(503)
+    world.pages[CONSOLEROMS_LISTING] = httpx.Response(503)
     assert world.run(fake_throttle).inconclusive == [
-        "coolrom",
-        "coolrom:contract:section",
-        "coolrom:contract:download-link",
+        "consoleroms",
+        "consoleroms:contract:listing",
+        "consoleroms:contract:download-link",
     ]
 
 
 def test_section_drift_leaves_the_download_check_unverified(
     world: World, fake_throttle: FakeThrottle
 ) -> None:
-    world.pages[COOLROM_SECTION] = html("<html></html>")
+    world.pages[CONSOLEROMS_LISTING] = html("<html></html>")
     report = world.run(fake_throttle)
-    assert keys(report) == ["coolrom:contract:section"]
+    assert keys(report) == ["consoleroms:contract:listing"]
     assert report.notes == []
-    assert report.inconclusive == ["coolrom:contract:download-link"]
+    assert report.inconclusive == ["consoleroms:contract:download-link"]
 
 
 def test_unverified_dat_prefixes_cover_the_skipped_dats(

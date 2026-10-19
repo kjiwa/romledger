@@ -46,10 +46,7 @@ def missing(
         "total": page.total,
         "offset": offset,
         "limit": limit,
-        "games": [
-            {"game": game.name, "links": {"vimm": game.vimm, "emuland": game.emuland}}
-            for game in page.games
-        ],
+        "games": [{"game": game.name, "links": {"vimm": game.vimm}} for game in page.games],
     }
 
 
@@ -92,7 +89,6 @@ def import_all(context: Ctx, services: Services) -> dict[str, Any]:
 
 def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
     counts = view.counts
-    configured = context.config.platforms[view.slug]
     return {
         "slug": view.slug,
         "name": view.name,
@@ -106,8 +102,6 @@ def _platform(view: views.PlatformView, context: Context) -> dict[str, Any]:
         "percent": view.percent,
         "sites": {
             "vimm": views.site_code(context, view.slug, "vimm"),
-            "coolrom": configured.coolrom,
             "consoleroms": views.site_code(context, view.slug, "consoleroms"),
-            "emuland": views.site_code(context, view.slug, "emuland"),
         },
     }

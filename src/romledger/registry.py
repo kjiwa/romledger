@@ -6,7 +6,7 @@ from importlib.resources import files
 
 DAT_SETS = ("no-intro", "redump")
 IGNORE_TABLE = "ignore"
-SITES = ("vimm", "coolrom", "consoleroms", "emuland")
+SITES = ("vimm", "consoleroms")
 
 
 @dataclass(frozen=True)
@@ -14,9 +14,7 @@ class Entry:
     slug: str
     dat: str
     vimm: str | None = None
-    coolrom: str | None = None
     consoleroms: str | None = None
-    emuland: str | None = None
 
 
 def load() -> dict[str, Entry]:

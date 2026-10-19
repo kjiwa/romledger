@@ -39,7 +39,7 @@ def test_a_config_with_only_a_library_is_valid(tmp_path: Path) -> None:
     text = valid_text(tmp_path).split("[platforms.nes]")[0]
     loaded = load(write(tmp_path, text))
     assert loaded.platforms["snes"] == config.Platform(
-        dat=registry.load()["snes"].dat, coolrom=None, consoleroms="snes"
+        dat=registry.load()["snes"].dat, consoleroms="snes"
     )
     assert loaded.wanted == config.Wanted()
 
@@ -302,7 +302,7 @@ def test_unknown_platform_without_a_near_match(tmp_path: Path) -> None:
     [
         ('dat = "no-intro/X"', "romledger picks each platform's DAT"),
         ('sources = ["coolrom"]', "fetch uses every source that carries the platform"),
-        ('archive_item = "x"', "the Internet Archive is no longer a fetch source"),
+        ('archive_item = "x"', "the Internet Archive is no longer a source"),
     ],
 )
 def test_removed_platform_keys_say_what_to_do(tmp_path: Path, line: str, reason: str) -> None:
@@ -389,11 +389,9 @@ def test_empty_regions_rejected(tmp_path: Path) -> None:
 
 def test_site_codes_come_from_the_registry(tmp_path: Path) -> None:
     platforms = load(write(tmp_path, valid_text(tmp_path))).platforms
-    assert (platforms["nes"].coolrom, platforms["nes"].consoleroms) == (None, "nes")
-    assert (platforms["atari7800"].coolrom, platforms["atari7800"].consoleroms) == (
-        "atari7800",
-        "atari-7800",
-    )
+    assert platforms["nes"].consoleroms == "nes"
+    assert platforms["atari7800"].consoleroms == "atari-7800"
+    assert platforms["neo-geo-pocket-color"].consoleroms is None
 
 
 def test_no_network_by_default(tmp_path: Path) -> None:

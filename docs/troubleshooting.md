@@ -211,11 +211,6 @@ exits 1. Fix: download by hand, and update romledger or report it.
 Cause: the site's robots.txt forbids that URL, or could not be read. `fetch` skips the source for
 the run and does not count it as a failure. Fix: honor it, and download by hand.
 
-## `warning: ambiguous: <game> matches N CoolROM rows; skipped`
-
-Cause: several CoolROM rows fit the game and none is the DAT game's region. Fix: download that
-game by hand.
-
 ## `warning: ambiguous: <game> matches N ConsoleRoms rows; skipped`
 
 Cause: several ConsoleRoms rows fit the game's title. Fix: download that game by hand.
@@ -273,5 +268,5 @@ above.
 
 ## `... page layout not recognized: ...`
 
-Shown in the extension popup. Cause: Vimm's Lair, CoolROM, ConsoleRoms or emu-land changed its markup, so the extension
+Shown in the extension popup. Cause: Vimm's Lair changed its markup, so the extension
 found no game data or links. Fix: report it.

@@ -6,27 +6,19 @@ from functools import partial
 import httpx
 
 from romledger import dats, http, igir, registry
-from romledger.sources import consoleroms, coolrom, internet_archive
+from romledger.sources import consoleroms
 from romledger.sources.base import Site
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
-COOLROM_PLATFORM = "atari7800"
 VIMM_URL = "https://vimm.net"
 VIMM_HOSTS = ("vimm.net",)
 VIMM_SYSTEM = "NES"
-EMULAND_URL = "https://www.emu-land.net"
-EMULAND_HOSTS = ("www.emu-land.net",)
 CONSOLEROMS_PLATFORM = "atari-7800"
-ARCHIVE_ITEM = "No-Intro_NES"
 IGIR_RELEASE_URL = "https://api.github.com/repos/emmercm/igir/releases/latest"
-COOLROM_PLATFORM_LINK = re.compile(r'href="/roms/([a-z0-9]+)/"')
 VIMM_PLATFORM_LINK = re.compile(r'href="/vault/([A-Za-z0-9-]+)"')
 VIMM_ROW_LINK = re.compile(r'href="/vault/\d+"')
 CONSOLEROMS_PLATFORM_LINK = re.compile(
     r"<loc>https://www\.consoleroms\.com/roms/([a-z0-9-]+)</loc>"
-)
-EMULAND_PLATFORM_LINK = re.compile(
-    r'href="/en/((?:consoles|portable|computers|arcade)/[A-Za-z0-9_-]+)/?"'
 )
 CHALLENGE_MARKERS = ("just a moment", "checking if you are human")
 
@@ -76,14 +68,11 @@ def run(
 ) -> Report:
     return _merge(
         [
-            _run_steps("coolrom", _coolrom_steps(client, throttle, entries, ignored["coolrom"])),
             _run_steps("vimm", _vimm_steps(client, throttle, entries, ignored["vimm"])),
             _run_steps(
                 "consoleroms",
                 _consoleroms_steps(client, throttle, entries, ignored["consoleroms"]),
             ),
-            _run_steps("emuland", _emuland_steps(client, throttle, entries, ignored["emuland"])),
-            _run_steps("internet-archive", _archive_steps(client, throttle)),
             _run_steps("dat", _dat_steps(client, throttle, entries)),
             _run_steps("igir", _igir_steps(client, throttle, pinned_igir, token)),
         ]
@@ -124,63 +113,6 @@ def _step(keys: tuple[str, ...], title: str, check: Check) -> Step:
         return [Finding(keys[0], title, detail)]
 
     return Step(guarded, keys)
-
-
-def _coolrom_steps(
-    client: httpx.Client,
-    throttle: http.Throttle,
-    entries: Mapping[str, registry.Entry],
-    ignored: frozenset[str],
-) -> list[Step]:
-    site = Site(coolrom.BASE_URL, coolrom.HOSTS, coolrom.MIN_GAP, client, throttle)
-    first_rows: list[coolrom.Row] = []
-    return [
-        _step(
-            (
-                "coolrom:contract:platform-links",
-                "coolrom:missing-platform",
-                "coolrom:new-platform",
-            ),
-            "CoolROM platform list changed",
-            partial(_coolrom_platforms, site, entries, ignored),
-        ),
-        _step(
-            ("coolrom:contract:section",),
-            "CoolROM section page changed",
-            partial(_coolrom_section, site, first_rows),
-        ),
-        _step(
-            ("coolrom:contract:download-link",),
-            "CoolROM download page changed",
-            partial(_coolrom_download, site, first_rows),
-        ),
-    ]
-
-
-def _coolrom_platforms(
-    site: Site, entries: Mapping[str, registry.Entry], ignored: frozenset[str]
-) -> list[Finding]:
-    url = f"{coolrom.BASE_URL}/roms/"
-    found = set(COOLROM_PLATFORM_LINK.findall(_page(site, url).text))
-    mapped = {entry.coolrom for entry in entries.values() if entry.coolrom}
-    return _platform_findings("coolrom", url, found, mapped, ignored)
-
-
-def _coolrom_section(site: Site, first_rows: list[coolrom.Row]) -> list[Finding]:
-    url = f"{coolrom.BASE_URL}/roms/{COOLROM_PLATFORM}/x/"
-    rows = coolrom.parse_section(_page(site, url).text, COOLROM_PLATFORM, url)
-    if not rows:
-        raise Drift(f"{url}: no game rows found")
-    first_rows.append(rows[0])
-    return []
-
-
-def _coolrom_download(site: Site, first_rows: list[coolrom.Row]) -> list[Finding]:
-    if not first_rows:
-        raise Skipped
-    url = f"{coolrom.BASE_URL}/dlpop.php?id={first_rows[0].id}"
-    coolrom.parse_signed_link(_page(site, url).text, url)
-    return []
 
 
 def _vimm_steps(
@@ -276,31 +208,6 @@ def _consoleroms_download(site: Site, first_rows: list[consoleroms.Row]) -> list
     return []
 
 
-def _emuland_steps(
-    client: httpx.Client,
-    throttle: http.Throttle,
-    entries: Mapping[str, registry.Entry],
-    ignored: frozenset[str],
-) -> list[Step]:
-    site = Site(EMULAND_URL, EMULAND_HOSTS, http.DEFAULT_GAP, client, throttle)
-    return [
-        _step(
-            ("emuland:contract:platform-links", "emuland:missing-platform", "emuland:new-platform"),
-            "emu-land platform list changed",
-            partial(_emuland_platforms, site, entries, ignored),
-        )
-    ]
-
-
-def _emuland_platforms(
-    site: Site, entries: Mapping[str, registry.Entry], ignored: frozenset[str]
-) -> list[Finding]:
-    url = f"{EMULAND_URL}/en"
-    found = set(EMULAND_PLATFORM_LINK.findall(_page(site, url).text))
-    mapped = {entry.emuland for entry in entries.values() if entry.emuland}
-    return _platform_findings("emuland", url, found, mapped, ignored)
-
-
 def _platform_findings(
     site: str, url: str, found: set[str], mapped: set[str], ignored: frozenset[str]
 ) -> list[Finding]:
@@ -325,27 +232,6 @@ def _platform_findings(
         for code in sorted(found - mapped - ignored)
     )
     return findings
-
-
-def _archive_steps(client: httpx.Client, throttle: http.Throttle) -> list[Step]:
-    site = Site(
-        internet_archive.BASE_URL, internet_archive.HOSTS, http.DEFAULT_GAP, client, throttle
-    )
-    return [
-        _step(
-            ("internet-archive:contract:metadata",),
-            "Internet Archive metadata changed",
-            partial(_archive_metadata, site),
-        )
-    ]
-
-
-def _archive_metadata(site: Site) -> list[Finding]:
-    url = f"{internet_archive.BASE_URL}/metadata/{ARCHIVE_ITEM}"
-    files = internet_archive.index(_page(site, url), url, ARCHIVE_ITEM)
-    if not any(isinstance(entry.get("md5"), str) for entry in files.values()):
-        raise Drift(f"{url}: no file entry has an md5")
-    return []
 
 
 def _dat_steps(

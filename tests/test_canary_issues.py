@@ -168,10 +168,10 @@ def test_unverified_prefix_keeps_the_issue_open(harness: Harness) -> None:
         [],
         [
             issue(7, "vimm:new-platform:Amiga"),
-            issue(8, "coolrom:contract:section"),
+            issue(8, "consoleroms:contract:listing"),
             issue(9, "igir:update:v8.0.0"),
         ],
-        ("vimm", "coolrom:contract:download-link"),
+        ("vimm", "consoleroms:contract:download-link"),
     )
     result = harness.run()
     assert result.returncode == 0, result.stderr

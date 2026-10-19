@@ -35,51 +35,20 @@ test("parseAllMedia returns null for a changed layout", () => {
   assert.equal(romledger.parseAllMedia('allMedia=[{"GoodTitle":"","GoodSha1":"x"}];'), null);
 });
 
-test("site codes come from titles and paths", () => {
+test("the Vimm system comes from the page title", () => {
   assert.equal(romledger.vimmSystemFromTitle("The Vault: Pokemon X (3DS)"), "3DS");
   assert.equal(romledger.vimmSystemFromTitle("The Vault: Something"), null);
-  assert.equal(romledger.coolromSystemFromPath("/roms/genesis/6013/Sagaia.php"), "genesis");
-  assert.equal(romledger.coolromSystemFromPath("/other"), null);
-  assert.equal(
-    romledger.coolromNameFromPath("/roms/genesis/47761/Saint_Sword_(Japan).php"),
-    "Saint Sword (Japan)",
-  );
-  assert.equal(romledger.coolromNameFromPath("/roms/genesis/1/100%_Fun.php"), "100% Fun");
-  assert.equal(romledger.consoleromsSystemFromPath("/roms/atari-7800"), "atari-7800");
-  assert.equal(romledger.consoleromsSystemFromPath("/roms/atari-7800/page/2"), "atari-7800");
-  assert.equal(romledger.consoleromsSystemFromPath("/tags/action"), null);
-  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/galaga"), "galaga");
-  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800"), null);
-  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/page"), null);
-  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/page/2"), null);
-  assert.equal(romledger.consoleromsGameSlug("/roms/atari-7800/galaga/download"), null);
-  assert.equal(romledger.emulandSystemFromPath("/en/consoles/dendy/roms/x"), "consoles/dendy");
-  assert.equal(romledger.emulandSystemFromPath("/portable/gb"), "portable/gb");
-  assert.equal(romledger.emulandSystemFromPath("/en/news/today"), null);
-  assert.equal(romledger.emulandSystemFromPath("/en"), null);
-});
-
-test("emulandGameSlug accepts game pages and skips index pages", () => {
-  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/roms/xevious"), "xevious");
-  assert.equal(romledger.emulandGameSlug("/computers/dos/games/doom"), "doom");
-  assert.equal(romledger.emulandGameSlug("/en/consoles/psx/iso/gran-turismo"), "gran-turismo");
-  for (const index of ["x", "0-9", "a-z", "best", "homebrew", "misc", "top"]) {
-    assert.equal(romledger.emulandGameSlug(`/en/consoles/dendy/roms/${index}`), null, index);
-  }
-  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/roms"), null);
-  assert.equal(romledger.emulandGameSlug("/en/consoles/dendy/news/xevious"), null);
-  assert.equal(romledger.emulandGameSlug("/en/news/dendy/roms/xevious"), null);
 });
 
 test("slugFor matches a site code case-insensitively", () => {
   const platforms = [
-    { slug: "nes", sites: { vimm: "NES", coolrom: null } },
-    { slug: "genesis", sites: { vimm: "Genesis", coolrom: "genesis" } },
+    { slug: "nes", sites: { vimm: "NES", consoleroms: null } },
+    { slug: "genesis", sites: { vimm: "Genesis", consoleroms: "genesis" } },
   ];
-  assert.equal(romledger.slugFor(platforms, "coolrom", "GENESIS"), "genesis");
+  assert.equal(romledger.slugFor(platforms, "vimm", "GENESIS"), "genesis");
   assert.equal(romledger.slugFor(platforms, "vimm", "nes"), "nes");
   assert.equal(romledger.slugFor(platforms, "vimm", "SNES"), null);
-  assert.equal(romledger.slugFor(platforms, "coolrom", ""), null);
+  assert.equal(romledger.slugFor(platforms, "vimm", ""), null);
 });
 
 test("describe labels every state and marks approximate matches", () => {

@@ -45,16 +45,15 @@ no config file and follows the same robots.txt and spacing rules as `fetch`. The
 
 It checks that:
 
-- CoolROM's `/roms/` lists every `coolrom` code in the registry, one section page parses, and one
-  `dlpop.php` page still holds a signed link. The link itself is never requested.
 - Vimm's Lair `/vault/` lists every `vimm` code in the registry, and one list page has game rows.
   Game pages are never requested.
-- The Internet Archive's metadata for `No-Intro_NES` lists files with checksums.
+- ConsoleRoms' sitemap lists every `consoleroms` code in the registry, one listing page parses, and
+  one download page still holds a link. The link itself is never requested.
 - Every DAT named in `src/romledger/platforms.toml` exists in libretro-database.
 - The latest igir release matches `IGIR_VERSION`.
 
 A finding means a site, the registry, or a pin needs a change. Each has a stable key such as
-`vimm:new-platform:Amiga`, `vimm:missing-platform:PS3`, `coolrom:contract:section`,
+`vimm:new-platform:Amiga`, `vimm:missing-platform:PS3`, `consoleroms:contract:listing`,
 `dat:missing:nes`, or `igir:update:v5.8.0`. `contract` keys mean a page changed shape; a platform
 index page with no platform links at all is `<site>:contract:platform-links`, while a registry code
 absent from an otherwise normal index is `<site>:missing-platform:<code>`. `dat:missing` means HTTP
@@ -64,10 +63,10 @@ A note means a check could not conclude: a network error, HTTP 403, 429, or 5xx,
 unexpected status, a bot challenge page, a robots.txt refusal, or (for GitHub's API) a redirect.
 Notes are not findings and leave the exit status at 0. The rest of that site's checks are skipped
 and listed as unverified: `--json` prints `{"findings": [...], "inconclusive": [...]}`, where
-`inconclusive` holds the key prefixes (`coolrom`, `vimm`, `internet-archive`, `dat`, `igir`, and
+`inconclusive` holds the key prefixes (`vimm`, `consoleroms`, `dat`, `igir`, and
 the skipped checks' keys) that were not verified; without `--json` they print as
-`unverified <prefix>`. The CoolROM download check is also unverified when the section page gave no
-row to use. The next run tries again.
+`unverified <prefix>`. The ConsoleRoms download check is also unverified when the listing page gave
+no row to use. The next run tries again.
 
 The workflow runs `scripts/canary-issues.sh` on the JSON. It opens one issue titled
 `canary: <key>` per finding, leaves an open one alone, and closes an open one with a comment once
@@ -75,7 +74,7 @@ its finding is gone, unless its key starts with an unverified prefix. A finding 
 closed as completed opens a new issue; close the issue as "not planned" to silence it.
 
 To support a platform a site lists, add its code to that platform's row in
-`src/romledger/platforms.toml`, or add a new row with `dat`, `vimm`, and `coolrom` keys. To decline
+`src/romledger/platforms.toml`, or add a new row with `dat`, `vimm`, and `consoleroms` keys. To decline
 it, add the code to the `[ignore]` table in the same file.
 
 Fix by key:
@@ -87,9 +86,9 @@ Fix by key:
   the code in `platforms.toml`.
 - `<site>:contract:platform-links`: the site's platform index page has no platform links. Update
   romledger or report it.
-- `coolrom:contract:section`, `coolrom:contract:download-link`, `vimm:contract:list`,
-  `internet-archive:contract:metadata`: a page no longer has what romledger expects, so `fetch` for
-  that source will fail the same way. Update romledger or report it.
+- `consoleroms:contract:listing`, `consoleroms:contract:download-link`, `vimm:contract:list`: a
+  page no longer has what romledger expects, so `fetch` or the extension for that source will fail
+  the same way. Update romledger or report it.
 - `dat:missing:<slug>`: libretro-database has no such DAT. Correct `dat` for that platform in
   `platforms.toml`.
 - `igir:update:<tag>`: a newer igir exists. Run `uv run pytest -m igir --no-cov`, then update
