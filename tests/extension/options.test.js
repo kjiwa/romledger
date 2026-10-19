@@ -6,6 +6,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
 
+const romledger = require("../../extension/lib/romledger.js");
+
 const SOURCE = fs.readFileSync(path.join(__dirname, "../../extension/options.js"), "utf8");
 
 function load({ stored = {}, grant = true, revoke = true, failSet = false, reply } = {}) {
@@ -38,7 +40,7 @@ function load({ stored = {}, grant = true, revoke = true, failSet = false, reply
     runtime: { sendMessage: async () => reply ?? { ok: true, data: [] } },
   };
   const document = { getElementById: element };
-  vm.runInNewContext(SOURCE, { chrome, document, URL });
+  vm.runInNewContext(SOURCE, { chrome, document, URL, romledger });
   return { elements, local };
 }
 
@@ -112,4 +114,55 @@ test("the button checks again", async () => {
   assert.equal(state.elements.result.dataset.kind, "error");
   await state.elements.check.listeners.click();
   assert.equal(state.elements.result.textContent, "down");
+});
+
+test("the gap field shows the saved value within the allowed range", async () => {
+  const { elements } = load({ stored: { gapSeconds: 45 } });
+  await settle();
+  assert.equal(elements.gap.value, 45);
+  assert.equal(elements.gap.min, 15);
+  assert.equal(elements.gap.max, 600);
+  assert.equal(elements["gap-field"].hidden, false);
+  assert.match(elements["gap-help"].textContent, /15 to 600 seconds/);
+});
+
+test("the gap field starts at the default and keeps an out-of-range saved value in range", async () => {
+  const fresh = load({});
+  await settle();
+  assert.equal(fresh.elements.gap.value, 15);
+  const wild = load({ stored: { gapSeconds: 1 } });
+  await settle();
+  assert.equal(wild.elements.gap.value, 15);
+});
+
+async function change(value, options = {}) {
+  const state = load(options);
+  await settle();
+  state.elements.gap.value = value;
+  await state.elements.gap.listeners.change();
+  return state;
+}
+
+test("a valid gap is saved", async () => {
+  const { elements, local } = await change("60");
+  assert.equal(local.gapSeconds, 60);
+  assert.equal(elements["gap-result"].dataset.kind, "ok");
+  assert.match(elements["gap-result"].textContent, /at least 60 seconds apart/);
+});
+
+test("a gap outside the range or not a number is refused and the field is reset", async () => {
+  for (const value of ["5", "601", "", "soon"]) {
+    const { elements, local } = await change(value, { stored: { gapSeconds: 30 } });
+    assert.equal(local.gapSeconds, 30, value);
+    assert.equal(elements.gap.value, 30, value);
+    assert.equal(elements["gap-result"].dataset.kind, "error", value);
+    assert.match(elements["gap-result"].textContent, /from 15 to 600/);
+  }
+});
+
+test("a gap that cannot be stored is reported and the field is reset", async () => {
+  const { elements } = await change("60", { stored: { gapSeconds: 30 }, failSet: true });
+  assert.equal(elements.gap.value, 30);
+  assert.equal(elements["gap-result"].dataset.kind, "error");
+  assert.match(elements["gap-result"].textContent, /quota/);
 });

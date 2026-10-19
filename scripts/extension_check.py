@@ -148,11 +148,11 @@ def patched_copy(directory: Path) -> Path:
     manifest = json.loads((target / "manifest.json").read_text())
     manifest["permissions"] = [*manifest["permissions"], "downloads"]
     (target / "manifest.json").write_text(json.dumps(manifest))
-    script = target / "content" / "vimm.js"
+    script = target / "lib" / "romledger.js"
     source = script.read_text()
-    patched = source.replace("const GAP_MS = 15000;", "const GAP_MS = 100;")
+    patched = source.replace("const MIN_GAP_SECONDS = 15;", "const MIN_GAP_SECONDS = 0;")
     if patched == source:
-        raise SystemExit("GAP_MS not found in content/vimm.js")
+        raise SystemExit("MIN_GAP_SECONDS not found in lib/romledger.js")
     script.write_text(patched)
     return target
 
@@ -481,6 +481,7 @@ def run(directory: Path, output: Path | None) -> list[str]:
             else context.wait_for_event("serviceworker")
         )
         extension_id = worker.url.split("/")[2]
+        worker.evaluate("chrome.storage.local.set({ gapSeconds: 0.1 })")
         context.route(
             re.compile(r"https://vimm\.net/.*"),
             serve_fixture,

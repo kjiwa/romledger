@@ -7,6 +7,7 @@ const vm = require("node:vm");
 const { test } = require("node:test");
 
 const romledger = require("../../extension/lib/romledger.js");
+romledger.register(require("../../extension/sites/vimm.js"));
 
 const SOURCE = fs.readFileSync(path.join(__dirname, "../../extension/background.js"), "utf8");
 const VIMM = { url: "https://dl3.vimm.net/", filename: "/home/user/Downloads/Game (USA).zip" };

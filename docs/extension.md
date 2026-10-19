@@ -1,9 +1,13 @@
 # Browser extension
 
-The extension marks games on Vimm's Lair as in your library, in your inbox, missing or not
+The extension marks games for supported sources as in your library, in your inbox, missing or not
 wanted, so you can browse and pick what to download. It can also download the missing games of a
 list page for you; that is off until you turn it on (see
 [Download from Vimm's Lair](#download-from-vimms-lair)). Nothing else clicks or downloads.
+
+The only source that works in the browser today is Vimm's Lair; [sources.md](sources.md) says
+which sources work where, and why. Every supported source gets the same features: a badge on each
+game, the state of each disc on a game page, and the download queue.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/extension-popup-dark.png">
@@ -49,7 +53,8 @@ page, and shows the saved path of each. Keep the tab open until it says Finished
 title (approximate) are included, so check their region and version first.
 
 Each download starts from the Vimm's Lair page the way a click on its Download button does. Games
-start at least 15 seconds apart. The queue stops at the first failed download, or when Vimm's Lair
+start at least the "Seconds between downloads" set in the options apart: 15 by default, and from
+15 to 600. A longer wait is gentler on the site. The queue stops at the first failed download, or when Vimm's Lair
 answers that you are going too fast; wait a while before starting it again. Chrome may ask once to
 allow Vimm's Lair to download multiple files.
 

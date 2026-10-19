@@ -9,8 +9,34 @@ const romledger = (() => {
     unscanned: ["Not scanned", "unknown"],
     unknown: ["Not in any DAT", "unknown"],
   };
-  const HASH_LENGTH = 40;
   const STATE_ORDER = ["have", "inbox", "missing", "unwanted", "unscanned", "unknown"];
+  const DOWNLOAD_FOLDER = "romledger";
+  const DEFAULT_GAP_SECONDS = 15;
+  const MIN_GAP_SECONDS = 15;
+  const MAX_GAP_SECONDS = 600;
+  const sites = {};
+
+  // A site adapter (see sites/vimm.js) registers itself here, and the generic scripts find it by
+  // the page's host. Supporting another site means one adapter and one manifest entry.
+  function register(site) {
+    sites[site.id] = site;
+  }
+
+  function siteFor(hostname) {
+    return Object.values(sites).find((site) => site.hosts.includes(hostname)) || null;
+  }
+
+  function isSiteDownload(item) {
+    return Object.values(sites).some((site) => site.isDownload(item));
+  }
+
+  function gapSeconds(stored) {
+    const seconds = Number(stored);
+    if (stored === undefined || stored === null || stored === "" || !Number.isFinite(seconds)) {
+      return DEFAULT_GAP_SECONDS;
+    }
+    return Math.min(MAX_GAP_SECONDS, Math.max(MIN_GAP_SECONDS, seconds));
+  }
 
   function describe(match) {
     const [text, kind] = STATES[match.state] || STATES.unknown;
@@ -25,52 +51,6 @@ const romledger = (() => {
     const rank = (match) => STATE_ORDER.indexOf(match.state);
     const picked = matches.reduce((leader, match) => (rank(match) < rank(leader) ? match : leader));
     return matches.length > 1 ? { ...picked, exact: false } : picked;
-  }
-
-  function regionsOf(row) {
-    if (!row) {
-      return [];
-    }
-    return [...row.querySelectorAll("img.flag")].map((flag) => flag.title);
-  }
-
-  function decodeBase64(text) {
-    const binary = atob(text);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
-  }
-
-  function stripExtension(name) {
-    return name.replace(/\.[A-Za-z0-9]{1,5}$/, "");
-  }
-
-  function parseAllMedia(source) {
-    const found = /allMedia\s*=\s*(\[.*?\]);/s.exec(source);
-    if (!found) {
-      return null;
-    }
-    let media;
-    try {
-      media = JSON.parse(found[1]);
-    } catch {
-      return null;
-    }
-    let discs;
-    try {
-      discs = media.map((entry) => ({
-        name: stripExtension(decodeBase64(entry.GoodTitle || "")),
-        sha1: String(entry.GoodSha1 || "").toLowerCase(),
-        serial: entry.Serial || "",
-      }));
-    } catch {
-      return null;
-    }
-    return discs.every((disc) => disc.sha1.length === HASH_LENGTH && disc.name) ? discs : null;
-  }
-
-  function vimmSystemFromTitle(title) {
-    const found = /\(([^()]+)\)\s*$/.exec(title.trim());
-    return found ? found[1] : null;
   }
 
   function slugFor(platforms, site, code) {
@@ -89,21 +69,6 @@ const romledger = (() => {
     return `${platform.have} of ${platform.wanted} wanted games (${platform.percent}%)`;
   }
 
-  const DOWNLOAD_FOLDER = "romledger";
-  const VIMM_DOWNLOAD_HOST = /^([a-z0-9-]+\.)+vimm\.net$/;
-
-  function hostOf(url) {
-    try {
-      return new URL(url).hostname.toLowerCase();
-    } catch {
-      return "";
-    }
-  }
-
-  function isVimmDownload(item) {
-    return [item.finalUrl, item.url].some((url) => VIMM_DOWNLOAD_HOST.test(hostOf(url)));
-  }
-
   function safeFilename(path) {
     const name = String(path || "").split(/[\\/]/).pop();
     return name.replace(/[\u0000-\u001f]/g, "").replace(/^\.+/, "").trim();
@@ -114,76 +79,28 @@ const romledger = (() => {
     return name === "" ? null : `${DOWNLOAD_FOLDER}/${name}`;
   }
 
-  function safeDecode(text) {
-    try {
-      return decodeURIComponent(text);
-    } catch {
-      return text;
-    }
-  }
-
-  const VIMM_SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/(?:[A-Za-z]|number)\/?$/;
-
-  function vimmListSystem(url) {
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return null;
-    }
-    if (parsed.searchParams.get("p") === "list") {
-      return parsed.searchParams.get("system") || null;
-    }
-    const section = VIMM_SECTION_PATH.exec(parsed.pathname);
-    return section ? safeDecode(section[1]) : null;
-  }
-
-  function vimmDownloadUrl(doc, pageUrl) {
-    const form = doc.querySelector("#dl-form");
-    if (!form) {
-      return null;
-    }
-    let target;
-    try {
-      target = new URL(form.getAttribute("action") || "", pageUrl);
-    } catch {
-      return null;
-    }
-    target.protocol = "https:";
-    target.search = "";
-    const fields = [...form.querySelectorAll("input[name], select[name]")].filter(
-      (field) => !field.disabled,
-    );
-    for (const field of fields) {
-      const value = field.tagName === "SELECT" ? field.value : field.getAttribute("value");
-      target.searchParams.append(field.getAttribute("name"), value || "");
-    }
-    const complete = target.searchParams.has("mediaId") && target.searchParams.has("token");
-    return complete && isVimmDownload({ url: target.href }) ? target.href : null;
-  }
-
   function queueable(entries) {
     const ready = entries.filter((entry) => entry.match.state === "missing");
     const approximate = ready.filter((entry) => describe(entry.match).approximate).length;
     return { ready, approximate };
   }
 
-  const api = {
-    isVimmDownload,
-    downloadTarget,
+  return {
+    register,
+    siteFor,
+    sites,
+    isSiteDownload,
+    gapSeconds,
     describe,
     best,
-    regionsOf,
-    parseAllMedia,
-    stripExtension,
-    vimmSystemFromTitle,
-    vimmListSystem,
-    vimmDownloadUrl,
-    queueable,
     slugFor,
     progress,
+    downloadTarget,
+    queueable,
+    DEFAULT_GAP_SECONDS,
+    MIN_GAP_SECONDS,
+    MAX_GAP_SECONDS,
   };
-  return api;
 })();
 
 if (typeof module !== "undefined") {

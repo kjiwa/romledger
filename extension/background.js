@@ -1,7 +1,7 @@
 "use strict";
 
 if (typeof importScripts === "function") {
-  importScripts("lib/romledger.js");
+  importScripts("lib/romledger.js", "sites/vimm.js");
 }
 
 const api = globalThis.browser ?? globalThis.chrome;
@@ -9,7 +9,7 @@ const HOST = "io.github.kjiwa.romledger";
 const ROUTE_KEY = "routeDownloads";
 const LAST_IMPORT_KEY = "lastImport";
 const NOT_INSTALLED = 'Run "romledger extension install", then reload the extension.';
-const DOWNLOADS_OFF = "Turn on the Vimm's Lair download option in the romledger options.";
+const DOWNLOADS_OFF = "Turn on the download option in the romledger options.";
 const MISSING_HOST = /not found|forbidden|no such native application/i;
 
 let port = null;
@@ -67,8 +67,8 @@ async function findDownload(url) {
   if (!downloads?.search || stored[ROUTE_KEY] !== true) {
     return { ok: false, error: DOWNLOADS_OFF };
   }
-  if (!romledger.isVimmDownload({ url })) {
-    return { ok: false, error: "Refused a download that is not from Vimm's Lair." };
+  if (!romledger.isSiteDownload({ url })) {
+    return { ok: false, error: "Refused a download that is not from a supported site." };
   }
   try {
     const [item] = await downloads.search({ url });
@@ -141,7 +141,7 @@ async function routeTarget(item) {
 }
 
 function onDeterminingFilename(item, suggest) {
-  if (!romledger.isVimmDownload(item)) {
+  if (!romledger.isSiteDownload(item)) {
     suggest();
     return;
   }
@@ -164,7 +164,7 @@ async function importFinished(change) {
     return;
   }
   const [item] = await globalThis.chrome.downloads.search({ id: change.id });
-  if (!item || !romledger.isVimmDownload(item)) {
+  if (!item || !romledger.isSiteDownload(item)) {
     return;
   }
   const reply = await ask({ type: "import", path: item.filename });
