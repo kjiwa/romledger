@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 - `Enhancement Chip` dumps (the SNES DSP, CX4, ST and Super Game Boy firmware that accurate
   emulators load) are wanted by default again; they are no longer in `programs`.
