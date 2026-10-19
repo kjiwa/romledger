@@ -8,7 +8,7 @@
   "optional_permissions": ["downloads"],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["lib/romledger.js", "background.js"]
+    "scripts": ["lib/romledger.js", "sites/vimm.js", "background.js"]
   },
   "action": {
     "default_title": "romledger",
@@ -21,7 +21,13 @@
   "content_scripts": [
     {
       "matches": ["https://vimm.net/vault/*"],
-      "js": ["lib/romledger.js", "content/page.js", "content/vimm.js"],
+      "js": [
+        "lib/romledger.js",
+        "sites/vimm.js",
+        "content/page.js",
+        "content/queue.js",
+        "content/annotate.js"
+      ],
       "css": ["romledger.css"]
     }
   ],

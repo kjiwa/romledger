@@ -23,6 +23,12 @@
     <p class="muted">Asks the browser for the downloads permission. It lets the Download button on a Vimm's Lair list page fetch every missing game, and moves downloads you start yourself into that folder. Add <code>~/Downloads/romledger</code> to <code>library.inboxes</code> and each finished download is imported at once.</p>
   </div>
   <p id="route-result" role="status"></p>
+  <div class="field" id="gap-field" hidden>
+    <label for="gap">Seconds between downloads</label>
+    <input id="gap" type="number" inputmode="numeric" step="1">
+    <p class="muted" id="gap-help"></p>
+  </div>
+  <p id="gap-result" role="status"></p>
 </main>
 </body>
 </html>

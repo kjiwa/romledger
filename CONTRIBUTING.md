@@ -24,8 +24,16 @@ sh scripts/extension-check.sh
 `extension-check.sh` loads the unpacked extension in Chromium against a fictional library and
 fixture pages, with the real native host (`romledger.native`) answering through the browser's
 native messaging. With a directory argument it also writes the popup screenshots. `addons-linter` warns that Firefox ignores `background.service_worker`; that key is
-for Chrome, and Firefox uses `background.scripts`. The page parsers are in `extension/content/` and
-`extension/lib/romledger.js`.
+for Chrome, and Firefox uses `background.scripts`.
+
+Each supported site is one adapter in `extension/sites/` (see `vimm.js`). It says how to read the
+site's pages (`read`), which downloads are its own (`isDownload`), how a game page offers its
+download (`downloadUrl`) and its own wording. The generic scripts do the rest: `content/annotate.js`
+badges games and `content/queue.js` runs the download queue for any adapter. To support another
+site, add its adapter, list the adapter and those scripts under a new `content_scripts` entry in
+`manifest.json` (and the adapter in the background `scripts`), and give the site a code column in
+`src/romledger/platforms.toml` and `romledger.sources.SOURCES`. Shared helpers and the adapter
+registry are in `extension/lib/romledger.js`.
 
 ## Drift checks
 
