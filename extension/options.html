@@ -12,23 +12,35 @@
 </head>
 <body>
 <main class="ui">
-  <h1>romledger</h1>
-  <p class="muted">The extension talks to romledger on this computer. Run <code>romledger extension install</code> once in a terminal, reload the extension, then check the connection.</p>
-  <div class="actions">
-    <button class="primary" id="check" type="button">Check connection</button>
-  </div>
-  <p id="result" role="status"></p>
-  <div class="field" id="route-field" hidden>
-    <label><input id="route" type="checkbox"> Download from Vimm's Lair into Downloads/romledger</label>
-    <p class="muted">Asks the browser for the downloads permission. It lets the Download button on a Vimm's Lair list page fetch every missing game, and moves downloads you start yourself into that folder. Add <code>~/Downloads/romledger</code> to <code>library.inboxes</code> and each finished download is imported at once.</p>
-  </div>
-  <p id="route-result" role="status"></p>
-  <div class="field" id="gap-field" hidden>
-    <label for="gap">Seconds between downloads</label>
-    <input id="gap" type="number" inputmode="numeric" step="1">
-    <p class="muted" id="gap-help"></p>
-  </div>
-  <p id="gap-result" role="status"></p>
+  <h1>romledger options</h1>
+
+  <section aria-labelledby="connection-heading">
+    <h2 id="connection-heading">Connection</h2>
+    <p class="muted">The extension talks to romledger on this computer. Run <code>romledger extension install</code> once in a terminal, reload the extension, then check the connection.</p>
+    <div class="actions">
+      <button class="romledger-button" data-variant="primary" id="check" type="button">Check connection</button>
+    </div>
+    <p id="result" class="romledger-notice" role="status"></p>
+  </section>
+
+  <section aria-labelledby="downloads-heading">
+    <h2 id="downloads-heading">Downloads</h2>
+    <p id="downloads-unsupported" class="muted" hidden>Downloading from Vimm's Lair needs a Chromium browser. Firefox does not offer the event it relies on.</p>
+    <div class="field" id="route-field" hidden>
+      <label><input id="route" type="checkbox" aria-describedby="route-help"> Download from Vimm's Lair into Downloads/romledger</label>
+      <p class="muted" id="route-help">Asks the browser for the downloads permission. It lets the Download button on a Vimm's Lair list page fetch every missing game, and moves downloads you start yourself into that folder. Add <code>~/Downloads/romledger</code> to <code>library.inboxes</code> and each finished download is imported at once.</p>
+    </div>
+    <p id="route-result" class="romledger-notice" role="status"></p>
+    <div class="field" id="gap-field" hidden>
+      <label for="gap">Wait between downloads</label>
+      <div class="suffixed">
+        <input id="gap" type="number" inputmode="numeric" step="1" aria-describedby="gap-help">
+        <span>seconds</span>
+      </div>
+      <p class="muted" id="gap-help"></p>
+    </div>
+    <p id="gap-result" class="romledger-notice" role="status"></p>
+  </section>
 </main>
 </body>
 </html>

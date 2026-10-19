@@ -82,7 +82,7 @@ ROM names (so `Possible Proto`, `Tech Demo` and `Music Program` count):
 - `unlicensed`: `Unl`, `Pirate`
 - `aftermarket`: `Aftermarket`, `Homebrew`
 - `prerelease`: `Proto`, `Beta`, `Demo`, `Sample`, `Kiosk`, `Debug`
-- `programs`: `Program`, `Test Program`, `Enhancement Chip`
+- `programs`: `Program`, `Test Program`
 - `bad`: `[b]` bad dumps
 
 A game with no language tag is taken to speak its region's language.

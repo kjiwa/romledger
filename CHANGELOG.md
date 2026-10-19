@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- `Enhancement Chip` dumps (the SNES DSP, CX4, ST and Super Game Boy firmware that accurate
+  emulators load) are wanted by default again; they are no longer in `programs`.
+- Extension: one set of buttons, notices and colors across the popup, options and page boxes, with
+  readable contrast in dark mode; page boxes have a Close button, show failure reasons as text,
+  and point to the options when downloading is off; the popup shows when the last import ran;
+  the options are grouped, say why downloading is unavailable in Firefox, and report an
+  unreachable background worker; a toolbar icon.
+
 ## 0.6.0
 
 romledger needs only the library and the inbox in its config now, and the command line is its only

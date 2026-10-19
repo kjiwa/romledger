@@ -45,7 +45,6 @@ def wanted(
         "Alpha (USA) (Movie Demo Disc)",
         "Alpha (USA) (Music Program)",
         "Alpha (USA) (Ending Credits Program)",
-        "Alpha (USA) (Enhancement Chip)",
         "Alpha (USA) (Kiosk, GameCube)",
         "Alpha (USA) (En,Fr) (Possible Proto)",
     ],
@@ -74,7 +73,8 @@ def test_bad_dump_flag_matches_only_a_leading_b() -> None:
 
 def test_official_distribution_tags_are_kept() -> None:
     names = ["A (USA) (Sega Channel)", "B (USA) (Virtual Console)", "C (USA) (Competition Cart)"]
-    assert len(wanted([game(name) for name in names])) == 3
+    names.append("D (World) (Enhancement Chip)")
+    assert len(wanted([game(name) for name in names])) == 4
 
 
 def test_include_keeps_a_category() -> None:

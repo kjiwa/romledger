@@ -66,7 +66,24 @@ const romledger = (() => {
     if (platform.percent === null || platform.percent === undefined) {
       return "Not scanned";
     }
-    return `${platform.have} of ${platform.wanted} wanted games (${platform.percent}%)`;
+    const count = (number) => number.toLocaleString("en-US");
+    return `${count(platform.have)} of ${count(platform.wanted)} wanted games (${platform.percent}%)`;
+  }
+
+  function ago(then, now) {
+    const seconds = Math.max(0, Math.round((now - then) / 1000));
+    const units = [
+      ["day", 86400],
+      ["hour", 3600],
+      ["minute", 60],
+    ];
+    for (const [unit, size] of units) {
+      if (seconds >= size) {
+        const count = Math.floor(seconds / size);
+        return `${count} ${unit}${count === 1 ? "" : "s"} ago`;
+      }
+    }
+    return "just now";
   }
 
   function safeFilename(path) {
@@ -95,6 +112,7 @@ const romledger = (() => {
     best,
     slugFor,
     progress,
+    ago,
     downloadTarget,
     queueable,
     MIN_GAP_SECONDS,

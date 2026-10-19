@@ -3,6 +3,7 @@ const missingQueue = (() => {
 
   const api = globalThis.browser ?? globalThis.chrome;
   const GAP_KEY = "gapSeconds";
+  const ROUTE_KEY = "routeDownloads";
   const STOPPED = { ok: false, stopped: true, error: "Stopped." };
   const POLL_MS = 3000;
   const FIND_MS = 1000;
@@ -91,7 +92,7 @@ const missingQueue = (() => {
       return page.row(entry.title, note(outcome.filename));
     }
     const error = outcome.ok ? outcome.reason || outcome.state : outcome.error;
-    return page.row(entry.title, page.badge("Failed", "error", error));
+    return page.row(entry.title, page.badge("Failed", "error", error), note(error));
   }
 
   async function waitForGap(startedAt, queue) {
@@ -165,26 +166,55 @@ const missingQueue = (() => {
     };
   }
 
-  async function setUp(site, entries) {
-    const { ready, approximate } = romledger.queueable(entries);
-    if (!ready.length) {
-      return;
-    }
+  function offerOptions(panel, count, onEnabled) {
+    const waiting = [
+      page.notice(`${count} missing. Turn on downloading in the options to fetch them.`),
+      page.button("Open options", () => page.ask({ type: "open-options" }), "primary"),
+    ];
+    panel.append(...waiting);
+    const listener = (changes) => {
+      if (changes[ROUTE_KEY]?.newValue === true) {
+        api.storage.onChanged.removeListener(listener);
+        waiting.forEach((node) => node.remove());
+        onEnabled();
+      }
+    };
+    api.storage.onChanged.addListener(listener);
+  }
+
+  async function offerQueue(site, panel, ready, approximate) {
     const stored = await api.storage.local.get(GAP_KEY);
     const queue = { stopped: false, resume: null, gapMs: romledger.gapSeconds(stored[GAP_KEY]) * 1000 };
-    const panel = page.panel("Missing games");
     const controls = queueControls(site, panel, queue);
     const caution = approximate
       ? ` ${approximate} matched by title; check their region and version.`
       : "";
     controls.progress(`${ready.length} missing.${caution}`);
-    const start = page.button(`Download ${ready.length} missing`, async () => {
-      start.hidden = true;
-      controls.showStop();
-      await downloadQueue(site, ready, queue, controls);
-      controls.hideStop();
-    });
+    const start = page.button(
+      `Download ${ready.length} missing`,
+      async () => {
+        start.hidden = true;
+        controls.showStop();
+        await downloadQueue(site, ready, queue, controls);
+        controls.hideStop();
+      },
+      "primary",
+    );
     panel.append(start);
+  }
+
+  async function setUp(site, entries) {
+    const { ready, approximate } = romledger.queueable(entries);
+    if (!ready.length) {
+      return;
+    }
+    const stored = await api.storage.local.get(ROUTE_KEY);
+    const panel = page.panel("Missing games");
+    if (stored[ROUTE_KEY] === true) {
+      await offerQueue(site, panel, ready, approximate);
+    } else {
+      offerOptions(panel, ready.length, () => offerQueue(site, panel, ready, approximate));
+    }
   }
 
   return { setUp };

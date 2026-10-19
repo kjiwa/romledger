@@ -105,3 +105,19 @@ test("gapSeconds defaults, clamps and ignores what is not a number", () => {
   assert.equal(romledger.gapSeconds(1), 15);
   assert.equal(romledger.gapSeconds(100000), 600);
 });
+
+test("ago words how long it has been", () => {
+  const now = 1_000_000_000;
+  assert.equal(romledger.ago(now - 5_000, now), "just now");
+  assert.equal(romledger.ago(now - 60_000, now), "1 minute ago");
+  assert.equal(romledger.ago(now - 3 * 3_600_000, now), "3 hours ago");
+  assert.equal(romledger.ago(now - 2 * 86_400_000, now), "2 days ago");
+  assert.equal(romledger.ago(now + 5_000, now), "just now");
+});
+
+test("progress groups thousands", () => {
+  assert.equal(
+    romledger.progress({ have: 1234, wanted: 2000, percent: 61 }),
+    "1,234 of 2,000 wanted games (61%)",
+  );
+});

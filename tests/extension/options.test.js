@@ -10,10 +10,24 @@ const romledger = require("../../extension/lib/romledger.js");
 
 const SOURCE = fs.readFileSync(path.join(__dirname, "../../extension/options.js"), "utf8");
 
-function load({ stored = {}, grant = true, revoke = true, failSet = false, reply } = {}) {
+function load({ stored = {}, grant = true, revoke = true, failSet = false, reply, reject = false } = {}) {
   const elements = {};
   const element = (id) => {
-    elements[id] ??= { id, listeners: {}, value: "", checked: false, hidden: true, dataset: {} };
+    elements[id] ??= {
+      id,
+      listeners: {},
+      attributes: {},
+      value: "",
+      checked: false,
+      hidden: true,
+      dataset: {},
+    };
+    elements[id].setAttribute = (name, value) => {
+      elements[id].attributes[name] = value;
+    };
+    elements[id].removeAttribute = (name) => {
+      delete elements[id].attributes[name];
+    };
     elements[id].addEventListener = (type, listener) => {
       elements[id].listeners[type] = listener;
     };
@@ -37,7 +51,14 @@ function load({ stored = {}, grant = true, revoke = true, failSet = false, reply
       remove: async () => revoke,
       contains: async () => true,
     },
-    runtime: { sendMessage: async () => reply ?? { ok: true, data: [] } },
+    runtime: {
+      sendMessage: async () => {
+        if (reject) {
+          throw new Error("no worker");
+        }
+        return reply ?? { ok: true, data: [] };
+      },
+    },
   };
   const document = { getElementById: element };
   vm.runInNewContext(SOURCE, { chrome, document, URL, romledger });
@@ -97,8 +118,23 @@ test("opening the page checks the connection and counts platforms with games", a
   const reply = { ok: true, data: [{ tracked: true }, { tracked: false }, { tracked: true }] };
   const { elements } = load({ reply });
   await settle();
-  assert.equal(elements.result.textContent, "Connected. 2 platform(s) with games.");
+  assert.equal(elements.result.textContent, "Connected. 2 platforms have games.");
   assert.equal(elements.result.dataset.kind, "ok");
+});
+
+test("a single platform with games is worded in the singular", async () => {
+  const { elements } = load({ reply: { ok: true, data: [{ tracked: true }] } });
+  await settle();
+  assert.equal(elements.result.textContent, "Connected. 1 platform has games.");
+});
+
+test("a worker that cannot be reached is shown as an error and the button recovers", async () => {
+  const { elements } = load({ reject: true });
+  await settle();
+  assert.equal(elements.result.dataset.kind, "error");
+  assert.match(elements.result.textContent, /background worker/);
+  assert.equal(elements.check.disabled, false);
+  assert.equal(elements.check.textContent, "Check connection");
 });
 
 test("a host that cannot be reached is shown as an error", async () => {
@@ -165,4 +201,9 @@ test("a gap that cannot be stored is reported and the field is reset", async () 
   assert.equal(elements.gap.value, 30);
   assert.equal(elements["gap-result"].dataset.kind, "error");
   assert.match(elements["gap-result"].textContent, /quota/);
+});
+
+test("a refused gap is flagged invalid", async () => {
+  const { elements } = await change("5", { stored: { gapSeconds: 30 } });
+  assert.equal(elements.gap.attributes["aria-invalid"], "true");
 });
