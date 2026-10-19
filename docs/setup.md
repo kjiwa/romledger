@@ -60,7 +60,7 @@ proxy = "socks5h://proxy.example:1080"
 | `network.proxy` | no | Proxy URL for every request. Schemes: `http`, `https`, `socks5`, `socks5h`. |
 | `hooks.after_import` | no | Commands to run after `import` moved at least one file. Each is an argument list, run without a shell. Default none. |
 
-Codes are upper case.
+Region and language codes are upper case.
 
 - Regions: ARG ASI AUS BEL BRA CAN CHN DAN EUR FRA FYN GER GRE HK HOL ITA JPN KOR MEX NOR
   NZ POR RUS SPA SWE TAI UK UNK USA WORLD
