@@ -1,13 +1,12 @@
 "use strict";
 
 const api = globalThis.browser ?? globalThis.chrome;
-const form = document.getElementById("form");
 const result = document.getElementById("result");
+const check = document.getElementById("check");
 const route = document.getElementById("route");
 const routeResult = document.getElementById("route-result");
 const ROUTE_KEY = "routeDownloads";
 const DOWNLOADS = { permissions: ["downloads"] };
-const DEFAULT_URL = "http://127.0.0.1:8730";
 
 function show(text, kind) {
   result.textContent = text;
@@ -15,37 +14,19 @@ function show(text, kind) {
 }
 
 async function load() {
-  const stored = await api.storage.local.get(["url", "token", ROUTE_KEY]);
+  const stored = await api.storage.local.get(ROUTE_KEY);
   if (typeof api.runtime.getBrowserInfo !== "function") {
     document.getElementById("route-field").hidden = false;
     route.checked = stored[ROUTE_KEY] === true && (await api.permissions.contains(DOWNLOADS));
   }
-  form.url.value = stored.url || DEFAULT_URL;
-  form.token.value = stored.token || "";
+  await test();
 }
 
-async function save(event) {
-  event.preventDefault();
-  const url = form.url.value.trim().replace(/\/+$/, "");
-  let origin;
-  try {
-    origin = new URL(url).origin;
-  } catch {
-    origin = "null";
-  }
-  if (!/^https?:\/\//.test(origin)) {
-    show("Enter the address with http:// or https://, such as http://127.0.0.1:8730.", "error");
-    return;
-  }
-  const granted = await api.permissions.request({ origins: [`${origin}/*`] });
-  if (!granted) {
-    show("The browser did not allow access to that address.", "error");
-    return;
-  }
-  await api.storage.local.set({ url, token: form.token.value.trim() });
+async function test() {
   const reply = await api.runtime.sendMessage({ type: "platforms" });
   if (reply.ok) {
-    show(`Connected. ${reply.data.filter((platform) => platform.tracked).length} platform(s) with games.`, "ok");
+    const count = reply.data.filter((platform) => platform.tracked).length;
+    show(`Connected. ${count} platform(s) with games.`, "ok");
   } else {
     show(reply.error, "error");
   }
@@ -79,6 +60,6 @@ async function toggleRoute() {
   routeResult.dataset.kind = "ok";
 }
 
-form.addEventListener("submit", save);
+check.addEventListener("click", test);
 route.addEventListener("change", toggleRoute);
 load();

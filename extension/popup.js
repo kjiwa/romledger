@@ -39,6 +39,21 @@ async function showPageStatus() {
   }
 }
 
+async function showLastImport() {
+  const stored = await api.storage.local.get("lastImport");
+  const last = stored.lastImport;
+  if (!last) {
+    return;
+  }
+  const note = document.getElementById("import");
+  const failed = Boolean(last.error) || (last.failures || []).length > 0;
+  note.textContent = failed
+    ? `Last import failed: ${last.error || last.failures.join("; ")}`
+    : `Last import: ${last.lines.join("; ")}`;
+  note.dataset.kind = failed ? "error" : "info";
+  note.hidden = false;
+}
+
 async function main() {
   const reply = await api.runtime
     .sendMessage({ type: "platforms" })
@@ -53,6 +68,7 @@ async function main() {
     showError(reply.error);
   }
   await showPageStatus();
+  await showLastImport();
 }
 
 main();

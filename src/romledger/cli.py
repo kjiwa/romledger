@@ -4,16 +4,14 @@ import functools
 import json
 import os
 import sys
-import webbrowser
 from collections.abc import Callable, Sequence
-
-import uvicorn
 
 from romledger import (
     __version__,
     canary,
     config,
     dats,
+    extension,
     fetch,
     http,
     igir,
@@ -24,15 +22,11 @@ from romledger import (
     setup,
     state,
     term,
+    watch,
 )
 from romledger.context import Context, load_context
 from romledger.sources import SOURCES
-from romledger.web import auth
-from romledger.web.app import create_app
 
-DEFAULT_HOST = "127.0.0.1"
-WILDCARD_HOSTS = ("0.0.0.0", "::")  # noqa: S104
-DEFAULT_PORT = 8730
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
 
 
@@ -65,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_parser.add_argument(
         "--dry-run", action="store_true", help="show what would happen; move nothing"
     )
+    import_parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="keep running and import files once they stop changing",
+    )
     status_parser = commands.add_parser("status", help="show have/missing counts per platform")
     status_parser.add_argument(
         "--all", action="store_true", help="include platforms that have no games"
@@ -96,26 +95,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="append the Vimm's Lair search URL, tab-separated",
     )
-    serve_parser = commands.add_parser("serve", help="run the local dashboard and API")
-    serve_parser.add_argument(
-        "--host", default=DEFAULT_HOST, help=f"address to bind (default: {DEFAULT_HOST})"
+    extension_parser = commands.add_parser("extension", help="connect the browser extension")
+    extension_commands = extension_parser.add_subparsers(
+        dest="extension_command", required=True, metavar="action"
     )
-    serve_parser.add_argument(
-        "--port", type=port_number, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})"
-    )
-    serve_parser.add_argument("--open", action="store_true", help="open the dashboard in a browser")
-    serve_parser.add_argument(
-        "--no-auto-import",
-        action="store_true",
-        help="do not import inbox files automatically once they stop changing",
-    )
+    for name, text in (
+        ("install", "let the browser extension talk to romledger"),
+        ("uninstall", "remove that connection"),
+        ("status", "show which browsers are connected"),
+    ):
+        extension_commands.add_parser(name, help=text).set_defaults(command=f"extension {name}")
     return parser
-
-
-def port_number(text: str) -> int:
-    if not text.isdigit() or not 1 <= int(text) <= 65535:
-        raise argparse.ArgumentTypeError(f"{text!r} is not a port between 1 and 65535")
-    return int(text)
 
 
 def positive_int(text: str) -> int:
@@ -204,12 +194,39 @@ def scan_platforms(args: argparse.Namespace) -> int:
 
 
 def import_games(args: argparse.Namespace) -> int:
+    if args.watch and args.dry_run:
+        raise config.ConfigError("--watch and --dry-run cannot be combined")
+    if args.watch:
+        return watch_inbox(args)
     return run_import(load_context(args.config), args.dry_run)
 
 
 def run_import(context: Context, dry_run: bool) -> int:
-    result = importer.import_inboxes(context.config, context.data_dir, dry_run)
+    if dry_run:
+        result = importer.import_inboxes(context.config, context.data_dir, True)
+    else:
+        result = importer.import_locked(
+            context.config,
+            context.data_dir,
+            lambda: print("waiting for another import to finish ...", file=sys.stderr),
+        )
     return importer.print_result(result, dry_run=dry_run)
+
+
+def watch_inbox(args: argparse.Namespace) -> int:
+    first = load_context(args.config)
+    inboxes = ", ".join(str(inbox) for inbox in first.config.library.inboxes)
+    print(f"watching {inboxes} (Ctrl-C to stop)", file=sys.stderr)
+    watcher = watch.Watcher(
+        lambda: load_context(args.config),
+        lambda context: run_import(context, dry_run=False),
+        lambda message: print(f"romledger: warning: {message}", file=sys.stderr),
+    )
+    try:
+        watcher.run()
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+    return 0
 
 
 def fetch_games(args: argparse.Namespace) -> int:
@@ -312,17 +329,31 @@ def show_missing(args: argparse.Namespace) -> int:
     return 0
 
 
-def serve(args: argparse.Namespace) -> int:
-    context = load_context(args.config)
-    token = auth.load_token(context.data_dir)
-    app = create_app(lambda: load_context(args.config), token, auto_import=not args.no_auto_import)
-    link_host = "localhost" if args.host in WILDCARD_HOSTS else args.host
-    url = f"http://{link_host}:{args.port}/?token={token}"
-    print(f"romledger dashboard: {url}", flush=True)
-    if args.open:
-        webbrowser.open(url)
-    uvicorn.run(app, host=args.host, port=args.port, access_log=False)
+def extension_install(args: argparse.Namespace) -> int:
+    path = config.config_path(args.config)
+    data = config.data_dir()
+    connected = extension.install(path, data, explicit_data=bool(os.environ.get(config.DATA_ENV)))
+    for browser in connected:
+        print(f"connected {browser.name}  {browser.manifest}")
+    print("Reload the extension in your browser, then open its options to check the connection.")
     return 0
+
+
+def extension_uninstall(args: argparse.Namespace) -> int:
+    removed = extension.uninstall(config.data_dir())
+    for browser in removed:
+        print(f"removed {browser.name}  {browser.manifest}")
+    if not removed:
+        print("nothing to remove")
+    return 0
+
+
+def extension_status(args: argparse.Namespace) -> int:
+    results = extension.status(config.data_dir())
+    rows = [(result.browser.name, result.state) for result in results]
+    for line in term.table(("browser", "state"), rows):
+        print(line)
+    return 1 if any(result.state.startswith(("broken", "stale")) for result in results) else 0
 
 
 def run_canary(args: argparse.Namespace) -> int:
@@ -363,7 +394,9 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "status": show_status,
     "missing": show_missing,
     "canary": run_canary,
-    "serve": serve,
+    "extension install": extension_install,
+    "extension uninstall": extension_uninstall,
+    "extension status": extension_status,
 }
 
 

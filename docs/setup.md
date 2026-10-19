@@ -232,66 +232,44 @@ It cannot tell duplicates from new games, so its counts include games the librar
 Exit status is 0, 1 if an `after_import` hook failed (everything else still completed), or 2 for
 errors.
 
-Partial downloads are skipped until the browser renames them. `serve` imports on its own; see below.
+Partial downloads are skipped until the browser renames them. `--watch` imports on its own; see
+below.
 
-## serve
+If another import is running, `import` waits for it to finish. A lock file in the data directory
+keeps imports from the command line, `--watch` and the browser extension from overlapping.
+
+## import --watch
 
 ```sh
-romledger serve [--host 127.0.0.1] [--port 8730] [--open] [--no-auto-import]
+romledger import --watch
 ```
 
-Runs the dashboard and JSON API, and prints a link ending in `?token=...`. `--open` launches the
-link in your browser; otherwise copy it from the terminal. Open it once; the browser keeps a session
-cookie. Pages and files are served from the local machine only; nothing loads from a CDN.
+Keeps running and imports on its own. Every 5 seconds it checks all inboxes, skipping `unmatched`,
+`unwanted`, `duplicates` and `extracted` and files that are still downloading (`.part`,
+`.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting and none changed size or
+modification time over the last two checks, it runs an import and prints its output, as `import`
+does. If the import fails or leaves files behind, those files are not retried; add or change a
+file to try again. It reads the config file on every check, so edits and a remounted library take
+effect without a restart. Stop it with Ctrl-C. It cannot be combined with `--dry-run`.
 
-- Overview: progress per platform.
-- Platform: missing, inbox or have games, a search box, and a Vimm's Lair search link
-  for missing games.
-- Inbox: drag and drop or choose files to upload them into the first inbox, the files waiting
-  there, and the counts set aside by `import` (unmatched, unwanted, duplicates, extracted). Press
-  Import to file them.
-- Activity: scans and imports, with their output. One runs at a time.
+## extension
 
-While `serve` runs it also imports on its own. Every 5 seconds it checks all inboxes, skipping
-`unmatched`, `unwanted`, `duplicates` and `extracted` and files that are still downloading (`.part`,
-`.crdownload`, `.download`, `._*`, `.DS_Store`). When files are waiting, none changed size or
-modification time over the last two checks, and no scan or import is running, it starts an import.
-The job shows on the Activity page like a manual one. If it fails, or leaves files behind, those
-files are not retried; add or change a file, or press Import, to try again. `--no-auto-import` turns
-this off; the Inbox and Activity pages say when it is on.
+```sh
+romledger extension install
+romledger extension uninstall
+romledger extension status
+```
 
-The service reads the config file on every request, so edits and a remounted library take effect
-without a restart. Scan and import need the DATs (`romledger dats update`) and igir, as on the
-command line.
+The browser extension talks to romledger through a small program the browser starts itself, so
+there is no server, port or password to set up. `install` writes a launcher into the data
+directory and tells each browser it finds (Chrome, Chromium, Brave, Edge and Firefox) where it
+is, and which extension may use it.
+It records the config file path in effect, so pass `--config` before `install` if yours is not in
+the default place. Run it again after you move the config or reinstall romledger. `uninstall`
+removes what `install` wrote. `status` lists each browser as `ready`, `not installed`, `not found`,
+`stale` (it points at another launcher) or `broken`, and for a ready one starts the launcher and
+checks that it answers; the exit status is 1 if any is stale or broken.
 
-### Access token
-
-Every request needs the token. It is generated on first run into `<data>/serve.token` (mode 0600),
-or taken from `$ROMLEDGER_TOKEN` (at least 16 characters). Delete the file to issue a new token.
-The default bind is `127.0.0.1`. Binding wider (`--host 0.0.0.0`) exposes the library to the
-network: the connection is plain HTTP, so anyone who can read the traffic sees the token. Use it
-on a trusted LAN or behind a reverse proxy that adds TLS.
-
-### API
-
-Send the token as `Authorization: Bearer <token>`. Responses are JSON. Errors are
-`{"detail": "<message>"}`.
-
-| Request | Meaning |
-| --- | --- |
-| `GET /api/platforms` | Per platform, all of them: `slug`, `name`, `tracked` (it holds a game), `scanned_at`, `wanted`, `have`, `inbox`, `missing`, `unmatched`, `percent` (null before a scan), `sites` (`vimm` and `consoleroms`: the platform's code on each site, or null). |
-| `GET /api/platforms/<slug>/missing?q=&limit=&offset=` | Missing titles, each by its preferred release, with `links.vimm`. |
-| `GET /api/lookup?sha1=<40 hex>` | Exact matches by hash. |
-| `GET /api/lookup?name=<game>&platform=<slug>&regions=<names>` | Match by name: exact, else by title ignoring tags (`exact` is false). `regions` is an optional comma list of No-Intro region names (`USA,Europe`) that narrows the candidates, as do extra tags in the name. `matches` lists every game that still fits. `name` is at most 300 characters. |
-| `GET /api/jobs/current` | The running scan or import, or null. |
-| `POST /api/scan`, `POST /api/import` | Start a job; 202, or 409 while another runs. |
-
-A match is `{platform, game, state, exact}`. `state` is the state of the game's title, so any
-release of a title you have reports `have`. It is one of `have`, `inbox`, `missing`, `unwanted`
-(in the DAT, but its title is not wanted: other regions or languages, or a category left out of
-`include`), `unscanned` (platform not scanned yet) or `unknown` (not in any DAT).
-
-Upload from a script with `curl -H "Authorization: Bearer $TOKEN" -F files=@game.nes
-http://127.0.0.1:8730/inbox/upload`; add `-H "Accept: application/json"` for a JSON reply. Names
-are reduced to their last path segment, and an existing name gets `.1`, `.2`, ... before the
-extension. A file is written as `<name>.part` and renamed when complete.
+The extension can ask for exactly three things: the list of platforms with their counts, the state
+of a game by hash or name, and an import after a download finished in an inbox. Windows is not
+supported. See [extension.md](extension.md).

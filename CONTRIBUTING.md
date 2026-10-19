@@ -13,17 +13,6 @@ npx --yes markdownlint-cli2@0.23.3 "**/*.md"
 Tests marked `igir` run the real igir and are skipped by default; run them with
 `uv run pytest -m igir --no-cov`.
 
-Browser-driven checks run Chromium against fictional data:
-
-```sh
-sh scripts/browser-check.sh
-sh scripts/extension-check.sh
-sh scripts/image-check.sh
-sh scripts/screenshots.sh
-```
-
-`screenshots.sh` regenerates `docs/images/*.png`.
-
 ## Extension
 
 ```sh
@@ -33,7 +22,8 @@ sh scripts/extension-check.sh
 ```
 
 `extension-check.sh` loads the unpacked extension in Chromium against a fictional library and
-fixture pages. `addons-linter` warns that Firefox ignores `background.service_worker`; that key is
+fixture pages, with the real native host (`romledger.native`) answering through the browser's
+native messaging. With a directory argument it also writes the popup screenshots. `addons-linter` warns that Firefox ignores `background.service_worker`; that key is
 for Chrome, and Firefox uses `background.scripts`. The page parsers are in `extension/content/` and
 `extension/lib/romledger.js`.
 

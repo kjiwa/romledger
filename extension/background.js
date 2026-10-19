@@ -5,37 +5,60 @@ if (typeof importScripts === "function") {
 }
 
 const api = globalThis.browser ?? globalThis.chrome;
+const HOST = "io.github.kjiwa.romledger";
 const ROUTE_KEY = "routeDownloads";
-const NOT_CONFIGURED = "Open the romledger options and enter the service URL and token.";
+const LAST_IMPORT_KEY = "lastImport";
+const NOT_INSTALLED = 'Run "romledger extension install", then reload the extension.';
 const DOWNLOADS_OFF = "Turn on the Vimm's Lair download option in the romledger options.";
+const MISSING_HOST = /not found|forbidden|no such native application/i;
 
-async function settings() {
-  const stored = await api.storage.local.get(["url", "token"]);
-  return { url: (stored.url || "").replace(/\/+$/, ""), token: stored.token || "" };
+let port = null;
+let nextId = 1;
+const pending = new Map();
+
+function hostError(reason) {
+  return MISSING_HOST.test(reason)
+    ? NOT_INSTALLED
+    : `The romledger host stopped: ${reason || "no reason given"}.`;
 }
 
-async function call(path) {
-  const { url, token } = await settings();
-  if (!url || !token) {
-    return { ok: false, error: NOT_CONFIGURED };
+function onReply(message) {
+  const resolve = pending.get(message.id);
+  if (resolve) {
+    pending.delete(message.id);
+    resolve(message.ok ? { ok: true, data: message.data } : { ok: false, error: message.error });
   }
-  let response;
-  try {
-    response = await fetch(`${url}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-  } catch {
-    return { ok: false, error: `Cannot reach ${url}. Is romledger serve running?` };
+}
+
+function onDisconnect(closed) {
+  const reason = closed?.error?.message ?? api.runtime.lastError?.message ?? "";
+  port = null;
+  for (const resolve of pending.values()) {
+    resolve({ ok: false, error: hostError(reason) });
   }
-  if (response.status === 401) {
-    return { ok: false, error: "The service rejected the token. Check it in the options." };
+  pending.clear();
+}
+
+function ask(request) {
+  if (!port) {
+    try {
+      port = api.runtime.connectNative(HOST);
+    } catch (error) {
+      return Promise.resolve({ ok: false, error: hostError(error.message) });
+    }
+    port.onMessage.addListener(onReply);
+    port.onDisconnect.addListener(onDisconnect);
   }
-  if (!response.ok) {
-    return { ok: false, error: `The service answered HTTP ${response.status}.` };
-  }
-  try {
-    return { ok: true, data: await response.json() };
-  } catch {
-    return { ok: false, error: `The service at ${url} did not answer with JSON.` };
-  }
+  const id = nextId++;
+  return new Promise((resolve) => {
+    pending.set(id, resolve);
+    try {
+      port.postMessage({ ...request, id });
+    } catch (error) {
+      pending.delete(id);
+      resolve({ ok: false, error: hostError(error.message) });
+    }
+  });
 }
 
 async function findDownload(url) {
@@ -81,7 +104,6 @@ async function downloadState(id) {
 }
 
 function route(message) {
-  const query = new URLSearchParams();
   if (message.type === "download-find") {
     return findDownload(message.url);
   }
@@ -92,18 +114,20 @@ function route(message) {
     return downloadState(message.id);
   }
   if (message.type === "platforms") {
-    return call("/api/platforms");
+    return ask({ type: "platforms" });
   }
   if (message.type === "lookup-sha1") {
-    query.set("sha1", message.sha1);
-  } else if (message.type === "lookup-name") {
-    query.set("name", message.name);
-    query.set("platform", message.platform);
-    query.set("regions", (message.regions || []).join(","));
-  } else {
-    return Promise.resolve({ ok: false, error: `Unknown request ${message.type}.` });
+    return ask({ type: "lookup", sha1: message.sha1 });
   }
-  return call(`/api/lookup?${query}`);
+  if (message.type === "lookup-name") {
+    return ask({
+      type: "lookup",
+      name: message.name,
+      platform: message.platform,
+      regions: message.regions || [],
+    });
+  }
+  return Promise.resolve({ ok: false, error: `Unknown request ${message.type}.` });
 }
 
 api.runtime.onMessage.addListener((message, _sender, respond) => {
@@ -131,15 +155,36 @@ function onDeterminingFilename(item, suggest) {
   return true;
 }
 
+async function importFinished(change) {
+  if (change.state?.current !== "complete") {
+    return;
+  }
+  const stored = await api.storage.local.get(ROUTE_KEY);
+  if (stored[ROUTE_KEY] !== true) {
+    return;
+  }
+  const [item] = await globalThis.chrome.downloads.search({ id: change.id });
+  if (!item || !romledger.isVimmDownload(item)) {
+    return;
+  }
+  const reply = await ask({ type: "import", path: item.filename });
+  const outcome = reply.ok
+    ? { lines: reply.data.lines, failures: reply.data.failures }
+    : { error: reply.error };
+  await api.storage.local.set({ [LAST_IMPORT_KEY]: { at: Date.now(), ...outcome } });
+}
+
 let listening = false;
 
 function listenForDownloads() {
   const downloads = globalThis.chrome?.downloads;
   if (!listening && downloads?.onDeterminingFilename) {
     downloads.onDeterminingFilename.addListener(onDeterminingFilename);
+    downloads.onChanged.addListener((change) => importFinished(change).catch(() => {}));
     listening = true;
   }
 }
 
 listenForDownloads();
 api.permissions.onAdded.addListener(listenForDownloads);
+api.storage.local.remove(["url", "token"]);

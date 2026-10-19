@@ -13,25 +13,14 @@
 <body>
 <main class="ui">
   <h1>romledger</h1>
-  <p class="muted">Connect the extension to your romledger service. Both values stay in this browser.</p>
-  <form id="form">
-    <div class="field">
-      <label for="url">Service URL</label>
-      <input id="url" name="url" type="url" required placeholder="http://127.0.0.1:8730" autocomplete="off">
-    </div>
-    <div class="field">
-      <label for="token">Access token</label>
-      <input id="token" name="token" type="password" required autocomplete="off">
-      <p class="muted">The part after <code>?token=</code> in the link <code>romledger serve</code> prints.</p>
-    </div>
-    <div class="actions">
-      <button class="primary" type="submit">Save and test</button>
-    </div>
-  </form>
+  <p class="muted">The extension talks to romledger on this computer. Run <code>romledger extension install</code> once in a terminal, reload the extension, then check the connection.</p>
+  <div class="actions">
+    <button class="primary" id="check" type="button">Check connection</button>
+  </div>
   <p id="result" role="status"></p>
   <div class="field" id="route-field" hidden>
     <label><input id="route" type="checkbox"> Download from Vimm's Lair into Downloads/romledger</label>
-    <p class="muted">Asks the browser for the downloads permission. It lets the Download button on a Vimm's Lair list page fetch every missing game, and moves downloads you start yourself into that folder. Point an inbox at it and <code>romledger serve</code> imports them.</p>
+    <p class="muted">Asks the browser for the downloads permission. It lets the Download button on a Vimm's Lair list page fetch every missing game, and moves downloads you start yourself into that folder. Add <code>~/Downloads/romledger</code> to <code>library.inboxes</code> and each finished download is imported at once.</p>
   </div>
   <p id="route-result" role="status"></p>
 </main>
