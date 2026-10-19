@@ -20,7 +20,7 @@ page.run(async () => {
       const result = await lookupDisc(disc, slug);
       panel.append(page.row(disc.name, result.ok ? page.matchBadge(result.match) : page.failure(result)));
       if (!result.ok) {
-        panel.append(page.notice(result.error, "error"));
+        page.reportOnce(result);
       }
     }
   }

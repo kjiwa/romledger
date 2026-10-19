@@ -209,6 +209,24 @@ STUB_DOWNLOADS = """() => {
 }"""
 
 
+def check_vimm_queue_offers_options(context: BrowserContext, worker: Worker) -> list[str]:
+    worker.evaluate("chrome.storage.local.set({ routeDownloads: false })")
+    page = context.new_page()
+    page.goto("https://vimm.net/vault/GB/A")
+    panel = page.locator(".romledger-panel")
+    problems = []
+    try:
+        panel.get_by_role("button", name="Open options").wait_for(timeout=10000)
+        worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
+        panel.get_by_role("button", name="Download 1 missing").wait_for(timeout=10000)
+        if panel.get_by_role("button", name="Open options").count():
+            problems.append("vimm queue options: the options button stayed after enabling")
+    except Error as error:
+        problems.append(f"vimm queue options: {error.message.splitlines()[0]}")
+    page.close()
+    return problems
+
+
 def check_vimm_queue(context: BrowserContext, worker: Worker) -> list[str]:
     """Stubs the downloads search: file routing is covered by check_vimm_download."""
     worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
@@ -519,7 +537,7 @@ def run(directory: Path, output: Path | None) -> list[str]:
             + check_popup(context, extension_id, output)
         )
         capture_pages(context, extension_id, output)
-        worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
+        problems += check_vimm_queue_offers_options(context, worker)
         capture(context, "https://vimm.net/vault/GB/A", output, "vimm-list-downloads")
         problems += (
             check_vimm_queue(context, worker)

@@ -114,7 +114,10 @@ function route(message) {
     return downloadState(message.id);
   }
   if (message.type === "open-options") {
-    return api.runtime.openOptionsPage().then(() => ({ ok: true }));
+    return api.runtime.openOptionsPage().then(
+      () => ({ ok: true }),
+      (error) => ({ ok: false, error: error.message }),
+    );
   }
   if (message.type === "platforms") {
     return ask({ type: "platforms" });

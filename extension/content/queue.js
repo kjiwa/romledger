@@ -166,21 +166,25 @@ const missingQueue = (() => {
     };
   }
 
-  async function setUp(site, entries) {
-    const { ready, approximate } = romledger.queueable(entries);
-    if (!ready.length) {
-      return;
-    }
-    const stored = await api.storage.local.get([GAP_KEY, ROUTE_KEY]);
+  function offerOptions(panel, count, onEnabled) {
+    const waiting = [
+      page.notice(`${count} missing. Turn on downloading in the options to fetch them.`),
+      page.button("Open options", () => page.ask({ type: "open-options" }), "primary"),
+    ];
+    panel.append(...waiting);
+    const listener = (changes) => {
+      if (changes[ROUTE_KEY]?.newValue === true) {
+        api.storage.onChanged.removeListener(listener);
+        waiting.forEach((node) => node.remove());
+        onEnabled();
+      }
+    };
+    api.storage.onChanged.addListener(listener);
+  }
+
+  async function offerQueue(site, panel, ready, approximate) {
+    const stored = await api.storage.local.get(GAP_KEY);
     const queue = { stopped: false, resume: null, gapMs: romledger.gapSeconds(stored[GAP_KEY]) * 1000 };
-    const panel = page.panel("Missing games");
-    if (stored[ROUTE_KEY] !== true) {
-      panel.append(
-        page.notice(`${ready.length} missing. Turn on downloading in the options to fetch them.`),
-        page.button("Open options", () => page.ask({ type: "open-options" }), "primary"),
-      );
-      return;
-    }
     const controls = queueControls(site, panel, queue);
     const caution = approximate
       ? ` ${approximate} matched by title; check their region and version.`
@@ -197,6 +201,20 @@ const missingQueue = (() => {
       "primary",
     );
     panel.append(start);
+  }
+
+  async function setUp(site, entries) {
+    const { ready, approximate } = romledger.queueable(entries);
+    if (!ready.length) {
+      return;
+    }
+    const stored = await api.storage.local.get(ROUTE_KEY);
+    const panel = page.panel("Missing games");
+    if (stored[ROUTE_KEY] === true) {
+      await offerQueue(site, panel, ready, approximate);
+    } else {
+      offerOptions(panel, ready.length, () => offerQueue(site, panel, ready, approximate));
+    }
   }
 
   return { setUp };

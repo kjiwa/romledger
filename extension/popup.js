@@ -77,8 +77,10 @@ async function main() {
 }
 
 document.getElementById("options").addEventListener("click", () => {
-  api.runtime.openOptionsPage();
-  window.close();
+  api.runtime.openOptionsPage().then(
+    () => window.close(),
+    (error) => showNotice("error", error.message, "error"),
+  );
 });
 
 main();

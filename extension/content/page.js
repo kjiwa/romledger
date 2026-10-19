@@ -5,7 +5,7 @@ const page = (() => {
   const CONCURRENCY = 6;
   const status = { recognized: true, detail: "" };
   let panels = 0;
-  let reported = false;
+  let failureBox = null;
 
   function ask(message) {
     return api.runtime.sendMessage(message);
@@ -109,13 +109,14 @@ const page = (() => {
   }
 
   function failurePanel(reply) {
-    panel("romledger").append(notice(reply.error, "error"));
+    const box = panel("romledger");
+    box.append(notice(reply.error, "error"));
+    return box;
   }
 
   function reportOnce(reply) {
-    if (!reported) {
-      reported = true;
-      failurePanel(reply);
+    if (!failureBox?.isConnected) {
+      failureBox = failurePanel(reply);
     }
   }
 
