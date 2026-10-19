@@ -8,7 +8,7 @@ EXCLUSIONS = {
     "unlicensed": "Unl|Pirate",
     "aftermarket": "Aftermarket|Homebrew",
     "prerelease": "Proto|Beta|Demo|Sample|Kiosk|Debug",
-    "programs": "Program|Test Program|Enhancement Chip",
+    "programs": "Program|Test Program",
     "bad": r"b\d*",
 }
 CATEGORIES = tuple(EXCLUSIONS)
