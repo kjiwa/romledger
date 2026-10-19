@@ -239,14 +239,14 @@ test("an unknown message type is refused", async () => {
 });
 
 test("a finished Vimm download is imported and the outcome is kept for the popup", async () => {
-  const done = { id: 7, url: "https://dl3.vimm.net/x", filename: "/home/u/Downloads/romledger/G.zip" };
+  const done = { id: 7, url: "https://dl3.vimm.net/x", filename: "/home/user/Downloads/romledger/G.zip" };
   const { changed, ports, local } = load({ routeDownloads: true }, true, {
     search: async () => [done],
   });
   changed[0]({ id: 7, state: { current: "complete" } });
   await settle();
   assert.deepEqual(plain(ports[0].sent), [
-    { type: "import", path: "/home/u/Downloads/romledger/G.zip", id: 1 },
+    { type: "import", path: "/home/user/Downloads/romledger/G.zip", id: 1 },
   ]);
   ports[0].reply({ id: 1, ok: true, data: { lines: ["moved snes 1"], failures: [] } });
   await settle();
