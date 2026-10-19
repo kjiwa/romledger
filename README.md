@@ -31,8 +31,7 @@ processes whatever is there. A zip is matched by the ROM inside it and the ROM i
 
 - [igir](https://igir.io) matches files to DATs and moves them into place.
 - romledger decides what you have and what is missing.
-- [RomM](https://romm.app) is optional. The library layout is RomM's folder naming
-  (`roms/<platform>/`), and romledger works the same without RomM.
+- The library is plain folders, `library/<platform>/`, named after each game's DAT entry.
 
 ## Install
 
@@ -69,7 +68,6 @@ romledger serve --open
 See [docs/setup.md](https://github.com/kjiwa/romledger/blob/master/docs/setup.md) for all options,
 [docs/deploy.md](https://github.com/kjiwa/romledger/blob/master/docs/deploy.md) to run it as a container,
 [docs/extension.md](https://github.com/kjiwa/romledger/blob/master/docs/extension.md) for the browser extension,
-[docs/playing.md](https://github.com/kjiwa/romledger/blob/master/docs/playing.md) to play what you collect,
 [docs/sources.md](https://github.com/kjiwa/romledger/blob/master/docs/sources.md) for download sources and
 [docs/troubleshooting.md](https://github.com/kjiwa/romledger/blob/master/docs/troubleshooting.md) for error messages.
 

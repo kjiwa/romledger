@@ -117,13 +117,6 @@ the terminal:
 docker compose -f /path/to/compose.yaml exec -T romledger romledger scan
 ```
 
-## Use it beside RomM
-
-RomM reads the same `roms/<platform>/` folders that `import` fills. Mount the library directory
-into RomM's container as its library, following [RomM's documentation](https://docs.romm.app),
-and let RomM's scheduled rescan pick up new games; see `hooks.after_import` in
-[setup.md](setup.md).
-
 ## Update
 
 Pull the new image and recreate the container:
