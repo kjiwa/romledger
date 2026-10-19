@@ -167,6 +167,7 @@ def serving(content: dict[str, str], requested: list[str] | None = None) -> scan
     return lambda proxy: httpx.Client(transport=httpx.MockTransport(handler))
 
 
+@pytest.mark.usefixtures("stderr_tty")
 def test_ensure_dats_downloads_only_what_is_missing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

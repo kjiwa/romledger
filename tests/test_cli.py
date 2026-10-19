@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import os
+import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -239,6 +240,7 @@ def test_unknown_platform_suggests_the_nearest(
     assert "unknown platform 'snez'. Nearest: snes" in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("stderr_tty")
 def test_scan_downloads_dats_and_fails_when_none_can_be_fetched(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -249,6 +251,7 @@ def test_scan_downloads_dats_and_fails_when_none_can_be_fetched(
     assert "romledger: error: no DAT could be downloaded (1 failed)" in err
 
 
+@pytest.mark.usefixtures("stderr_tty")
 def test_scan_runs_the_named_platform(
     tmp_path: Path,
     data_dir: Path,
@@ -303,7 +306,7 @@ def test_dats_update_output(
 
     monkeypatch.setattr(dats, "update", fake_update)
     assert run(make_config(tmp_path), "dats", "update", "nes") == 0
-    assert capsys.readouterr().out == "nes 2026.10.01 (updated)\n"
+    assert capsys.readouterr().out == "updated nes 2026.10.01\n"
 
 
 def test_dats_error_exit_code(
@@ -477,6 +480,7 @@ def test_fetch_unknown_source(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert "unknown source 'coolrom'. Sources: vimm, consoleroms." in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("stderr_tty")
 def test_fetch_defaults_to_the_platforms_that_have_games(
     tmp_path: Path,
     data_dir: Path,
@@ -955,3 +959,76 @@ def test_import_watch_cannot_be_a_dry_run(
 ) -> None:
     assert run(make_config(tmp_path), "import", "--watch", "--dry-run") == 2
     assert "--watch and --dry-run cannot be combined" in capsys.readouterr().err
+
+
+def test_help_groups_the_usual_commands_and_documents_exit_status(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["--help"])
+    assert exit_info.value.code == 0
+    out = capsys.readouterr().out
+    assert "Typical use:" in out
+    assert "romledger import          file what is in the inbox into the library" in out
+    assert "Exit status: 0 success; 1 something failed" in out
+    assert "canary" not in out
+    assert out.index("status") < out.index("import") < out.index("fetch") < out.index("init")
+
+
+def test_no_command_shows_the_help(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main([]) == 0
+    assert "Typical use:" in capsys.readouterr().out
+
+
+def test_canary_is_still_runnable_but_not_listed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_canary(monkeypatch, canary.Report([], [], []))
+    assert cli.main(["canary"]) == 0
+
+
+def test_status_is_colored_on_request_and_plain_otherwise(
+    tmp_path: Path,
+    data_dir: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed(data_dir, "nes", [state.Item("A", "have", "/a"), state.Item("B", "missing", None)])
+    path = make_config(tmp_path)
+    assert run(path, "status") == 0
+    plain = capsys.readouterr().out
+    assert "\x1b" not in plain
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert run(path, "status") == 0
+    colored = capsys.readouterr().out
+    assert colored.splitlines()[0].startswith("\x1b[1mplatform\x1b[0m")
+    assert "\x1b[33m50%\x1b[0m" in colored
+    assert re.sub(r"\x1b\[[0-9;]*m", "", colored) == plain
+
+
+@pytest.mark.parametrize(
+    ("text", "style"), [("100%", "32"), ("75%", "32"), ("50%", "33"), ("10%", "31")]
+)
+def test_done_is_green_yellow_or_red(text: str, style: str) -> None:
+    assert (
+        cli.done_style(len(cli.STATUS_COLUMNS), text)
+        == {"32": "green", "33": "yellow", "31": "red"}[style]
+    )
+    assert cli.done_style(1, text) is None
+    assert cli.done_style(len(cli.STATUS_COLUMNS), "-") is None
+
+
+def test_errors_are_colored_on_a_color_terminal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert run(tmp_path / "none.toml", "config") == 2
+    assert capsys.readouterr().err.startswith("romledger: \x1b[31merror:\x1b[0m ")
+
+
+def test_extension_states_have_a_color_each() -> None:
+    assert [
+        cli.state_style(1, text)
+        for text in ("ready", "broken: x", "stale: y", "not installed", "not found")
+    ] == ["green", "red", "red", "yellow", "dim"]
+    assert cli.state_style(0, "ready") is None

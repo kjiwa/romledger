@@ -4,7 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from romledger import http
+from romledger import http, term
 
 FakeThrottle = Callable[[float], tuple[http.Throttle, list[float]]]
 
@@ -35,3 +35,8 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError(f"test tried to reach {request.url}")
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", refuse)
+
+
+@pytest.fixture
+def stderr_tty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(term, "stderr_is_tty", lambda: True)

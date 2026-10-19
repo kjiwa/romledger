@@ -18,7 +18,8 @@ and what is not.
    already have it).
 
 The inbox is a plain folder. Copy files into it yourself, zipped or not, and the next import
-processes whatever is there. A zip is matched by the ROM inside it and the ROM is extracted, so you do not unzip it.
+processes whatever is there. A zip is matched by the ROM inside it and the ROM is extracted, so you
+do not unzip it.
 
 ![A terminal running romledger status, which lists wanted, have, inbox, missing and unmatched counts per platform, then romledger missing snes, which lists missing games.](https://raw.githubusercontent.com/kjiwa/romledger/master/docs/images/demo.gif)
 
@@ -59,6 +60,10 @@ Then put ROMs in the inbox, import them and see where you stand:
 romledger import
 romledger status
 ```
+
+To mark and download games on Vimm's Lair from your browser, run `romledger extension install` and
+follow [docs/extension.md](https://github.com/kjiwa/romledger/blob/master/docs/extension.md).
+`romledger --help` lists every command.
 
 See [docs/setup.md](https://github.com/kjiwa/romledger/blob/master/docs/setup.md) for all options,
 [docs/extension.md](https://github.com/kjiwa/romledger/blob/master/docs/extension.md) for the browser extension,

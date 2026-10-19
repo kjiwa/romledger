@@ -4,7 +4,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from romledger import config
+from romledger import config, term
 
 DEFAULT_ROMS = "~/roms"
 EXTENSION_INBOX = "~/Downloads/romledger"
@@ -117,7 +117,7 @@ def run_init(path: Path, roms_arg: str | None, force: bool, interactive: bool) -
     library = roms / "library"
     check_targets(path, [library, *inboxes])
     write_config(path, render_config(library, inboxes), [library, *inboxes])
-    print(f"wrote {path}")
+    term.say(f"wrote {path}")
     print("\n".join(next_steps(path, inboxes[0])))
 
 

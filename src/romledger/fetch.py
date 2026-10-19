@@ -1,11 +1,10 @@
-import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
 
-from romledger import http, igir, scan
+from romledger import http, igir, scan, term
 from romledger.config import Config, ConfigError, Platform
 from romledger.sources import SOURCES, consoleroms
 from romledger.sources.base import Source, fetch_to
@@ -94,7 +93,7 @@ def fetch_platform(
         run.fetch(game, client, throttle)
     verb = "would fetch" if dry_run else "fetched"
     result = run.result
-    print(
+    term.say(
         f"{verb} {len(result.fetched)}, not found {len(result.not_found)}, "
         f"failed {len(result.failed)}, skipped {len(result.skipped)}"
     )
@@ -130,13 +129,13 @@ class _Run:
         if blocked and failure is None:
             failure = "blocked by robots.txt"
         if failure is not None:
-            print(f"failed {game}: {failure}")
+            term.say(f"failed {game}: {failure}")
             self.result.failed.append((game, failure))
         elif set_aside is not None:
-            print(f"skipped {game}: {set_aside} was set aside by an earlier import")
+            term.say(f"skipped {game}: {set_aside} was set aside by an earlier import")
             self.result.skipped.append(game)
         else:
-            print(f"not found {game}")
+            term.say(f"not found {game}")
             self.result.not_found.append(game)
 
     def _attempt(
@@ -147,10 +146,10 @@ class _Run:
             return False
         self._reject_set_aside(candidate.filename)
         if self._dry_run:
-            print(f"would fetch {game} ({source.name})")
+            term.say(f"would fetch {game} ({source.name})")
         else:
             fetch_to(self._inboxes[0], candidate, client, throttle)
-            print(f"fetched {game} ({source.name})")
+            term.say(f"fetched {game} ({source.name})")
         self.result.fetched.append(game)
         return True
 
@@ -161,5 +160,5 @@ class _Run:
                     raise _SetAside(inbox / directory / filename)
 
     def _drop(self, source: Source, error: Exception) -> None:
-        print(f"romledger: warning: skipping {source.name}: {error}", file=sys.stderr)
+        term.warning(f"skipping {source.name}: {error}")
         self.sources.remove(source)

@@ -30,31 +30,49 @@ from romledger.sources import SOURCES
 STATUS_COLUMNS = ("wanted", "have", "inbox", "missing", "unmatched", "done")
 
 
+EPILOG = """\
+Typical use:
+  romledger init            create the config, the library and the inbox
+  romledger import          file what is in the inbox into the library
+  romledger status          see what you have and what is missing
+  romledger missing snes    list the games a platform is missing
+  romledger fetch           download missing games where a source allows it
+
+Exit status: 0 success; 1 something failed (a download, a hook, a browser host);
+2 a usage or configuration error; 130 interrupted.
+Docs: https://github.com/kjiwa/romledger/tree/master/docs
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
+    options: dict[str, object] = {}
+    if sys.version_info >= (3, 14):
+        options = {"suggest_on_error": True, "color": term.color_enabled(sys.stdout)}
     parser = argparse.ArgumentParser(
         prog="romledger",
         description="Track which retro games you have and which are missing.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        **options,  # type: ignore[arg-type]
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--config",
         metavar="FILE",
-        help="config file (default: $ROMLEDGER_CONFIG, else "
-        "$XDG_CONFIG_HOME/romledger/config.toml, i.e. ~/.config/romledger/config.toml)",
+        help="config file (default: $ROMLEDGER_CONFIG, else ~/.config/romledger/config.toml)",
     )
-    commands = parser.add_subparsers(dest="command", required=True, metavar="command")
-    init_parser = commands.add_parser("init", help="create the config file and library folders")
-    init_parser.add_argument("--roms", metavar="DIR", help="ROM folder (default: ~/roms)")
-    init_parser.add_argument("--force", action="store_true", help="overwrite an existing config")
-    commands.add_parser("platforms", help="list the platforms romledger knows")
-    commands.add_parser("config", help="validate the config file and print a summary")
-    dats_parser = commands.add_parser("dats", help="manage platform DATs")
-    dats_commands = dats_parser.add_subparsers(dest="dats_command", required=True, metavar="action")
-    update = dats_commands.add_parser("update", help="download the latest DATs")
-    update.set_defaults(command="dats update")
-    update.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
-    scan_parser = commands.add_parser("scan", help="match library and inbox files to DATs")
-    scan_parser.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
+    commands = parser.add_subparsers(dest="command", metavar="command")
+    status_parser = commands.add_parser("status", help="show have and missing counts per platform")
+    status_parser.add_argument(
+        "--all", action="store_true", help="include platforms that have no games"
+    )
+    missing = commands.add_parser("missing", help="list the games a platform is missing")
+    missing.add_argument("platform", metavar="PLATFORM")
+    missing.add_argument(
+        "--links",
+        action="store_true",
+        help="append the Vimm's Lair search URL, tab-separated",
+    )
     import_parser = commands.add_parser("import", help="file inbox games into the library")
     import_parser.add_argument(
         "--dry-run", action="store_true", help="show what would happen; move nothing"
@@ -63,10 +81,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--watch",
         action="store_true",
         help="keep running and import files once they stop changing",
-    )
-    status_parser = commands.add_parser("status", help="show have/missing counts per platform")
-    status_parser.add_argument(
-        "--all", action="store_true", help="include platforms that have no games"
     )
     fetch_parser = commands.add_parser("fetch", help="download missing games from the sources")
     fetch_parser.add_argument(
@@ -82,19 +96,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-import", action="store_true", help="leave the downloads in the inbox"
     )
     fetch_parser.add_argument("--source", metavar="NAME", help="use only this source")
-    canary_parser = commands.add_parser(
-        "canary", help="check that the supported sites and upstream pins still match"
-    )
-    canary_parser.add_argument(
-        "--json", action="store_true", help="print findings as JSON; notes go to stderr"
-    )
-    missing = commands.add_parser("missing", help="list the games a platform is missing")
-    missing.add_argument("platform", metavar="PLATFORM")
-    missing.add_argument(
-        "--links",
-        action="store_true",
-        help="append the Vimm's Lair search URL, tab-separated",
-    )
+    scan_parser = commands.add_parser("scan", help="match library and inbox files to DATs")
+    scan_parser.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
+    init_parser = commands.add_parser("init", help="create the config file and library folders")
+    init_parser.add_argument("--roms", metavar="DIR", help="ROM folder (default: ~/roms)")
+    init_parser.add_argument("--force", action="store_true", help="overwrite an existing config")
+    commands.add_parser("config", help="validate the config file and print a summary")
+    commands.add_parser("platforms", help="list the platforms romledger knows")
+    dats_parser = commands.add_parser("dats", help="manage platform DATs")
+    dats_commands = dats_parser.add_subparsers(dest="dats_command", required=True, metavar="action")
+    update = dats_commands.add_parser("update", help="download the latest DATs")
+    update.set_defaults(command="dats update")
+    update.add_argument("platforms", nargs="*", metavar="PLATFORM", help="default: all")
     extension_parser = commands.add_parser("extension", help="connect the browser extension")
     extension_commands = extension_parser.add_subparsers(
         dest="extension_command", required=True, metavar="action"
@@ -105,6 +118,13 @@ def build_parser() -> argparse.ArgumentParser:
         ("status", "show which browsers are connected"),
     ):
         extension_commands.add_parser(name, help=text).set_defaults(command=f"extension {name}")
+    # No help text on purpose: argparse then leaves this maintainer command out of the list.
+    canary_parser = commands.add_parser(
+        "canary", description="Check that the sites and pins still match."
+    )
+    canary_parser.add_argument(
+        "--json", action="store_true", help="print findings as JSON; notes go to stderr"
+    )
     return parser
 
 
@@ -133,7 +153,9 @@ def show_platforms(args: argparse.Namespace) -> int:
         for slug, entry in registry.load().items()
     ]
     header = ("platform", "name", "dat", "sources")
-    for line in term.table(header, rows, flex=1, columns=term.width()):
+    for line in term.table(
+        header, rows, flex=1, columns=term.width(), enabled=term.color_enabled(sys.stdout)
+    ):
         print(line)
     return 0
 
@@ -176,7 +198,7 @@ def update_dats(args: argparse.Namespace) -> int:
     with http.client(context.config.network.proxy) as client:
         results = dats.update(context.data_dir, wanted, client)
     for slug, result in results.items():
-        print(f"{slug} {result.version} ({'updated' if result.changed else 'unchanged'})")
+        term.say(f"{'updated' if result.changed else 'unchanged'} {slug} {result.version}")
     return 0
 
 
@@ -187,7 +209,7 @@ def scan_platforms(args: argparse.Namespace) -> int:
         context.config,
         slugs,
         context.data_dir,
-        progress=lambda name: print(f"scanning {name} ...", file=sys.stderr),
+        progress=lambda name: term.progress(f"scanning {name} ..."),
     )
     print(f"scanned {len(slugs)} platform(s)")
     return 0
@@ -208,7 +230,7 @@ def run_import(context: Context, dry_run: bool) -> int:
         result = importer.import_locked(
             context.config,
             context.data_dir,
-            lambda: print("waiting for another import to finish ...", file=sys.stderr),
+            lambda: term.note("waiting for another import to finish ..."),
         )
     return importer.print_result(result, dry_run=dry_run)
 
@@ -216,11 +238,11 @@ def run_import(context: Context, dry_run: bool) -> int:
 def watch_inbox(args: argparse.Namespace) -> int:
     first = load_context(args.config)
     inboxes = ", ".join(str(inbox) for inbox in first.config.library.inboxes)
-    print(f"watching {inboxes} (Ctrl-C to stop)", file=sys.stderr)
+    term.note(f"watching {inboxes} (Ctrl-C to stop)")
     watcher = watch.Watcher(
         lambda: load_context(args.config),
         lambda context: run_import(context, dry_run=False),
-        lambda message: print(f"romledger: warning: {message}", file=sys.stderr),
+        term.warning,
     )
     try:
         watcher.run()
@@ -244,7 +266,7 @@ def fetch_games(args: argparse.Namespace) -> int:
             remaining = None if args.limit is None else args.limit - fetched
             if remaining is not None and remaining <= 0:
                 break
-            print(f"fetching {slug} ...", file=sys.stderr)
+            term.progress(f"fetching {slug} ...")
             result = fetch.fetch_platform(
                 context.config,
                 slug,
@@ -292,7 +314,10 @@ def show_status(args: argparse.Namespace) -> int:
     if slugs:
         rows = [status_row(slug, counts.get(slug)) for slug in slugs]
         header = ("platform", *STATUS_COLUMNS)
-        for line in term.table(header, rows, right=range(1, len(header))):
+        enabled = term.color_enabled(sys.stdout)
+        for line in term.table(
+            header, rows, right=range(1, len(header)), enabled=enabled, cell_style=done_style
+        ):
             print(line)
     if not counts or any(slug not in counts for slug in slugs):
         print(scan.SCAN_HINT)
@@ -303,6 +328,13 @@ def show_status(args: argparse.Namespace) -> int:
             f"{len(everything) - len(slugs)} platforms with no games hidden; romledger status --all"
         )
     return 0
+
+
+def done_style(column: int, text: str) -> str | None:
+    if column != len(STATUS_COLUMNS) or not text.endswith("%"):
+        return None
+    percent = int(text.removesuffix("%"))
+    return "green" if percent >= 75 else "yellow" if percent >= 25 else "red"
 
 
 def has_games(counts: state.Counts | None) -> bool:
@@ -334,7 +366,7 @@ def extension_install(args: argparse.Namespace) -> int:
     data = config.data_dir()
     connected = extension.install(path, data, explicit_data=bool(os.environ.get(config.DATA_ENV)))
     for browser in connected:
-        print(f"connected {browser.name}  {browser.manifest}")
+        term.say(f"connected {browser.name}  {browser.manifest}")
     print("Reload the extension in your browser, then open its options to check the connection.")
     return 0
 
@@ -342,16 +374,31 @@ def extension_install(args: argparse.Namespace) -> int:
 def extension_uninstall(args: argparse.Namespace) -> int:
     removed = extension.uninstall(config.data_dir())
     for browser in removed:
-        print(f"removed {browser.name}  {browser.manifest}")
+        term.say(f"removed {browser.name}  {browser.manifest}")
     if not removed:
         print("nothing to remove")
     return 0
 
 
+def state_style(column: int, text: str) -> str | None:
+    if column != 1:
+        return None
+    if text == "ready":
+        return "green"
+    if text.startswith(("broken", "stale")):
+        return "red"
+    return "yellow" if text == "not installed" else "dim"
+
+
 def extension_status(args: argparse.Namespace) -> int:
     results = extension.status(config.data_dir())
     rows = [(result.browser.name, result.state) for result in results]
-    for line in term.table(("browser", "state"), rows):
+    for line in term.table(
+        ("browser", "state"),
+        rows,
+        enabled=term.color_enabled(sys.stdout),
+        cell_style=state_style,
+    ):
         print(line)
     return 1 if any(result.state.startswith(("broken", "stale")) for result in results) else 0
 
@@ -401,18 +448,22 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     try:
         return HANDLERS[args.command](args)
     except (config.ConfigError, dats.DatError, igir.ToolError) as error:
-        print(f"romledger: error: {error}", file=sys.stderr)
+        term.error(str(error))
         return 2
     except setup.Interrupted:
-        print("romledger: error: cancelled", file=sys.stderr)
+        term.error("cancelled")
         return 130
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
     except OSError as error:
-        print(f"romledger: error: {error}", file=sys.stderr)
+        term.error(str(error))
         return 2
