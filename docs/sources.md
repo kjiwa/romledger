@@ -49,8 +49,7 @@ side of the challenge:
 - The [browser extension](extension.md) marks what you have and can save Vimm's Lair downloads
   into an inbox, where the extension imports them.
 
-Partial browser downloads are skipped until finished. For GameCube, pick the default ISO; the
-other formats do not match the Redump DAT.
+Partial browser downloads are skipped until finished.
 
 ## Not supported yet
 

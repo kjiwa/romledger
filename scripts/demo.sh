@@ -15,8 +15,8 @@ main() {
   trap 'rm -rf "$_main_work"' EXIT
   uv run --no-project --with "$PLAYWRIGHT" --with-editable . \
     python scripts/demo_library.py --library "$_main_work/library"
-  ROMLEDGER_CONFIG="$_main_work/library/config.toml"
-  ROMLEDGER_DATA="$_main_work/library/data"
+  readonly ROMLEDGER_CONFIG="$_main_work/library/config.toml"
+  readonly ROMLEDGER_DATA="$_main_work/library/data"
   export ROMLEDGER_CONFIG ROMLEDGER_DATA
   uv run --no-project --with-editable . vhs docs/demo.tape
 }

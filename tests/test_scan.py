@@ -4,6 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from conftest import Serving
 from romledger import catalog, config, dats, igir, lookup, registry, scan, state
 
 ReportRow = igir.ReportRow
@@ -117,7 +118,7 @@ def test_scan_platform_with_library(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=True)
     write_dat(tmp_path, cfg)
     calls: list[tuple[list[Path], Sequence[str]]] = []
-    scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report(calls))
+    scan.scan_platforms(cfg, ["nes"], tmp_path / "data", fake_report(calls))
     inbox = tmp_path / "inbox"
     assert calls == [
         ([inbox], igir.inbox_excludes([inbox])),
@@ -132,7 +133,7 @@ def test_scan_platform_without_library_dir(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=False)
     write_dat(tmp_path, cfg)
     calls: list[tuple[list[Path], Sequence[str]]] = []
-    scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report(calls))
+    scan.scan_platforms(cfg, ["nes"], tmp_path / "data", fake_report(calls))
     assert [inputs for inputs, _ in calls] == [[tmp_path / "inbox"]]
     with state.State(tmp_path / "data" / "state.db") as database:
         assert database.counts()["nes"] == state.Counts(have=0, inbox=1, missing=2, unmatched=0)
@@ -141,7 +142,7 @@ def test_scan_platform_without_library_dir(tmp_path: Path) -> None:
 def test_scan_platform_applies_include(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=True, include=("unlicensed",))
     write_dat(tmp_path, cfg)
-    scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report([]))
+    scan.scan_platforms(cfg, ["nes"], tmp_path / "data", fake_report([]))
     with state.State(tmp_path / "data" / "state.db") as database:
         assert database.missing("nes") == ["C (USA)"]
         assert [match.state for match in lookup.by_name(database, "nes", "C (USA) (Unl)")] == [
@@ -152,24 +153,14 @@ def test_scan_platform_applies_include(tmp_path: Path) -> None:
 def test_scan_platform_indexes_the_dat_before_reading_it(tmp_path: Path) -> None:
     cfg = make_config(tmp_path, library=True)
     write_dat(tmp_path, cfg)
-    scan.scan_platform(cfg, "nes", tmp_path / "data", fake_report([]))
+    scan.scan_platforms(cfg, ["nes"], tmp_path / "data", fake_report([]))
     with state.State(tmp_path / "data" / "state.db") as database:
         assert len(database.dat_roms("nes")) == len(GAMES)
 
 
-def serving(content: dict[str, str], requested: list[str] | None = None) -> scan.ClientFactory:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if requested is not None:
-            requested.append(request.url.path.rsplit("/", 1)[-1])
-        text = content.get(request.url.path.rsplit("/", 1)[-1])
-        return httpx.Response(200, text=text) if text else httpx.Response(404)
-
-    return lambda proxy: httpx.Client(transport=httpx.MockTransport(handler))
-
-
 @pytest.mark.usefixtures("stderr_tty")
 def test_ensure_dats_downloads_only_what_is_missing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], serving: Serving
 ) -> None:
     cfg = make_config(tmp_path, library=True)
     write_dat(tmp_path, cfg)
@@ -194,7 +185,7 @@ def test_ensure_dats_opens_no_connection_when_every_dat_exists(tmp_path: Path) -
 
 
 def test_ensure_dats_skips_a_platform_whose_dat_cannot_be_downloaded(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], serving: Serving
 ) -> None:
     cfg = make_config(tmp_path, library=True)
     write_dat(tmp_path, cfg)
@@ -205,7 +196,7 @@ def test_ensure_dats_skips_a_platform_whose_dat_cannot_be_downloaded(
     assert "warning: skipping snes: " in capsys.readouterr().err
 
 
-def test_ensure_dats_fails_when_none_can_be_downloaded(tmp_path: Path) -> None:
+def test_ensure_dats_fails_when_none_can_be_downloaded(tmp_path: Path, serving: Serving) -> None:
     cfg = make_config(tmp_path, library=True)
     with pytest.raises(config.ConfigError, match=r"no DAT could be downloaded \(1 failed\)"):
         scan.ensure_dats(cfg, ["nes"], tmp_path / "data", serving({}))

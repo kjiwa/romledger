@@ -3,9 +3,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from xml.etree import ElementTree
 
-import httpx
 import pytest
 
+from conftest import Serving
 from romledger import config, dats, igir, importer, lock, registry, scan
 
 DAT_NAME = "Nintendo - Nintendo Entertainment System"
@@ -104,15 +104,7 @@ def make_files(env: Env) -> dict[str, Path]:
     return files
 
 
-def serving(content: dict[str, str]) -> scan.ClientFactory:
-    def handler(request: httpx.Request) -> httpx.Response:
-        text = content.get(request.url.path.rsplit("/", 1)[-1])
-        return httpx.Response(200, text=text) if text else httpx.Response(404)
-
-    return lambda proxy: httpx.Client(transport=httpx.MockTransport(handler))
-
-
-def test_a_missing_dat_is_downloaded(tmp_path: Path) -> None:
+def test_a_missing_dat_is_downloaded(tmp_path: Path, serving: Serving) -> None:
     env = Env(tmp_path)
     env.full_dat.unlink()
     env.reports = [[row("MISSING", "A")]]
@@ -121,7 +113,7 @@ def test_a_missing_dat_is_downloaded(tmp_path: Path) -> None:
 
 
 def test_a_dat_that_cannot_be_downloaded_is_skipped(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], serving: Serving
 ) -> None:
     env = Env(tmp_path)
     snes = registry.load()["snes"].dat
@@ -135,7 +127,7 @@ def test_a_dat_that_cannot_be_downloaded_is_skipped(
     assert len(env.report_dats[0]) == 1
 
 
-def test_no_dat_can_be_downloaded(tmp_path: Path) -> None:
+def test_no_dat_can_be_downloaded(tmp_path: Path, serving: Serving) -> None:
     env = Env(tmp_path)
     env.full_dat.unlink()
     with pytest.raises(config.ConfigError, match=r"no DAT could be downloaded \(1 failed\)"):

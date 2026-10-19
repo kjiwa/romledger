@@ -4,7 +4,7 @@
 
 - Python 3.11+
 - Node.js 22.22+ with `npx`, or [igir](https://igir.io) on `PATH`. romledger runs
-  `igir@5.7.2` through `npx` when `igir` is not on `PATH`.
+  igir through `npx` when `igir` is not on `PATH`.
 
 ## Config file
 
@@ -60,8 +60,7 @@ proxy = "socks5h://proxy.example:1080"
 | `network.proxy` | no | Proxy URL for every request. Schemes: `http`, `https`, `socks5`, `socks5h`. |
 | `hooks.after_import` | no | Commands to run after `import` moved at least one file. Each is an argument list, run without a shell. Default none. |
 
-A config from 0.5 may name `dat`, `sources` or `archive_item` under a platform; those keys were
-removed, and the error says to delete them. Codes are upper case.
+Region and language codes are upper case.
 
 - Regions: ARG ASI AUS BEL BRA CAN CHN DAN EUR FRA FYN GER GRE HK HOL ITA JPN KOR MEX NOR
   NZ POR RUS SPA SWE TAI UK UNK USA WORLD
@@ -70,8 +69,6 @@ removed, and the error says to delete them. Codes are upper case.
 Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
 wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
 password on a terminal. It never prints the password, and shows proxy URLs as `scheme://***@host`.
-
-See [sources.md](sources.md) before you list a source.
 
 ## What counts as wanted
 

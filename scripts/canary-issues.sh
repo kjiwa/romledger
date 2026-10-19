@@ -48,31 +48,38 @@ _all_issues() {
 }
 
 _validate_input() {
-  if ! jq -e '.findings | type == "array"' "$1" >/dev/null 2>&1; then
-    echo "canary-issues: $1 has no findings array" >&2
+  _validate_input_file=$1
+  if ! jq -e '.findings | type == "array"' "$_validate_input_file" >/dev/null 2>&1; then
+    echo "canary-issues: $_validate_input_file has no findings array" >&2
     return 1
   fi
-  if ! jq -e '.inconclusive | type == "array"' "$1" >/dev/null 2>&1; then
-    echo "canary-issues: $1 has no inconclusive array" >&2
+  if ! jq -e '.inconclusive | type == "array"' "$_validate_input_file" >/dev/null 2>&1; then
+    echo "canary-issues: $_validate_input_file has no inconclusive array" >&2
     return 1
   fi
 }
 
 _finding_keys() {
-  jq -r '.findings[].key' "$1"
+  _finding_keys_file=$1
+  jq -r '.findings[].key' "$_finding_keys_file"
 }
 
 _unverified_prefixes() {
-  jq -r '.inconclusive[]' "$1"
+  _unverified_prefixes_file=$1
+  jq -r '.inconclusive[]' "$_unverified_prefixes_file"
 }
 
 _issue_body() {
-  jq -r --arg key "$2" '.findings[] | select(.key == $key)
-    | "\(.title)\n\n\(.detail)\n\nThe weekly canary found this."' "$1"
+  _issue_body_file=$1
+  _issue_body_key=$2
+  jq -r --arg key "$_issue_body_key" '.findings[] | select(.key == $key)
+    | "\(.title)\n\n\(.detail)\n\nThe weekly canary found this."' "$_issue_body_file"
 }
 
 _is_tracked() {
-  _is_tracked_count=$(printf '%s' "$1" | jq -r --arg title "$2" \
+  _is_tracked_issues=$1
+  _is_tracked_title=$2
+  _is_tracked_count=$(printf '%s' "$_is_tracked_issues" | jq -r --arg title "$_is_tracked_title" \
     '[.[] | select(.title == $title)
       | select((.state | ascii_upcase) == "OPEN"
         or (.stateReason // "" | ascii_upcase) == "NOT_PLANNED")] | length')
@@ -97,7 +104,8 @@ ISSUES
 }
 
 _open_numbers_and_keys() {
-  printf '%s' "$1" | jq -r --arg prefix "$TITLE_PREFIX" \
+  _open_numbers_and_keys_issues=$1
+  printf '%s' "$_open_numbers_and_keys_issues" | jq -r --arg prefix "$TITLE_PREFIX" \
     '.[] | select((.state | ascii_upcase) == "OPEN")
       | select(.title | startswith($prefix))
       | "\(.number) \(.title[($prefix | length):])"'
@@ -105,22 +113,24 @@ _open_numbers_and_keys() {
 
 _is_unverified() {
   _is_unverified_key=$1
+  _is_unverified_prefixes=$2
   while IFS= read -r _is_unverified_prefix; do
     [ -n "$_is_unverified_prefix" ] || continue
     case $_is_unverified_key in
       "$_is_unverified_prefix"*) return 0 ;;
     esac
   done <<ISSUES
-$2
+$_is_unverified_prefixes
 ISSUES
   return 1
 }
 
 _close_resolved() {
   _close_resolved_findings=$1
+  _close_resolved_issues=$2
   _close_resolved_keys=$(_finding_keys "$_close_resolved_findings")
   _close_resolved_unverified=$(_unverified_prefixes "$_close_resolved_findings")
-  _close_resolved_open=$(_open_numbers_and_keys "$2")
+  _close_resolved_open=$(_open_numbers_and_keys "$_close_resolved_issues")
   while read -r _close_resolved_number _close_resolved_key; do
     [ -n "$_close_resolved_number" ] || continue
     if printf '%s\n' "$_close_resolved_keys" | grep -Fxq -- "$_close_resolved_key"; then

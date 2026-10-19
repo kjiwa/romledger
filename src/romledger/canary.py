@@ -6,12 +6,11 @@ from functools import partial
 import httpx
 
 from romledger import dats, http, igir, registry
-from romledger.sources import consoleroms
+from romledger.sources import SOURCES, consoleroms
 from romledger.sources.base import Site
 from romledger.sources.errors import FetchError, SourceBlocked, SourceChanged
 
 VIMM_URL = "https://vimm.net"
-VIMM_HOSTS = ("vimm.net",)
 VIMM_SYSTEM = "NES"
 CONSOLEROMS_PLATFORM = "atari-7800"
 IGIR_RELEASE_URL = "https://api.github.com/repos/emmercm/igir/releases/latest"
@@ -121,7 +120,7 @@ def _vimm_steps(
     entries: Mapping[str, registry.Entry],
     ignored: frozenset[str],
 ) -> list[Step]:
-    site = Site(VIMM_URL, VIMM_HOSTS, http.DEFAULT_GAP, client, throttle)
+    site = Site(VIMM_URL, SOURCES["vimm"].hosts, http.DEFAULT_GAP, client, throttle)
     return [
         _step(
             ("vimm:contract:platform-links", "vimm:missing-platform", "vimm:new-platform"),

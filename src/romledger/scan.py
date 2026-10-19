@@ -93,12 +93,6 @@ def wanted_groups(
     return catalog.wanted_groups(games, platform.regions, platform.languages, platform.include)
 
 
-def scan_platform(
-    config: Config, slug: str, data_dir: Path, igir_report: IgirReport = igir.report
-) -> None:
-    scan_platforms(config, [slug], data_dir, igir_report)
-
-
 def scan_platforms(
     config: Config,
     slugs: Sequence[str],

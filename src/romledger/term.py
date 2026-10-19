@@ -5,7 +5,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import TextIO
 
 GAP = "  "
-ELLIPSIS = "…"
+ELLIPSIS = "..."
 MIN_FLEX = 12
 STYLES = {"bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33"}
 # The first words of a result line and how they are colored. Lines stay plain text when piped.
@@ -79,7 +79,7 @@ def table(
 
 
 def _fit(text: str, size: int) -> str:
-    return text if len(text) <= size else text[: size - 1] + ELLIPSIS
+    return text if len(text) <= size else text[: size - len(ELLIPSIS)] + ELLIPSIS
 
 
 def say(line: str, stream: TextIO | None = None) -> None:

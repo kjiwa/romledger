@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Errors print as `romledger: error: <message>` and exit with status 2.
+Errors print as `romledger: error: <message>` and exit with a nonzero status; see the [exit status table](setup.md#output-and-exit-status).
 
 ## `config file not found`
 
@@ -64,10 +64,6 @@ and `HTTPS_PROXY`, then run the command again.
 ## `X has not been scanned. run: romledger scan`
 
 Cause: `missing X` ran before the first scan. Fix: run `romledger scan X`.
-
-## `cannot write to <inbox>: ...`
-
-Cause: the inbox is read-only or full. Fix: check the directory's permissions and free space.
 
 ## `igir not found and Node.js 22.22+ (with npx) is required to run it`
 

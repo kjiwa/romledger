@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -67,6 +68,11 @@ def test_reopen_persists(tmp_path: Path) -> None:
         assert database.missing("nes") == ["Beta (USA)", "Zed (USA)"]
 
 
+def user_version(path: Path) -> int:
+    with closing(sqlite3.connect(path)) as connection:
+        return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+
 def test_version_one_database_migrates_but_must_be_rescanned(tmp_path: Path) -> None:
     path = tmp_path / "state.db"
     connection = sqlite3.connect(path)
@@ -78,9 +84,7 @@ def test_version_one_database_migrates_but_must_be_rescanned(tmp_path: Path) -> 
         assert database.scanned_at("nes") is None
         assert database.index_stamp("nes") is None
         assert database.locate_sha1("a" * 40) == []
-    assert (
-        sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == state.SCHEMA_VERSION
-    )
+    assert user_version(path) == state.SCHEMA_VERSION
 
 
 def test_entries_filter_page_and_escape_wildcards(tmp_path: Path) -> None:
@@ -157,9 +161,7 @@ def test_version_two_database_migrates_to_group_scans_and_rom_names(tmp_path: Pa
         assert database.dat_roms("nes") == [
             state.DatRom("a" * 40, None, None, 1, "A (USA)", "a.nes", 0)
         ]
-    assert (
-        sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == state.SCHEMA_VERSION
-    )
+    assert user_version(path) == state.SCHEMA_VERSION
 
 
 V3_SCHEMA = """

@@ -32,13 +32,13 @@ def test_table_shrinks_only_the_flex_column_to_fit() -> None:
     assert lines == [
         "name   count  note",
         "alpha  1      short",
-        "b      200    a rather long n…",
+        "b      200    a rather long...",
     ]
 
 
 def test_table_keeps_a_readable_minimum_for_the_flex_column() -> None:
     lines = term.table(HEADER, ROWS, flex=2, columns=5)
-    assert lines[2].endswith("a rather lo…")
+    assert lines[2].endswith("a rather ...")
 
 
 def test_table_that_already_fits_is_untouched() -> None:

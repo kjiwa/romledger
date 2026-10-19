@@ -378,3 +378,8 @@ def test_the_default_import_runs_locked_against_the_loaded_config(
     answer = native.reply(host, {"type": "import", "path": str(env.inbox / "a.zip")})
     assert answer["data"]["lines"] == ["moved snes 2"]
     assert seen == [(env.context.config, env.context.data_dir)]
+
+
+def test_the_extension_connects_to_the_host_the_installer_registers() -> None:
+    background = (Path(__file__).parent.parent / "extension" / "background.js").read_text()
+    assert f'const HOST = "{native.HOST_NAME}";' in background
