@@ -86,12 +86,13 @@ Each platform wants one release per title. romledger groups the DAT's games by t
 the categories you did not `include`, keeps the games whose region and language you listed, and
 prefers the release with the fewest extra tags (such as `Evercade` or `Collection`), then the
 earliest region and language in your lists, then the newest revision. A title is had when any
-wanted release of it is. The categories, by tag in the game name or in any of its ROM names:
+wanted release of it is. The categories, by a word in a tag of the game name or of any of its
+ROM names (so `Possible Proto`, `Tech Demo` and `Music Program` count):
 
 - `unlicensed`: `Unl`, `Pirate`
 - `aftermarket`: `Aftermarket`, `Homebrew`
 - `prerelease`: `Proto`, `Beta`, `Demo`, `Sample`, `Kiosk`, `Debug`
-- `programs`: `Program`, `Test Program`
+- `programs`: `Program`, `Test Program`, `Enhancement Chip`
 - `bad`: `[b]` bad dumps
 
 A game with no language tag is taken to speak its region's language.

@@ -8,12 +8,14 @@ EXCLUSIONS = {
     "unlicensed": "Unl|Pirate",
     "aftermarket": "Aftermarket|Homebrew",
     "prerelease": "Proto|Beta|Demo|Sample|Kiosk|Debug",
-    "programs": "Program|Test Program",
+    "programs": "Program|Test Program|Enhancement Chip",
     "bad": r"b\d*",
 }
 CATEGORIES = tuple(EXCLUSIONS)
+LEADING_WORDS = r"(?:\S+ )*"
 EXCLUDED = {
-    category: re.compile(rf"(?:{names})(?: \S+)*") for category, names in EXCLUSIONS.items()
+    category: re.compile(rf"{'' if category == 'bad' else LEADING_WORDS}(?:{names})(?: \S+)*")
+    for category, names in EXCLUSIONS.items()
 }
 TAG = re.compile(r"[(\[]([^()\[\]]*)[)\]]")
 PAREN_TAG = re.compile(r"\(([^()]*)\)")
@@ -145,9 +147,10 @@ def _is_wanted(
 
 def _is_excluded(names: Iterable[str], excluded: list[re.Pattern[str]]) -> bool:
     return any(
-        pattern.fullmatch(tag)
+        pattern.fullmatch(part)
         for name in names
         for tag in TAG.findall(name)
+        for part in tag.split(", ")
         for pattern in excluded
     )
 
