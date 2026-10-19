@@ -65,43 +65,6 @@ and `HTTPS_PROXY`, then run the command again.
 
 Cause: `missing X` ran before the first scan. Fix: run `romledger scan X`.
 
-## `<path>: token is shorter than 16 characters. ...`
-
-Cause: `serve.token` in the data directory, or `ROMLEDGER_TOKEN`, is too short to be safe. Fix:
-delete the file to generate a new token, or set a longer `ROMLEDGER_TOKEN`.
-
-## `--port: 'X' is not a port between 1 and 65535`
-
-Cause: `serve --port` got something else. Fix: pass a number in that range.
-
-## `Missing or invalid access token` (HTTP 401)
-
-Cause: the browser has no session or the token changed. Fix: run `romledger serve` and open the
-link it prints. Scripts send `Authorization: Bearer <token>`.
-
-## `Cross-origin requests are not allowed.` (HTTP 403)
-
-Cause: a POST came from a page on another origin, such as a different host name or port than the
-one the dashboard was opened on. Fix: open the dashboard at the address you started it on.
-
-## `a scan is already running. Wait for it to finish.` (HTTP 409)
-
-Cause: a scan or import was started while another runs. Fix: wait; Activity shows progress.
-
-## `a scan is running; upload again when it finishes` (HTTP 409)
-
-Cause: uploads are refused while a scan or import runs, so the job never sees a half-written
-file. Fix: upload again when Activity shows the job finished.
-
-## `names ending in .part are reserved for unfinished uploads`
-
-Cause: an uploaded file name ends in `.part`. Fix: rename the file before uploading.
-
-## `send the files as multipart/form-data`, `the upload ended early`, `the upload is malformed`
-
-Cause: the upload was not a form, or the connection dropped mid-file. Nothing from the unfinished
-file is kept. Fix: upload again, with `-F files=@<file>` from `curl`.
-
 ## `cannot write to <inbox>: ...`
 
 Cause: the inbox is read-only or full. Fix: check the directory's permissions and free space.
@@ -245,26 +208,29 @@ other unexpected status, `request failed (...)`, `bot challenge page`, or a robo
 checks. The exit status is not affected. Run it again later. A rate limit on GitHub's API clears
 by itself; set `GITHUB_TOKEN` to raise it.
 
-## `Open the romledger options and enter the service URL and token.`
+## `Run "romledger extension install", then reload the extension.`
 
-Shown by the browser extension. Cause: the options are empty. Fix: follow
-[extension.md](extension.md#connect-it-to-romledger).
+Shown by the browser extension. Cause: the browser does not know how to start romledger, or the
+host manifest names another extension. Fix: run `romledger extension install`, reload the extension,
+and check `romledger extension status`. In Firefox, load the extension again after a restart.
 
-## `Cannot reach <url>. Is romledger serve running?`
+## `The romledger host stopped: ...`
 
-Shown by the browser extension. Cause: nothing answers at the service URL, or the browser has no
-permission for that address. Fix: start `romledger serve`, correct the URL in the options, and
-choose Save and test to grant access.
+Shown by the browser extension. Cause: the program the browser started exited, for example because
+`romledger extension install` recorded a Python that was since removed, or the config file moved.
+Fix: run `romledger extension status`; run `romledger extension install` again if it says `stale` or
+`broken`.
 
-## `The service rejected the token. Check it in the options.`
+## `<dir> is not an inbox. Add it to library.inboxes in <config>.`
 
-Shown by the browser extension. Cause: the token differs from `<data>/serve.token` or
-`$ROMLEDGER_TOKEN`. Fix: copy the part after `?token=` in the link `romledger serve` prints.
+Shown by the browser extension after a download. Cause: the file landed in a folder that is not an
+inbox, so it was not imported. Fix: add that folder (usually `~/Downloads/romledger`) to
+`library.inboxes`.
 
-## `The service answered HTTP N.`
+## `waiting for another import to finish ...`
 
-Shown by the browser extension. Fix: read the server's output and see the entry for that status
-above.
+Not an error: an import (from the command line, `--watch` or the extension) holds the lock in the
+data directory, and this one starts when it finishes.
 
 ## `... page layout not recognized: ...`
 

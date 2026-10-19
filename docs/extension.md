@@ -26,14 +26,15 @@ the extension's card in `chrome://extensions`; until then the browser keeps runn
 
 ## Connect it to romledger
 
-1. Run `romledger serve` and keep the link it prints.
-2. Open the extension's options. Enter the service URL (the field starts as `http://127.0.0.1:8730`, for a service on this
-   machine) and the token (the part after `?token=` in the link).
-3. Choose Save and test, then allow the browser to reach that address. The page reports the
-   number of platforms that have games.
+1. Run `romledger extension install`. It tells each browser it finds how to start romledger.
+2. Reload the extension on `chrome://extensions` (or load it, see above).
+3. Open the extension's options. The page checks the connection and reports the number of
+   platforms that have games; choose Check connection to try again.
 
-The URL and token stay in this browser. The extension sends the SHA-1 hashes and titles it finds
-on a page only to that address.
+The browser starts romledger itself when the extension needs it, so nothing runs in the
+background and nothing listens on the network. The extension sends the SHA-1 hashes and titles
+it finds on a page only to that program, on this computer. The browser and romledger must be on
+the same machine. `romledger extension status` shows which browsers are connected.
 
 ## Download from Vimm's Lair
 
@@ -56,8 +57,10 @@ Vimm's Lair asks for a Turnstile check before it offers a download. The extensio
 When a game page comes back without a download form, the queue pauses; open any game page, pass
 the check, and press Resume.
 
-Add `~/Downloads/romledger` as an inbox (`romledger init` offers to) and `romledger serve` imports
-the files by itself; see [serve](setup.md#serve).
+Add `~/Downloads/romledger` as an inbox (`romledger init` offers to) and the extension imports
+each file as soon as its download finishes. The popup shows the outcome of the last import. Files
+you copy into an inbox yourself are filed by `romledger import`, or by `romledger import --watch`
+while it runs.
 
 ## What it shows
 

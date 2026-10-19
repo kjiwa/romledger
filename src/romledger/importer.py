@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from romledger import datindex, dats, igir, scan, state
+from romledger import datindex, dats, igir, lock, scan, state
 from romledger.config import Config
 
 IgirMove = Callable[..., None]
@@ -44,6 +44,13 @@ def import_inboxes(
     with tempfile.TemporaryDirectory() as temp:
         subsets = _write_subsets(config, data_dir, Path(temp))
         return _import(config, data_dir, subsets, dry_run, igir_report, igir_move, hook)
+
+
+def import_locked(
+    config: Config, data_dir: Path, on_wait: Callable[[], None] = lambda: None
+) -> ImportResult:
+    with lock.exclusive(data_dir / "import.lock", on_wait):
+        return import_inboxes(config, data_dir, False)
 
 
 def _import(

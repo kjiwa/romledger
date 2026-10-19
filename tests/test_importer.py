@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 import httpx
 import pytest
 
-from romledger import config, dats, igir, importer, registry, scan
+from romledger import config, dats, igir, importer, lock, registry, scan
 
 DAT_NAME = "Nintendo - Nintendo Entertainment System"
 GAMES = ["Alpha (USA)", "Alpha (USA) (Rev 1)", "Beta (USA) (Unl)", "Gamma (Japan)", "Delta (World)"]
@@ -384,3 +384,26 @@ def test_inbox_survives_igir_deleting_it(tmp_path: Path) -> None:
     env.reports = [[row("FOUND", "A", "/gone/A")], []]
     env.run()
     assert env.inbox.is_dir()
+
+
+def test_import_locked_takes_the_lock_around_the_import(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env = Env(tmp_path)
+    held: list[bool] = []
+    real = lock.exclusive
+
+    def spy(path: Path, on_wait: object) -> object:
+        assert path == env.data / "import.lock"
+        held.append(True)
+        return real(path)
+
+    monkeypatch.setattr(lock, "exclusive", spy)
+    monkeypatch.setattr(
+        importer,
+        "import_inboxes",
+        lambda cfg, data, dry_run: importer.ImportResult({"nes": 1}, [], [], [], []),
+    )
+    result = importer.import_locked(env.config, env.data)
+    assert result.moved == {"nes": 1}
+    assert held == [True]

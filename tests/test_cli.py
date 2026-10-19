@@ -1,14 +1,12 @@
 import dataclasses
 import json
 import os
-import webbrowser
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import httpx
 import pytest
-import uvicorn
-from fastapi import FastAPI
 
 from romledger import (
     __version__,
@@ -16,6 +14,7 @@ from romledger import (
     cli,
     config,
     dats,
+    extension,
     fetch,
     http,
     importer,
@@ -23,10 +22,9 @@ from romledger import (
     scan,
     state,
     term,
+    watch,
 )
-from romledger.context import Context
 from romledger.sources.base import Candidate
-from romledger.web import app as web_app
 
 
 @pytest.fixture(autouse=True)
@@ -808,74 +806,152 @@ def test_platforms_names_every_source_that_carries_a_platform(
     ).endswith("no-intro  -")
 
 
-def test_serve_prints_the_link_and_runs_uvicorn(
+def make_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *roots: str) -> Path:
+    home = tmp_path / "home"
+    for root in roots:
+        (home / ".config" / root).mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(sys, "platform", "linux")
+    return home
+
+
+def test_extension_install_connects_each_browser_it_finds(
+    tmp_path: Path,
+    data_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    home = make_home(tmp_path, monkeypatch, "google-chrome")
+    path = make_config(tmp_path)
+    assert run(path, "extension", "install") == 0
+    manifest = home / ".config/google-chrome/NativeMessagingHosts" / extension.MANIFEST
+    assert capsys.readouterr().out.splitlines() == [
+        f"connected Chrome  {manifest}",
+        "Reload the extension in your browser, then open its options to check the connection.",
+    ]
+    launcher = (data_dir / "native-host").read_text()
+    assert f"ROMLEDGER_CONFIG={path}" in launcher
+    assert f"ROMLEDGER_DATA={data_dir}" in launcher
+
+
+def test_extension_install_without_a_browser_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_home(tmp_path, monkeypatch)
+    assert run(make_config(tmp_path), "extension", "install") == 2
+    assert "no supported browser found" in capsys.readouterr().err
+
+
+def test_extension_install_leaves_the_default_data_directory_implicit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = make_home(tmp_path, monkeypatch, "chromium")
+    monkeypatch.delenv(config.DATA_ENV)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    assert run(make_config(tmp_path), "extension", "install") == 0
+    assert "ROMLEDGER_DATA" not in (tmp_path / "xdg" / "romledger" / "native-host").read_text()
+    assert (home / ".config/chromium/NativeMessagingHosts" / extension.MANIFEST).is_file()
+
+
+def test_extension_uninstall_and_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_home(tmp_path, monkeypatch, "chromium")
+    path = make_config(tmp_path)
+    assert run(path, "extension", "install") == 0
+    capsys.readouterr()
+    monkeypatch.setattr(extension, "ping_host", lambda launcher: None)
+    assert run(path, "extension", "status") == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].split() == ["browser", "state"]
+    assert next(line for line in lines if line.startswith("Chromium")).split() == [
+        "Chromium",
+        "ready",
+    ]
+    assert run(path, "extension", "uninstall") == 0
+    assert capsys.readouterr().out.startswith("removed Chromium  ")
+    assert run(path, "extension", "uninstall") == 0
+    assert capsys.readouterr().out == "nothing to remove\n"
+
+
+def test_extension_status_fails_when_a_host_is_broken(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_home(tmp_path, monkeypatch, "chromium")
+    path = make_config(tmp_path)
+    run(path, "extension", "install")
+    monkeypatch.setattr(extension, "ping_host", lambda launcher: "it crashed")
+    assert run(path, "extension", "status") == 1
+    assert "broken: it crashed" in capsys.readouterr().out
+
+
+def test_import_takes_the_lock_and_says_when_it_waits(
     tmp_path: Path,
     data_dir: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[dict[str, object]] = []
-    opened: list[str] = []
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(webbrowser, "open", opened.append)
-    path = make_config(tmp_path)
-    assert run(path, "serve") == 0
-    token = (data_dir / "serve.token").read_text().strip()
-    assert capsys.readouterr().out == f"romledger dashboard: http://127.0.0.1:8730/?token={token}\n"
-    assert calls == [{"host": "127.0.0.1", "port": 8730, "access_log": False}]
-    assert opened == []
-    assert run(path, "serve", "--host", "192.0.2.10", "--port", "9000", "--open") == 0
-    assert opened == [f"http://192.0.2.10:9000/?token={token}"]
-    assert calls[1]["host"] == "192.0.2.10"
-    assert calls[1]["port"] == 9000
+    waited: list[Path] = []
+
+    def locked(
+        cfg: config.Config, data: Path, on_wait: Callable[[], None]
+    ) -> importer.ImportResult:
+        waited.append(data / "import.lock")
+        on_wait()
+        return importer.ImportResult({}, [], [], [], [])
+
+    monkeypatch.setattr(importer, "import_locked", locked)
+    assert run(make_config(tmp_path), "import") == 0
+    captured = capsys.readouterr()
+    assert waited == [data_dir / "import.lock"]
+    assert captured.err == "waiting for another import to finish ...\n"
 
 
-def test_serve_imports_automatically_unless_told_not_to(
-    tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+def test_import_watch_runs_until_interrupted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    flags: list[bool] = []
-    create = web_app.create_app
+    built: list[watch.Watcher] = []
 
-    def record(factory: Callable[[], Context], token: str, *, auto_import: bool) -> FastAPI:
-        flags.append(auto_import)
-        return create(factory, token, auto_import=auto_import)
+    class Interrupted(watch.Watcher):
+        def run(self) -> None:
+            built.append(self)
+            raise KeyboardInterrupt
 
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: None)
-    monkeypatch.setattr("romledger.cli.create_app", record)
-    path = make_config(tmp_path)
-    assert run(path, "serve") == 0
-    assert run(path, "serve", "--no-auto-import") == 0
-    assert flags == [True, False]
+    monkeypatch.setattr(watch, "Watcher", Interrupted)
+    assert run(make_config(tmp_path), "import", "--watch") == 0
+    assert capsys.readouterr().err == f"watching {tmp_path / 'inbox'} (Ctrl-C to stop)\n\n"
+    assert len(built) == 1
 
 
-@pytest.mark.parametrize("host", cli.WILDCARD_HOSTS)
-def test_serve_links_localhost_for_a_wildcard_bind(
-    tmp_path: Path,
-    data_dir: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    host: str,
+def test_import_watch_imports_and_warns_through_the_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[dict[str, object]] = []
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
-    assert run(make_config(tmp_path), "serve", "--host", host) == 0
-    token = (data_dir / "serve.token").read_text().strip()
-    assert capsys.readouterr().out == f"romledger dashboard: http://localhost:8730/?token={token}\n"
-    assert calls[0]["host"] == host
+    imported: list[bool] = []
+
+    def locked(
+        cfg: config.Config, data: Path, on_wait: Callable[[], None]
+    ) -> importer.ImportResult:
+        imported.append(True)
+        return importer.ImportResult({}, [], [], [], [])
+
+    monkeypatch.setattr(importer, "import_locked", locked)
+
+    class Once(watch.Watcher):
+        def run(self) -> None:
+            self._run_import(self._load())
+            self._warn("roms: not a directory")
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(watch, "Watcher", Once)
+    assert run(make_config(tmp_path), "import", "--watch") == 0
+    captured = capsys.readouterr()
+    assert imported == [True]
+    assert captured.out == "inbox is empty\n"
+    assert "romledger: warning: roms: not a directory" in captured.err
 
 
-def test_serve_reports_an_unmounted_library(
+def test_import_watch_cannot_be_a_dry_run(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(make_config(tmp_path, mkdirs=False), "serve") == 2
-    assert "drive or share mounted" in capsys.readouterr().err
-
-
-@pytest.mark.parametrize("port", ["0", "70000", "abc", "-1"])
-def test_serve_rejects_bad_ports(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], port: str
-) -> None:
-    with pytest.raises(SystemExit) as exit_info:
-        run(make_config(tmp_path), "serve", "--port", port)
-    assert exit_info.value.code == 2
-    assert "not a port between 1 and 65535" in capsys.readouterr().err
+    assert run(make_config(tmp_path), "import", "--watch", "--dry-run") == 2
+    assert "--watch and --dry-run cannot be combined" in capsys.readouterr().err

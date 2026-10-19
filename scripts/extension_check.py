@@ -1,7 +1,8 @@
 """Load the unpacked extension in Chromium and check it against a fictional library.
 
-Run through scripts/extension-check.sh, which supplies Playwright and romledger. With an output
-directory argument it also writes the popup screenshots used by docs/extension.md.
+Run through scripts/extension-check.sh, which supplies Playwright and romledger. The browser starts
+the real native host (romledger.native) through its native messaging. With an output directory
+argument it also writes the popup screenshots used by docs/extension.md.
 """
 
 import base64
@@ -16,8 +17,9 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Literal
 
-from demo_library import SCHEMES, TOKEN, serve, write_library
+from demo_library import write_library
 from playwright.sync_api import (
     BrowserContext,
     Error,
@@ -28,10 +30,11 @@ from playwright.sync_api import (
     sync_playwright,
 )
 
-from romledger import datindex, dats, state
+from romledger import datindex, dats, extension, state
 from romledger.context import load_context
 
 EXTENSION = Path(__file__).resolve().parent.parent / "extension"
+SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 SHA1 = {"Alpha Quest (USA)": "a" * 40, "Beta Quest (USA)": "b" * 40, "Gamma Quest (USA)": "c" * 40}
 GENESIS = {"Delta Run (USA)": "d" * 40, "Echo Run (USA)": "e" * 40}
 QUEUED = {"Foxtrot Run (USA)": "1" * 40, "Golf Run (USA)": "2" * 40}
@@ -123,11 +126,24 @@ def serve_fixture(route: Route) -> None:
     route.fulfill(status=200, content_type="text/html", body=f"<!doctype html><body>{body}</body>")
 
 
-def patched_copy(directory: Path, base: str) -> Path:
+def install_host(directory: Path, profile: Path) -> Path:
+    launcher = directory / "native-host"
+    library = directory / "library"
+    launcher.write_text(
+        extension.launcher_text(sys.executable, library / "config.toml", library / "data")
+    )
+    launcher.chmod(0o755)
+    browser = extension.Browser("Chromium", "chromium", profile, profile / extension.HOSTS_DIR)
+    manifest = profile / extension.HOSTS_DIR / extension.MANIFEST
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps(extension.manifest_for(browser, launcher)))
+    return launcher
+
+
+def patched_copy(directory: Path) -> Path:
     target = directory / "extension"
     shutil.copytree(EXTENSION, target)
     manifest = json.loads((target / "manifest.json").read_text())
-    manifest["host_permissions"] = [f"{base}/*"]
     manifest["permissions"] = [*manifest["permissions"], "downloads"]
     (target / "manifest.json").write_text(json.dumps(manifest))
     script = target / "content" / "vimm.js"
@@ -343,6 +359,18 @@ DOWNLOAD_SCRIPT = """async (url) => {
 }"""
 
 
+LAST_IMPORT_SCRIPT = """async () => {
+  for (let tries = 0; tries < 100; tries += 1) {
+    const { lastImport } = await chrome.storage.local.get("lastImport");
+    if (lastImport) {
+      return lastImport.error || lastImport.lines.join("; ");
+    }
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  return "timeout";
+}"""
+
+
 def is_romledger(worker: Worker) -> bool:
     try:
         return worker.evaluate("chrome.runtime.getManifest().name") == "romledger"
@@ -355,6 +383,7 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
     saved_to = directory / "downloads"
     preferences = directory / "download-profile" / "Default" / "Preferences"
     preferences.parent.mkdir(parents=True)
+    install_host(directory, directory / "download-profile")
     preferences.write_text(
         json.dumps({"download": {"default_directory": str(saved_to), "prompt_for_download": False}})
     )
@@ -403,16 +432,17 @@ def check_vimm_download(playwright: Playwright, directory: Path, extension: Path
             return ["vimm download: the extension did not load"]
         worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
         saved = worker.evaluate(DOWNLOAD_SCRIPT, f"http://dl3.vimm.net:{port}/?mediaId=9&token=t")
+        imported = worker.evaluate(LAST_IMPORT_SCRIPT)
         connected.close()
     finally:
         browser.terminate()
         browser.wait()
         server.shutdown()
-    return (
-        []
-        if saved == str(saved_to / "romledger" / "Game (USA).zip")
-        else [f"vimm download: {saved}"]
-    )
+    if saved != str(saved_to / "romledger" / "Game (USA).zip"):
+        return [f"vimm download: {saved}"]
+    if "is not an inbox" not in str(imported):
+        return [f"vimm download import: the host did not answer the import request: {imported}"]
+    return []
 
 
 def check_popup(context: BrowserContext, extension_id: str, output: Path | None) -> list[str]:
@@ -431,22 +461,14 @@ def check_popup(context: BrowserContext, extension_id: str, output: Path | None)
     return problems
 
 
-def check_unreachable(context: BrowserContext, extension_id: str, worker: object) -> list[str]:
-    worker.evaluate("chrome.storage.local.set({ token: 'wrong' })")  # type: ignore[attr-defined]
-    page = context.new_page()
-    page.goto("https://vimm.net/vault/?p=list&system=GB&q=")
-    found = badges(page, 1)
-    page.close()
-    return [] if "romledger unavailable" in found[0] else [f"rejected token: {found}"]
-
-
-def run(base: str, directory: Path, output: Path | None) -> list[str]:
-    extension = patched_copy(directory, base)
+def run(directory: Path, output: Path | None) -> list[str]:
+    unpacked = patched_copy(directory)
+    install_host(directory, directory / "profile")
     with sync_playwright() as playwright:
         context = playwright.chromium.launch_persistent_context(
             str(directory / "profile"),
             channel="chromium",
-            args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}"],
+            args=[f"--disable-extensions-except={unpacked}", f"--load-extension={unpacked}"],
         )
         worker = (
             context.service_workers[0]
@@ -454,7 +476,6 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
             else context.wait_for_event("serviceworker")
         )
         extension_id = worker.url.split("/")[2]
-        worker.evaluate(f"chrome.storage.local.set({{ url: '{base}', token: '{TOKEN}' }})")
         context.route(
             re.compile(r"https://vimm\.net/.*"),
             serve_fixture,
@@ -465,8 +486,7 @@ def run(base: str, directory: Path, output: Path | None) -> list[str]:
             + check_popup(context, extension_id, output)
             + check_vimm_queue(context, worker)
             + check_vimm_queue_stops(context, worker)
-            + check_unreachable(context, extension_id, worker)
-            + check_vimm_download(playwright, directory, extension)
+            + check_vimm_download(playwright, directory, unpacked)
         )
         context.close()
     return problems
@@ -478,9 +498,7 @@ def main() -> int:
         root = Path(directory)
         write_library(root / "library")
         seed(root / "library")
-        server, base = serve()
-        problems = run(base, root, output)
-        server.should_exit = True
+        problems = run(root, output)
     for problem in problems:
         print(problem)
     print("extension checks: " + ("FAILED" if problems else "ok"))

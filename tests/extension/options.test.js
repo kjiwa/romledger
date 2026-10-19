@@ -8,7 +8,7 @@ const { test } = require("node:test");
 
 const SOURCE = fs.readFileSync(path.join(__dirname, "../../extension/options.js"), "utf8");
 
-function load({ stored = {}, grant = true, revoke = true, failSet = false }) {
+function load({ stored = {}, grant = true, revoke = true, failSet = false, reply } = {}) {
   const elements = {};
   const element = (id) => {
     elements[id] ??= { id, listeners: {}, value: "", checked: false, hidden: true, dataset: {} };
@@ -17,9 +17,6 @@ function load({ stored = {}, grant = true, revoke = true, failSet = false }) {
     };
     return elements[id];
   };
-  const form = element("form");
-  form.url = { value: "" };
-  form.token = { value: "" };
   const local = { ...stored };
   const chrome = {
     storage: {
@@ -38,16 +35,20 @@ function load({ stored = {}, grant = true, revoke = true, failSet = false }) {
       remove: async () => revoke,
       contains: async () => true,
     },
-    runtime: {},
+    runtime: { sendMessage: async () => reply ?? { ok: true, data: [] } },
   };
   const document = { getElementById: element };
   vm.runInNewContext(SOURCE, { chrome, document, URL });
   return { elements, local };
 }
 
+async function settle() {
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
 async function toggle(options, checked) {
   const state = load(options);
-  await new Promise((resolve) => setImmediate(resolve));
+  await settle();
   state.elements.route.checked = checked;
   await state.elements.route.listeners.change();
   return state;
@@ -88,4 +89,27 @@ test("a failed save keeps the checkbox at what was saved and reports an error", 
   assert.equal(elements.route.checked, true);
   assert.equal(elements["route-result"].dataset.kind, "error");
   assert.match(elements["route-result"].textContent, /quota/);
+});
+
+test("opening the page checks the connection and counts platforms with games", async () => {
+  const reply = { ok: true, data: [{ tracked: true }, { tracked: false }, { tracked: true }] };
+  const { elements } = load({ reply });
+  await settle();
+  assert.equal(elements.result.textContent, "Connected. 2 platform(s) with games.");
+  assert.equal(elements.result.dataset.kind, "ok");
+});
+
+test("a host that cannot be reached is shown as an error", async () => {
+  const { elements } = load({ reply: { ok: false, error: "Run romledger extension install." } });
+  await settle();
+  assert.equal(elements.result.textContent, "Run romledger extension install.");
+  assert.equal(elements.result.dataset.kind, "error");
+});
+
+test("the button checks again", async () => {
+  const state = load({ reply: { ok: false, error: "down" } });
+  await settle();
+  assert.equal(state.elements.result.dataset.kind, "error");
+  await state.elements.check.listeners.click();
+  assert.equal(state.elements.result.textContent, "down");
 });

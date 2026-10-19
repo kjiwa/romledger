@@ -1,29 +1,16 @@
-"""Build a fictional library and render the dashboard to PNG files.
+"""Write a fictional library, its config.toml and scan results into an empty directory.
 
-Run through scripts/screenshots.sh, which supplies Playwright and romledger. With
-`--library DIR` it only writes the library, config.toml and scan results into the empty DIR, for
-scripts/demo.sh.
+Used by scripts/demo.sh and scripts/extension_check.py.
 """
 
 import os
 import random
-import socket
 import sys
-import tempfile
-import threading
-import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
-
-import uvicorn
-from playwright.sync_api import Browser, sync_playwright
 
 from romledger import config, state
-from romledger.context import load_context
-from romledger.web.app import create_app
 
-TOKEN = "demo-token-for-screenshots"
 ADJECTIVES = [
     "Atomic",
     "Brave",
@@ -71,14 +58,6 @@ NOUNS = [
 REGIONS = ("(USA)", "(USA)", "(USA)", "(Europe)", "(World)")
 PLATFORMS = {"nes": 260, "snes": 180, "genesis": 120, "gb": 90}
 HAVE_SHARE = {"nes": 0.74, "snes": 0.52, "genesis": 0.31, "gb": 0.9}
-VIEWPORTS = {"mobile": (393, 852), "desktop": (1440, 900)}
-SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
-PAGES = {
-    "overview": "/",
-    "platform": "/platforms/snes",
-    "inbox": "/inbox",
-    "activity": "/activity",
-}
 INBOX_FILES = {
     "Atomic Arena (USA).sfc": 1_048_576,
     "Brave Quest (Europe).sfc": 2_097_152,
@@ -86,9 +65,6 @@ INBOX_FILES = {
     "scan-notes.txt": 812,
     "Wild Harbor (USA).nes.part": 524_288,
 }
-SHOW_DEMO_PATH = """() => document.querySelectorAll("p.path").forEach(
-    (element) => { element.textContent = "~/roms/inbox"; })"""
-SCAN_LOG = "".join(f"scanning {slug} ...\n" for slug in PLATFORMS) + "scanned 4 platform(s)\n"
 
 
 def titles(slug: str, count: int) -> list[str]:
@@ -121,9 +97,8 @@ def build(root: Path) -> None:
         (root / "inbox" / name).mkdir()
     (root / "inbox" / "unmatched" / "mystery.bin").write_bytes(b"\0")
     (root / "inbox" / "unwanted" / "Neon Raiders (Japan).sfc").write_bytes(b"\0")
-    tables = "".join(f"[platforms.{slug}]\n" for slug in PLATFORMS)
     (root / "config.toml").write_text(
-        f'[library]\nroms = "{root / "roms"}"\ninboxes = ["{root / "inbox"}"]\n{tables}'
+        f'[library]\nroms = "{root / "roms"}"\ninboxes = ["{root / "inbox"}"]\n'
     )
     os.environ[config.CONFIG_ENV] = str(root / "config.toml")
     os.environ[config.DATA_ENV] = str(root / "data")
@@ -133,40 +108,6 @@ def build(root: Path) -> None:
             database.replace_platform(slug, items_for(slug, count), ["/x"] * 3, "demo", stamp)
 
 
-def serve(**tools: Any) -> tuple[uvicorn.Server, str]:
-    app = create_app(lambda: load_context(None), TOKEN, **tools)
-    app.state.services.jobs.start("scan", lambda: print(SCAN_LOG, end="") or True)
-    app.state.services.jobs.wait(5)
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
-    while not server.started:
-        time.sleep(0.05)
-    return server, f"http://127.0.0.1:{port}"
-
-
-def shoot(browser: Browser, base: str, output: Path) -> list[Path]:
-    written = []
-    for scheme in SCHEMES:
-        for device, (width, height) in VIEWPORTS.items():
-            context = browser.new_context(
-                viewport={"width": width, "height": height},
-                color_scheme=scheme,
-            )
-            page = context.new_page()
-            page.goto(f"{base}/?token={TOKEN}")
-            for name, path in PAGES.items():
-                page.goto(base + path)
-                page.evaluate(SHOW_DEMO_PATH)
-                target = output / f"{name}-{device}-{scheme}.png"
-                page.screenshot(path=target, full_page=name != "platform")
-                written.append(target)
-            context.close()
-    return written
-
-
 def write_library(directory: Path) -> int:
     directory.mkdir(parents=True, exist_ok=True)
     build(directory)
@@ -174,21 +115,10 @@ def write_library(directory: Path) -> int:
 
 
 def main() -> int:
-    if sys.argv[1:2] == ["--library"]:
-        return write_library(Path(sys.argv[2]))
-    output = Path(sys.argv[1] if len(sys.argv) > 1 else "docs/images")
-    output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as directory:
-        build(Path(directory))
-        server, base = serve()
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch()
-            written = shoot(browser, base, output)
-            browser.close()
-        server.should_exit = True
-    for path in written:
-        print(path)
-    return 0
+    if sys.argv[1:2] != ["--library"] or len(sys.argv) != 3:
+        print("usage: demo_library.py --library DIR", file=sys.stderr)
+        return 2
+    return write_library(Path(sys.argv[2]))
 
 
 if __name__ == "__main__":
