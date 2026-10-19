@@ -38,6 +38,16 @@ def wanted(
         "Alpha (USA) (Test Program)",
         "Alpha (USA) [b]",
         "Alpha (USA) [b2]",
+        "Alpha (USA) (Possible Proto)",
+        "Alpha (USA) (Auto Demo)",
+        "Alpha (World) (Tech Demo)",
+        "Alpha (Japan) (Jitsuen-you Sample)",
+        "Alpha (USA) (Movie Demo Disc)",
+        "Alpha (USA) (Music Program)",
+        "Alpha (USA) (Ending Credits Program)",
+        "Alpha (USA) (Enhancement Chip)",
+        "Alpha (USA) (Kiosk, GameCube)",
+        "Alpha (USA) (En,Fr) (Possible Proto)",
     ],
 )
 def test_excluded_by_game_name_tag(name: str) -> None:
@@ -48,11 +58,23 @@ def test_excluded_by_rom_name_tag_when_the_game_name_is_clean() -> None:
     assert wanted([game("Alpha (USA)", "Alpha (USA) (Aftermarket) (Unl).nes")]) == []
 
 
-def test_tags_must_match_whole_tags() -> None:
-    assert wanted([game("Alpha (USA) (Unlimited)"), game("Beta (USA) (Betamax)")]) == [
+def test_tags_must_match_whole_words() -> None:
+    games = [game("Alpha (USA) (Unlimited)"), game("Beta (USA) (Betamax)")]
+    games.append(game("Gamma (USA) (Riff Sampler Test)"))
+    assert wanted(games) == [
         ("Alpha (USA) (Unlimited)",),
         ("Beta (USA) (Betamax)",),
+        ("Gamma (USA) (Riff Sampler Test)",),
     ]
+
+
+def test_bad_dump_flag_matches_only_a_leading_b() -> None:
+    assert wanted([game("Alpha (USA) (Fan b)")]) == [("Alpha (USA) (Fan b)",)]
+
+
+def test_official_distribution_tags_are_kept() -> None:
+    names = ["A (USA) (Sega Channel)", "B (USA) (Virtual Console)", "C (USA) (Competition Cart)"]
+    assert len(wanted([game(name) for name in names])) == 3
 
 
 def test_include_keeps_a_category() -> None:
