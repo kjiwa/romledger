@@ -70,6 +70,7 @@ def _import(
         return ImportResult(moved, [], unwanted, unmatched, [])
     library_before = _library_games(config, subsets, cache, igir_report)
     try:
+        # igir has no other platform-folder token; {romm} names them by slug.
         igir_move(subsets, inboxes, f"{config.library.roms}/{{romm}}", cache, excludes)
     finally:
         _restore_inboxes(inboxes)

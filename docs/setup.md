@@ -52,7 +52,7 @@ proxy = "socks5h://proxy.example:1080"
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `library.roms` | yes | Library directory (RomM layout). Games for `<slug>` live in `<roms>/<slug>/`. |
+| `library.roms` | yes | Library directory. Games for `<slug>` live in `<roms>/<slug>/`. |
 | `library.inboxes` | yes | One or more mixed-platform directories where new files arrive. |
 | `platforms.<slug>.dat` | no | DAT name, `<no-intro or redump>/<name>`. Omit it for platforms known to romledger. |
 | `platforms.<slug>.regions` | no | Wanted regions, igir codes, best first. Default `["USA", "WORLD"]`. |
@@ -68,11 +68,6 @@ Codes are upper case.
 - Regions: ARG ASI AUS BEL BRA CAN CHN DAN EUR FRA FYN GER GRE HK HOL ITA JPN KOR MEX NOR
   NZ POR RUS SPA SWE TAI UK UNK USA WORLD
 - Languages: DA DE EL EN ES FI FR IT JA KO NL NO PT RU SV ZH
-
-If you run [RomM](https://docs.romm.app), its filesystem watcher or scheduled rescan
-(`ENABLE_RESCAN_ON_FILESYSTEM_CHANGE`, `ENABLE_SCHEDULED_RESCAN`) normally makes a
-`hooks.after_import` hook unnecessary. Whether inotify events arrive over SMB or NFS is
-unverified, so prefer the scheduled rescan if the library is on a network share.
 
 Proxies may also come from the `HTTPS_PROXY` or `ALL_PROXY` environment variables; `network.proxy`
 wins when both are set. If the proxy URL has a user name but no password, romledger asks for the
