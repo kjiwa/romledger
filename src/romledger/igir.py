@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-IGIR_VERSION = "5.7.2"
+IGIR_VERSION = "5.8.0"
 TAIL_LINES = 20
 REPORT_COLUMNS = {"DAT Name", "Status", "Game Name", "ROM Files"}
 JUNK_EXCLUDES = ("**/._*", "**/.DS_Store", "**/*.part", "**/*.crdownload", "**/*.download")
