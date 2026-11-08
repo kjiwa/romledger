@@ -117,6 +117,13 @@ test("downloadUrl refuses other hosts, missing fields and a missing form", () =>
   assert.equal(vimm.downloadUrl({ querySelector: () => null }, "https://vimm.net/vault/77"), null);
 });
 
+test("downloadForm names the form that downloadUrl reads", () => {
+  const selectors = [];
+  const doc = { querySelector: (selector) => (selectors.push(selector), null) };
+  vimm.downloadUrl(doc, "https://vimm.net/vault/77");
+  assert.deepEqual(selectors, [vimm.downloadForm]);
+});
+
 function page(scripts, links = []) {
   return {
     title: "The Vault: Pokemon X (3DS)",

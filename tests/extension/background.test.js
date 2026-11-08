@@ -57,18 +57,23 @@ function load(stored, downloads = true, extra = {}) {
     permissions: { onAdded: { addListener: (listener) => added.push(listener) } },
   };
   const listeners = [];
+  const timers = [];
   const changed = [];
   if (downloads) {
     chrome.downloads = {
-      onDeterminingFilename: { addListener: (l) => listeners.push(l) },
+      onDeterminingFilename: {
+        addListener: (l) => listeners.push(l),
+        removeListener: (l) => listeners.splice(listeners.indexOf(l), 1),
+      },
       onChanged: { addListener: (l) => changed.push(l) },
       ...extra,
     };
   }
-  vm.runInNewContext(SOURCE, { chrome, romledger, URLSearchParams });
+  const setTimeout = (fn, ms) => timers.push({ fn, ms });
+  vm.runInNewContext(SOURCE, { chrome, romledger, URLSearchParams, setTimeout, clearTimeout: () => {} });
   const ask = (message) =>
     new Promise((resolve) => handlers[0](message, null, (reply) => resolve({ ...reply })));
-  return { listeners, added, changed, local, ports, ask, opened };
+  return { listeners, timers, added, changed, local, ports, ask, opened };
 }
 
 function decide(listener, item) {
@@ -76,33 +81,80 @@ function decide(listener, item) {
   const suggested = new Promise((resolve) => {
     returned = listener(item, (suggestion) => resolve(suggestion));
   });
-  return suggested.then((suggestion) => ({ suggestion, returned }));
+  return suggested
+    .then((suggestion) => new Promise((done) => setImmediate(() => done(suggestion))))
+    .then((suggestion) => ({ suggestion, returned }));
 }
 
-test("a Vimm download is routed once the option is on", async () => {
+test("no filename listener is registered at load", () => {
   const { listeners } = load({ routeDownloads: true });
+  assert.equal(listeners.length, 0);
+});
+
+test("download-expect arms the listener only when routing is on", async () => {
+  const off = load({});
+  assert.deepEqual(await off.ask({ type: "download-expect" }), { ok: true, armed: false });
+  assert.equal(off.listeners.length, 0);
+  const on = load({ routeDownloads: true });
+  assert.deepEqual(await on.ask({ type: "download-expect" }), { ok: true, armed: true });
+  assert.equal(on.listeners.length, 1);
+});
+
+test("download-expect does nothing without the downloads permission", async () => {
+  const { ask } = load({ routeDownloads: true }, false);
+  assert.deepEqual(await ask({ type: "download-expect" }), { ok: true, armed: false });
+});
+
+test("a Vimm download is routed once the option is on, then the listener goes", async () => {
+  const { listeners, ask } = load({ routeDownloads: true });
+  await ask({ type: "download-expect" });
   const { suggestion, returned } = await decide(listeners[0], VIMM);
   assert.deepEqual({ ...suggestion }, {
     filename: "romledger/Game (USA).zip",
     conflictAction: "uniquify",
   });
   assert.equal(returned, true);
+  assert.equal(listeners.length, 0);
 });
 
-test("a Vimm download passes through when the option is off", async () => {
-  const { listeners } = load({});
+test("the listener stays until every expected download is routed", async () => {
+  const { listeners, ask } = load({ routeDownloads: true });
+  await ask({ type: "download-expect" });
+  await ask({ type: "download-expect" });
+  assert.equal(listeners.length, 1);
+  const first = listeners[0];
+  await decide(first, VIMM);
+  assert.equal(listeners.length, 1);
+  await decide(first, VIMM);
+  assert.equal(listeners.length, 0);
+});
+
+test("the backstop timer removes the listener", async () => {
+  const { listeners, timers, ask } = load({ routeDownloads: true });
+  await ask({ type: "download-expect" });
+  assert.equal(timers.at(-1).ms, 60000);
+  timers.at(-1).fn();
+  assert.equal(listeners.length, 0);
+});
+
+test("a Vimm download passes through when the option is turned off after arming", async () => {
+  const { listeners, local, ask } = load({ routeDownloads: true });
+  await ask({ type: "download-expect" });
+  local.routeDownloads = false;
   const { suggestion } = await decide(listeners[0], VIMM);
   assert.equal(suggestion, undefined);
 });
 
-test("other downloads pass through synchronously", async () => {
-  const { listeners } = load({ routeDownloads: true });
+test("foreign downloads get suggest() with no argument and keep the listener armed", async () => {
+  const { listeners, ask } = load({ routeDownloads: true });
+  await ask({ type: "download-expect" });
   const { suggestion, returned } = await decide(listeners[0], {
     url: "https://example.com/a.zip",
     filename: "/x/a.zip",
   });
   assert.equal(suggestion, undefined);
   assert.equal(returned, undefined);
+  assert.equal(listeners.length, 1);
 });
 
 test("the listener attaches when the permission arrives later", () => {

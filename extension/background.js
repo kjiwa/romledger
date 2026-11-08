@@ -10,6 +10,7 @@ const ROUTE_KEY = "routeDownloads";
 const LAST_IMPORT_KEY = "lastImport";
 const NOT_INSTALLED = 'Run "romledger extension install", then reload the extension.';
 const DOWNLOADS_OFF = "Turn on the download option in the romledger options.";
+const EXPECT_MS = 60000;
 const MISSING_HOST = /not found|forbidden|no such native application/i;
 
 let port = null;
@@ -113,6 +114,9 @@ function route(message) {
   if (message.type === "download-state") {
     return downloadState(message.id);
   }
+  if (message.type === "download-expect") {
+    return expectDownload();
+  }
   if (message.type === "open-options") {
     return api.runtime.openOptionsPage().then(
       () => ({ ok: true }),
@@ -146,18 +150,56 @@ async function routeTarget(item) {
   return stored[ROUTE_KEY] === true ? romledger.downloadTarget(item) : null;
 }
 
+let expected = 0;
+let expiry = null;
+
+function disarm() {
+  clearTimeout(expiry);
+  expiry = null;
+  expected = 0;
+  globalThis.chrome?.downloads?.onDeterminingFilename?.removeListener(onDeterminingFilename);
+}
+
+async function expectDownload() {
+  const downloads = globalThis.chrome?.downloads;
+  const stored = await api.storage.local.get(ROUTE_KEY);
+  if (stored[ROUTE_KEY] !== true || !downloads?.onDeterminingFilename) {
+    return { ok: true, armed: false };
+  }
+  if (expected === 0) {
+    downloads.onDeterminingFilename.addListener(onDeterminingFilename);
+  }
+  expected += 1;
+  clearTimeout(expiry);
+  expiry = setTimeout(disarm, EXPECT_MS);
+  return { ok: true, armed: true };
+}
+
+function settleExpected() {
+  expected -= 1;
+  if (expected <= 0) {
+    disarm();
+  }
+}
+
 function onDeterminingFilename(item, suggest) {
   if (!romledger.isSiteDownload(item)) {
     suggest();
     return;
   }
-  routeTarget(item).then((filename) => {
-    if (filename === null) {
-      suggest();
-    } else {
-      suggest({ filename, conflictAction: "uniquify" });
-    }
-  }, () => suggest());
+  routeTarget(item)
+    .then(
+      (filename) => {
+        if (filename === null) {
+          suggest();
+        } else {
+          suggest({ filename, conflictAction: "uniquify" });
+        }
+      },
+      () => suggest(),
+    )
+    .catch(() => {})
+    .then(settleExpected);
   return true;
 }
 
@@ -184,8 +226,7 @@ let listening = false;
 
 function listenForDownloads() {
   const downloads = globalThis.chrome?.downloads;
-  if (!listening && downloads?.onDeterminingFilename) {
-    downloads.onDeterminingFilename.addListener(onDeterminingFilename);
+  if (!listening && downloads?.onChanged) {
     downloads.onChanged.addListener((change) => importFinished(change).catch(() => {}));
     listening = true;
   }

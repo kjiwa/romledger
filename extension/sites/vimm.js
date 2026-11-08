@@ -5,6 +5,7 @@
 //   isDownload   whether a browser download comes from the site
 //   read         the page's kind and games, or null when there is nothing to do on it
 //   downloadUrl  the address a game page offers for its download, or null
+//   downloadForm the selector of the game page's download form
 //   messages     the site's own wording for a slow-down answer and a missing download
 (() => {
   "use strict";
@@ -12,6 +13,7 @@
   const HASH_LENGTH = 40;
   const GAME_PATH = /^\/vault\/\d+\/?$/;
   const SECTION_PATH = /^\/vault\/([^/\d][^/]*)\/(?:[A-Za-z]|number)\/?$/;
+  const DOWNLOAD_FORM = "#dl-form";
   const DOWNLOAD_HOST = /^([a-z0-9-]+\.)+vimm\.net$/;
 
   function decodeBase64(text) {
@@ -95,7 +97,7 @@
   }
 
   function downloadUrl(doc, pageUrl) {
-    const form = doc.querySelector("#dl-form");
+    const form = doc.querySelector(DOWNLOAD_FORM);
     if (!form) {
       return null;
     }
@@ -166,6 +168,7 @@
     isDownload,
     read,
     downloadUrl,
+    downloadForm: DOWNLOAD_FORM,
     messages: {
       slowDown: "Vimm's Lair says to slow down. Try again later.",
       paused:

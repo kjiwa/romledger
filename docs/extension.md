@@ -48,10 +48,14 @@ permission back. Firefox does not offer the event this needs, so the options say
 nothing there. While the option is off, a list page's box says so and has an Open options button
 instead of the download button.
 
-With it on, every download that comes from Vimm's Lair (a `*.vimm.net` host) is saved into
-`Downloads/romledger` under the file name the site gave, and a list page gets a "Download N
-missing" box. The button downloads each game marked Missing, one at a time, in the order of the
-page, and shows the saved path of each. Keep the tab open until it says Finished. Games matched by
+With it on, a download you start with a game page's Download button, or the queue below, from
+Vimm's Lair (a `*.vimm.net` host) is saved into `Downloads/romledger` under the file name the site
+gave, and a list page gets a "Download N missing" box. Other extensions' downloads are left alone:
+Chrome ignores the folder an extension asks for while any extension watches file names, so
+romledger watches only for a minute around each of its own downloads.
+
+The button downloads each game marked Missing, one at a time, in the order of the page, and shows
+the saved path of each. Keep the tab open until it says Finished. Games matched by
 title (approximate) are included, so check their region and version first.
 
 Each download starts from the Vimm's Lair page the way a click on its Download button does. Games
