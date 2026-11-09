@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+- Extension: downloads that other extensions start keep the folder and file name they ask for.
+  romledger watches file names only for a minute around each of its own Vimm's Lair downloads.
+- igir 5.8.0.
+
 ## 0.7.0
 
 - `Enhancement Chip` dumps (the SNES DSP, CX4, ST and Super Game Boy firmware that accurate
