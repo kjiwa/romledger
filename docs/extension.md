@@ -55,14 +55,15 @@ Chrome ignores the folder an extension asks for while any extension watches file
 romledger watches only for a minute around each of its own downloads.
 
 The button downloads each game marked Missing, one at a time, in the order of the page, and shows
-the saved path of each. Keep the tab open until it says Finished. Games matched by
-title (approximate) are included, so check their region and version first.
+the saved path of each. Keep the tab open until it says Finished. Games matched by title
+(approximate) are included, so check their region and version first.
 
 Each download starts from the Vimm's Lair page the way a click on its Download button does. Games
 start at least the "Wait between downloads" set in the options apart: 15 seconds by default, and
 from 15 to 600. A longer wait is gentler on the site. The queue stops at the first failed
-download, and says why beside the game, or when Vimm's Lair answers that you are going too fast; wait a while before starting it again. Chrome may ask once to
-allow Vimm's Lair to download multiple files.
+download, and says why beside the game, or when Vimm's Lair answers that you are going too fast;
+wait a while before starting it again. Chrome may ask once to allow Vimm's Lair to download
+multiple files.
 
 Vimm's Lair asks for a Turnstile check before it offers a download. The extension never solves it.
 When a game page comes back without a download form, the queue pauses; open any game page, pass
