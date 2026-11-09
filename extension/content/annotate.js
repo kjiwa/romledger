@@ -1,6 +1,8 @@
 page.run(async () => {
   "use strict";
 
+  const ARM_DEBOUNCE_MS = 2000;
+
   async function lookupDisc(disc, slug) {
     const byHash = await page.ask({ type: "lookup-sha1", sha1: disc.sha1 });
     if (!byHash.ok) {
@@ -54,6 +56,22 @@ page.run(async () => {
     );
   }
 
+  function expectFormDownload(site) {
+    const form = document.querySelector(site.downloadForm);
+    if (!form) {
+      return;
+    }
+    let armedAt = 0;
+    const arm = () => {
+      if (Date.now() - armedAt > ARM_DEBOUNCE_MS) {
+        armedAt = Date.now();
+        page.ask({ type: "download-expect" }).catch(() => {});
+      }
+    };
+    form.addEventListener("click", arm, true);
+    form.addEventListener("submit", arm, true);
+  }
+
   const site = romledger.siteFor(location.hostname);
   const view = site ? site.read(location, document) : null;
   if (!view) {
@@ -70,6 +88,7 @@ page.run(async () => {
   }
   const slug = romledger.slugFor(platforms.data, site.id, view.system);
   if (view.kind === "game") {
+    expectFormDownload(site);
     await annotateGame(view, slug);
   } else {
     await annotateList(site, view, slug);

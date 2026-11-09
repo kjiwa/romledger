@@ -367,8 +367,8 @@ class ZipHandler(BaseHTTPRequestHandler):
         pass
 
 
-DOWNLOAD_SCRIPT = """async (url) => {
-  const id = await chrome.downloads.download({ url });
+DOWNLOAD_SCRIPT = """async ({ url, filename }) => {
+  const id = await chrome.downloads.download(filename ? { url, filename } : { url });
   for (let tries = 0; tries < 100; tries += 1) {
     const [item] = await chrome.downloads.search({ id });
     if (item.state !== "in_progress") {
@@ -455,13 +455,21 @@ def check_vimm_download(playwright: Playwright, directory: Path, unpacked: Path)
         if worker is None:
             return ["vimm download: the extension did not load"]
         worker.evaluate("chrome.storage.local.set({ routeDownloads: true })")
-        saved = worker.evaluate(DOWNLOAD_SCRIPT, f"http://dl3.vimm.net:{port}/?mediaId=9&token=t")
+        probed = worker.evaluate(
+            DOWNLOAD_SCRIPT, {"url": f"http://127.0.0.1:{port}/page", "filename": "probe/page.zip"}
+        )
+        worker.evaluate("expectDownload()")
+        saved = worker.evaluate(
+            DOWNLOAD_SCRIPT, {"url": f"http://dl3.vimm.net:{port}/?mediaId=9&token=t"}
+        )
         imported = worker.evaluate(LAST_IMPORT_SCRIPT)
         connected.close()
     finally:
         browser.terminate()
         browser.wait()
         server.shutdown()
+    if probed != str(saved_to / "probe" / "page.zip"):
+        return [f"non-vimm download lost its requested filename: {probed}"]
     if saved != str(saved_to / "romledger" / "Game (USA).zip"):
         return [f"vimm download: {saved}"]
     if "is not an inbox" not in str(imported):

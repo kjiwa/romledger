@@ -56,6 +56,7 @@ const missingQueue = (() => {
   }
 
   async function startFrom(site, url, queue) {
+    await page.ask({ type: "download-expect" });
     const frame = document.createElement("iframe");
     frame.hidden = true;
     frame.src = url;
